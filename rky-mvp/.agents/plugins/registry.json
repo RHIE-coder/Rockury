@@ -1,0 +1,29 @@
+{
+  "version": "1.0",
+  "plugins": [
+    {
+      "name": "jest",
+      "path": ".agents/plugins/jest",
+      "stages": ["unit", "coverage"],
+      "description": "Jest test runner with coverage support"
+    },
+    {
+      "name": "junit",
+      "path": ".agents/plugins/junit",
+      "stages": ["unit"],
+      "description": "JUnit 5 test runner"
+    },
+    {
+      "name": "jacoco",
+      "path": ".agents/plugins/jacoco",
+      "stages": ["coverage"],
+      "description": "JaCoCo coverage reports and thresholds"
+    },
+    {
+      "name": "checkstyle",
+      "path": ".agents/plugins/checkstyle",
+      "stages": ["lint"],
+      "description": "Checkstyle static analysis"
+    }
+  ]
+}
