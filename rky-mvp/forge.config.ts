@@ -7,6 +7,11 @@ import { VitePlugin } from '@electron-forge/plugin-vite';
 import { FusesPlugin } from '@electron-forge/plugin-fuses';
 import { FuseV1Options, FuseVersion } from '@electron/fuses';
 
+import { resolve } from 'path';
+
+export const mainEntry = resolve(__dirname, 'src/app', 'main.ts');
+export const preloadEntry = resolve(__dirname, 'src/app', 'preload.ts');
+
 const config: ForgeConfig = {
   packagerConfig: {
     asar: true,
@@ -20,30 +25,25 @@ const config: ForgeConfig = {
   ],
   plugins: [
     new VitePlugin({
-      // `build` can specify multiple entry builds, which can be Main process, Preload scripts, Worker process, etc.
-      // If you are familiar with Vite configuration, it will look really familiar.
       build: [
         {
-          // `entry` is just an alias for `build.lib.entry` in the corresponding file of `config`.
-          entry: 'src/main.ts',
+          entry: mainEntry,
           config: 'vite.main.config.ts',
           target: 'main',
         },
         {
-          entry: 'src/preload.ts',
+          entry: preloadEntry,
           config: 'vite.preload.config.ts',
           target: 'preload',
         },
       ],
       renderer: [
         {
-          name: 'main_window',
-          config: 'vite.renderer.config.ts',
+          name: 'main-window',
+          config: 'vite.renderer.main.config.ts',
         },
       ],
     }),
-    // Fuses are used to enable/disable various Electron functionality
-    // at package time, before code signing the application
     new FusesPlugin({
       version: FuseVersion.V1,
       [FuseV1Options.RunAsNode]: false,

@@ -1,4 +1,19 @@
 import { defineConfig } from 'vite';
+import { alias, buildOutputPath } from './vite.common.config';
 
-// https://vitejs.dev/config
-export default defineConfig({});
+
+export default defineConfig({
+  resolve: {
+    alias,
+  },
+  build: {
+    outDir: buildOutputPath,
+    rollupOptions: {
+      external: ["better-sqlite3", "playwright", "appium-ios-device"],
+    },
+
+  },
+  define: {
+    // MAIN_WINDOW_VITE_NAME: '"aaaa"', //ReferenceError: ... is not defined 조심
+  },
+})
