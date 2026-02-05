@@ -61,11 +61,46 @@
 
 ---
 
-## 7. Documentation
-### @planner / @qa
-- 구조/학습자료/현황 문서 업데이트
+## 7. Documentation & Learning
+### @documentor
+- 코드 변경 분석 및 문서 자동 갱신
+- 아키텍처 문서 생성/업데이트
+- API 문서 생성
+- CHANGELOG 갱신
+
+**Prompts**
+- `prompts/auto-document.md`
 
 **Outputs**
-- `templates/docs/architecture.md`
-- `templates/docs/learning-pack.md`
-- `templates/docs/status-report.md`
+- `docs/architecture.md`
+- `docs/api.md`
+- `CHANGELOG.md`
+
+---
+
+## 8. Learning Materials
+### @educator
+- 기술 스택 분석 및 학습 우선순위 결정
+- 핵심 기술별 학습 가이드 생성
+- 온보딩 문서 생성
+- 개념 설명 및 패턴 문서화
+
+**Prompts**
+- `prompts/generate-learning.md`
+
+**Outputs**
+- `docs/learning/tech-guides/` (기술별 학습 가이드)
+- `docs/learning/onboarding.md` (온보딩 가이드)
+- `docs/learning/patterns.md` (패턴 설명)
+- `docs/learning/faq.md` (FAQ)
+
+---
+
+## 9. Status Report
+### @planner / @qa
+- 개발 현황 및 체크리스트 업데이트
+- 완료된 작업 정리
+- 다음 단계 계획
+
+**Outputs**
+- `docs/status-report.md`
