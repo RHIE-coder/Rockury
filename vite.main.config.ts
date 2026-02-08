@@ -9,7 +9,7 @@ export default defineConfig({
   build: {
     outDir: buildOutputPath,
     rollupOptions: {
-      external: ["better-sqlite3", "playwright", "appium-ios-device"],
+      external: ["better-sqlite3", "mysql2", "pg", "playwright", "appium-ios-device"],
     },
 
   },

@@ -3,6 +3,7 @@ import started from 'electron-squirrel-startup';
 import { BROWSER_WINDOWS } from './windows-config';
 import { createWindow } from './windows';
 import { registerAllHandlers } from '#/ipc';
+import { initLocalDb, closeLocalDb } from '#/infrastructure';
 
 // Handle creating/removing shortcuts on Windows when installing/uninstalling.
 if (started) {
@@ -12,6 +13,9 @@ if (started) {
 // This method will be called when Electron has finished
 // initialization and is ready to create browser windows.
 app.whenReady().then(() => {
+  // Initialize local SQLite database
+  initLocalDb();
+
   // Register all IPC handlers
   registerAllHandlers();
 
@@ -30,4 +34,8 @@ app.on('activate', () => {
   if (BrowserWindow.getAllWindows().length === 0) {
     createWindow(BROWSER_WINDOWS.MAIN);
   }
+});
+
+app.on('before-quit', () => {
+  closeLocalDb();
 });

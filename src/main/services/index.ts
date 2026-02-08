@@ -1,1 +1,10 @@
 export { systemInfoService } from './systemInfoService';
+export { packageService } from './packageService';
+export { connectionService } from './connectionService';
+export { schemaService } from './schemaService';
+export { virtualDiagramService } from './virtualDiagramService';
+export { diffService } from './diffService';
+export { queryService } from './queryService';
+export { documentService } from './documentService';
+export { validationService } from './validationService';
+export { mockingService } from './mockingService';
