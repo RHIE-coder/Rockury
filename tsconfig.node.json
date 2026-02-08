@@ -1,0 +1,29 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "target": "ESNext",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "strict": true,
+    "noEmit": true,
+    "skipLibCheck": true,
+    "esModuleInterop": true,
+    "allowSyntheticDefaultImports": true,
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "baseUrl": ".",
+    "paths": {
+      "~/*": ["src/*"],
+      "@/*": ["src/renderer/*"],
+      "#/*": ["src/main/*"]
+    }
+  },
+  "include": [
+    "src/app/**/*",
+    "src/main/**/*",
+    "src/shared/**/*",
+    "vite.*.ts",
+    "forge.config.ts",
+    "forge.env.d.ts"
+  ]
+}
