@@ -1,8 +1,7 @@
 import { useState } from 'react';
-import { Plus, Code, PanelLeft, PanelRight, Search, SlidersHorizontal, Camera } from 'lucide-react';
+import { Plus, Code, PanelLeft, PanelRight, Search, SlidersHorizontal, Camera, GitCompareArrows, FolderOpen, ArrowUpFromLine } from 'lucide-react';
 import { Button } from '@/shared/components/ui/button';
 import { Input } from '@/shared/components/ui/input';
-import { Select } from '@/shared/components/ui/select';
 import type { IDiagram } from '~/shared/types/db';
 import { useDiagramStore } from '../model/diagramStore';
 import type { TDiagramTab } from '../model/diagramStore';
@@ -21,6 +20,13 @@ interface DiagramToolbarProps {
   onDiagramNameChange?: (name: string) => void;
   onDiagramVersionChange?: (version: string) => void;
   onAddTable?: () => void;
+  isFilterPanelOpen?: boolean;
+  onToggleFilterPanel?: () => void;
+  isSnapshotPanelOpen?: boolean;
+  onToggleSnapshotPanel?: () => void;
+  onToggleDiagramList?: () => void;
+  isForwardEngineerOpen?: boolean;
+  onToggleForwardEngineer?: () => void;
 }
 
 export function DiagramToolbar({
@@ -31,6 +37,13 @@ export function DiagramToolbar({
   onDiagramNameChange,
   onDiagramVersionChange,
   onAddTable,
+  isFilterPanelOpen = false,
+  onToggleFilterPanel,
+  isSnapshotPanelOpen = false,
+  onToggleSnapshotPanel,
+  onToggleDiagramList,
+  isForwardEngineerOpen = false,
+  onToggleForwardEngineer,
 }: DiagramToolbarProps) {
   const {
     selectedDiagramId,
@@ -44,11 +57,7 @@ export function DiagramToolbar({
     toggleRightPanel,
     isSearchOpen,
     setSearchOpen,
-    filter,
-    setFilterPreset,
   } = useDiagramStore();
-
-  const [isFilterOpen, setIsFilterOpen] = useState(false);
 
   const [isEditingName, setIsEditingName] = useState(false);
   const [editName, setEditName] = useState('');
@@ -95,16 +104,9 @@ export function DiagramToolbar({
     <div className="flex items-center gap-2 border-b border-border px-3 py-1.5">
       {/* Left section: Diagram selector + name + version */}
       <div className="flex items-center gap-2">
-        <Select
-          className="h-7 w-40 text-xs"
-          value={selectedDiagramId ?? ''}
-          onChange={(e) => onDiagramSelect(e.target.value)}
-        >
-          <option value="">Select diagram...</option>
-          {diagrams?.map((d) => (
-            <option key={d.id} value={d.id}>{d.name}</option>
-          ))}
-        </Select>
+        <Button variant="ghost" size="xs" onClick={onToggleDiagramList} title="Diagram list">
+          <FolderOpen className="size-3.5" />
+        </Button>
 
         <Button variant="ghost" size="xs" onClick={onDiagramCreate} title="New diagram">
           <Plus className="size-3.5" />
@@ -198,40 +200,44 @@ export function DiagramToolbar({
           <Search className="size-3.5" />
         </Button>
 
-        {/* Filter preset selector */}
-        <div className="relative">
-          <Button
-            variant={isFilterOpen ? 'secondary' : 'ghost'}
-            size="xs"
-            onClick={() => setIsFilterOpen(!isFilterOpen)}
-            title="Filter preset"
-          >
-            <SlidersHorizontal className="size-3.5" />
-          </Button>
-          {isFilterOpen && (
-            <div className="absolute right-0 top-full z-50 mt-1 w-32 rounded-md border border-border bg-popover p-1 shadow-md">
-              {(['compact', 'full', 'custom'] as const).map((preset) => (
-                <button
-                  key={preset}
-                  type="button"
-                  onClick={() => {
-                    setFilterPreset(preset);
-                    setIsFilterOpen(false);
-                  }}
-                  className={`w-full rounded-sm px-2 py-1 text-left text-xs hover:bg-accent ${
-                    filter.preset === preset ? 'bg-accent font-medium' : ''
-                  }`}
-                >
-                  {preset.charAt(0).toUpperCase() + preset.slice(1)}
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
+        <Button
+          variant={isFilterPanelOpen ? 'secondary' : 'ghost'}
+          size="xs"
+          onClick={onToggleFilterPanel}
+          title="Filter"
+        >
+          <SlidersHorizontal className="size-3.5" />
+        </Button>
 
-        <Button variant="ghost" size="xs" title="Snapshot (coming soon)" disabled>
+        <Button
+          variant={isSnapshotPanelOpen ? 'secondary' : 'ghost'}
+          size="xs"
+          onClick={onToggleSnapshotPanel}
+          title="View Snapshots"
+        >
           <Camera className="size-3.5" />
         </Button>
+
+        {currentDiagram && (
+          <>
+            <Button
+              variant={isForwardEngineerOpen ? 'secondary' : 'ghost'}
+              size="xs"
+              onClick={onToggleForwardEngineer}
+              title="Forward Engineering"
+            >
+              <ArrowUpFromLine className="size-3.5" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="xs"
+              onClick={() => setActiveTab('diff')}
+              title="Migration / Diff"
+            >
+              <GitCompareArrows className="size-3.5" />
+            </Button>
+          </>
+        )}
 
         <Button
           variant={isLeftPanelOpen ? 'secondary' : 'ghost'}

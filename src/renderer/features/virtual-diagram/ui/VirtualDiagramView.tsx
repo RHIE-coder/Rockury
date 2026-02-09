@@ -1,12 +1,16 @@
-import { useCallback } from 'react';
-import type { ITable, IDiagramLayout, ISearchResult } from '~/shared/types/db';
-import { useDiagrams, useDiagram, useUpdateDiagram, useCreateDiagram, useDiagramLayout, useSaveDiagramLayout } from '../model/useDiagrams';
+import { useCallback, useEffect, useState } from 'react';
+import type { ITable, IDiagramLayout, ISearchResult, IViewSnapshot } from '~/shared/types/db';
+import { useDiagrams, useDiagram, useUpdateDiagram, useCreateDiagram, useDeleteDiagram, useDiagramLayout, useSaveDiagramLayout } from '../model/useDiagrams';
 import { useDiagramStore } from '../model/diagramStore';
 import { DiagramCanvas } from './DiagramCanvas';
 import { DiagramToolbar } from './DiagramToolbar';
 import { TableListPanel } from './TableListPanel';
 import { TableDetailPanel } from './TableDetailPanel';
 import { SearchOverlay } from './SearchOverlay';
+import { FilterPanel } from './FilterPanel';
+import { ViewSnapshotManager } from './ViewSnapshotManager';
+import { DiagramListPanel } from './DiagramListPanel';
+import { ForwardEngineerPanel } from './ForwardEngineerPanel';
 
 function createEmptyTable(): ITable {
   return {
@@ -38,7 +42,6 @@ export function VirtualDiagramView() {
     setSelectedDiagramId,
     selectedTableId,
     setSelectedTableId,
-    filter,
     isLeftPanelOpen,
     toggleLeftPanel,
     isRightPanelOpen,
@@ -48,14 +51,35 @@ export function VirtualDiagramView() {
     setSearchQuery,
     searchResults,
     setSearchResults,
+    filter,
+    setFilter,
+    setFilterPreset,
   } = useDiagramStore();
+
+  const [isFilterPanelOpen, setIsFilterPanelOpen] = useState(false);
+  const [isSnapshotPanelOpen, setIsSnapshotPanelOpen] = useState(false);
+  const [isDiagramListOpen, setIsDiagramListOpen] = useState(false);
+  const [isForwardEngineerOpen, setIsForwardEngineerOpen] = useState(false);
   const { data: diagram } = useDiagram(selectedDiagramId ?? '');
   const { data: layout } = useDiagramLayout(selectedDiagramId ?? '');
   const updateDiagram = useUpdateDiagram();
   const createDiagram = useCreateDiagram();
+  const deleteDiagram = useDeleteDiagram();
   const saveLayout = useSaveDiagramLayout();
 
   const selectedTable = diagram?.tables.find((t) => t.id === selectedTableId) ?? null;
+
+  // Cmd+F shortcut to open search
+  useEffect(() => {
+    function handleKeyDown(e: KeyboardEvent) {
+      if ((e.metaKey || e.ctrlKey) && e.key === 'f') {
+        e.preventDefault();
+        setSearchOpen(true);
+      }
+    }
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [setSearchOpen]);
 
   const highlightedTableIds = searchResults
     .filter((r) => r.type === 'table')
@@ -64,6 +88,19 @@ export function VirtualDiagramView() {
   function handleDiagramSelect(id: string) {
     setSelectedDiagramId(id);
     setSelectedTableId(null);
+    setIsDiagramListOpen(false);
+  }
+
+  function handleDiagramRename(id: string, name: string) {
+    updateDiagram.mutate({ id, name });
+  }
+
+  function handleDiagramDelete(id: string) {
+    deleteDiagram.mutate(id);
+    if (selectedDiagramId === id) {
+      setSelectedDiagramId(null);
+      setSelectedTableId(null);
+    }
   }
 
   function handleAddTable() {
@@ -140,6 +177,17 @@ export function VirtualDiagramView() {
     updateDiagram.mutate({ id: diagram.id, version });
   }
 
+  function handleSnapshotRestore(snapshot: IViewSnapshot) {
+    setFilter(snapshot.filter);
+    if (selectedDiagramId) {
+      saveLayout.mutate({
+        diagramId: selectedDiagramId,
+        ...snapshot.layout,
+      });
+    }
+    setIsSnapshotPanelOpen(false);
+  }
+
   function handleSearchSelect(result: ISearchResult) {
     setSelectedTableId(result.tableId);
     setSearchOpen(false);
@@ -184,10 +232,30 @@ export function VirtualDiagramView() {
         onDiagramNameChange={handleDiagramNameChange}
         onDiagramVersionChange={handleDiagramVersionChange}
         onAddTable={handleAddTable}
+        isFilterPanelOpen={isFilterPanelOpen}
+        onToggleFilterPanel={() => setIsFilterPanelOpen((v) => !v)}
+        isSnapshotPanelOpen={isSnapshotPanelOpen}
+        onToggleSnapshotPanel={() => setIsSnapshotPanelOpen((v) => !v)}
+        onToggleDiagramList={() => setIsDiagramListOpen((v) => !v)}
+        isForwardEngineerOpen={isForwardEngineerOpen}
+        onToggleForwardEngineer={() => setIsForwardEngineerOpen((v) => !v)}
       />
 
       {/* 3-Panel Layout */}
-      <div className="flex flex-1 overflow-hidden">
+      <div className="relative flex flex-1 overflow-hidden">
+        {/* Diagram List Panel (overlay) */}
+        {isDiagramListOpen && (
+          <DiagramListPanel
+            diagrams={diagrams ?? []}
+            selectedDiagramId={selectedDiagramId}
+            onSelect={handleDiagramSelect}
+            onCreate={handleCreateDiagram}
+            onRename={handleDiagramRename}
+            onDelete={handleDiagramDelete}
+            onClose={() => setIsDiagramListOpen(false)}
+          />
+        )}
+
         {/* Left Panel: Table List */}
         {isLeftPanelOpen && diagram && (
           <TableListPanel
@@ -201,6 +269,41 @@ export function VirtualDiagramView() {
 
         {/* Center: Canvas */}
         <div className="relative flex-1">
+          {/* Filter Panel (floating) */}
+          {isFilterPanelOpen && (
+            <div className="absolute right-2 top-2 z-50">
+              <FilterPanel
+                filter={filter}
+                onFilterChange={setFilter}
+                onPresetChange={setFilterPreset}
+                onClose={() => setIsFilterPanelOpen(false)}
+              />
+            </div>
+          )}
+
+          {/* Snapshot Panel (floating) */}
+          {isSnapshotPanelOpen && selectedDiagramId && (
+            <div className="absolute right-2 top-2 z-50">
+              <ViewSnapshotManager
+                diagramId={selectedDiagramId}
+                currentFilter={filter}
+                currentLayout={layout ?? null}
+                onRestore={handleSnapshotRestore}
+                onClose={() => setIsSnapshotPanelOpen(false)}
+              />
+            </div>
+          )}
+
+          {/* Forward Engineer Panel (floating) */}
+          {isForwardEngineerOpen && diagram && (
+            <div className="absolute left-2 top-2 z-50">
+              <ForwardEngineerPanel
+                tables={diagram.tables}
+                onClose={() => setIsForwardEngineerOpen(false)}
+              />
+            </div>
+          )}
+
           {/* Search Overlay */}
           {isSearchOpen && diagram && (
             <SearchOverlay

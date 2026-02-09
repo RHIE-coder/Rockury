@@ -1,11 +1,11 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { GitBranch, ArrowRightLeft } from 'lucide-react';
 import { Button } from '@/shared/components/ui/button';
 import { Select } from '@/shared/components/ui/select';
 import { Badge } from '@/shared/components/ui/badge';
 import { useConnections } from '@/features/db-connection';
-import { useDiagrams } from '@/features/virtual-diagram';
+import { useDiagrams, useDiagramStore } from '@/features/virtual-diagram';
 import type { IDiffResult, ITableDiff } from '../model/types';
 import { diffApi } from '../api/diffApi';
 import { useCreateMigration } from '../model/useMigrations';
@@ -51,9 +51,26 @@ export function DiffView() {
   const { data: diagrams } = useDiagrams('virtual');
   const { data: connections } = useConnections();
   const queryClient = useQueryClient();
+  const {
+    selectedDiagramId: storeDiagramId,
+    selectedConnectionId: storeConnectionId,
+  } = useDiagramStore();
   const [selectedDiagramId, setSelectedDiagramId] = useState('');
   const [selectedConnectionId, setSelectedConnectionId] = useState('');
   const [diffResult, setDiffResult] = useState<IDiffResult | null>(null);
+
+  // Auto-sync from global store when tab is shown
+  useEffect(() => {
+    if (storeDiagramId && !selectedDiagramId) {
+      setSelectedDiagramId(storeDiagramId);
+    }
+  }, [storeDiagramId, selectedDiagramId]);
+
+  useEffect(() => {
+    if (storeConnectionId && !selectedConnectionId) {
+      setSelectedConnectionId(storeConnectionId);
+    }
+  }, [storeConnectionId, selectedConnectionId]);
 
   const compareMutation = useMutation({
     mutationFn: () =>

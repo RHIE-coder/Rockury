@@ -1,4 +1,4 @@
-import { memo } from 'react';
+import { memo, useState, useCallback, useRef, useEffect } from 'react';
 import { Handle, Position } from '@xyflow/react';
 import type { NodeProps } from '@xyflow/react';
 import type { ITable, IColumn, IDiagramFilter } from '~/shared/types/db';
@@ -9,6 +9,7 @@ export interface TableNodeData {
   filter: IDiagramFilter;
   isHighlighted: boolean;
   isSelected: boolean;
+  onTableUpdate?: (table: ITable) => void;
 }
 
 function KeyIcon({ keyType }: { keyType: IColumn['keyType'] }) {
@@ -33,7 +34,34 @@ function NullableIcon({ nullable }: { nullable: boolean }) {
 }
 
 function TableNodeComponent({ data }: NodeProps) {
-  const { table, filter, isHighlighted, isSelected } = data as unknown as TableNodeData;
+  const { table, filter, isHighlighted, isSelected, onTableUpdate } = data as unknown as TableNodeData;
+  const [isEditing, setIsEditing] = useState(false);
+  const [editName, setEditName] = useState(table.name);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (isEditing) inputRef.current?.focus();
+  }, [isEditing]);
+
+  const handleHeaderDoubleClick = useCallback((e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!onTableUpdate) return;
+    setEditName(table.name);
+    setIsEditing(true);
+  }, [onTableUpdate, table.name]);
+
+  const handleNameSubmit = useCallback(() => {
+    const trimmed = editName.trim();
+    if (trimmed && trimmed !== table.name && onTableUpdate) {
+      onTableUpdate({ ...table, name: trimmed });
+    }
+    setIsEditing(false);
+  }, [editName, table, onTableUpdate]);
+
+  const handleNameKeyDown = useCallback((e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') handleNameSubmit();
+    if (e.key === 'Escape') setIsEditing(false);
+  }, [handleNameSubmit]);
 
   const borderClasses = isSelected
     ? 'border-primary ring-2 ring-primary/30'
@@ -51,8 +79,22 @@ function TableNodeComponent({ data }: NodeProps) {
       />
 
       {/* Header */}
-      <div className="rounded-t-lg bg-primary px-3 py-1.5 text-primary-foreground">
-        <p className="text-sm font-semibold">{table.name}</p>
+      <div
+        className="rounded-t-lg bg-primary px-3 py-1.5 text-primary-foreground"
+        onDoubleClick={handleHeaderDoubleClick}
+      >
+        {isEditing ? (
+          <input
+            ref={inputRef}
+            className="nodrag w-full rounded bg-primary-foreground/20 px-1 text-sm font-semibold text-primary-foreground outline-none"
+            value={editName}
+            onChange={(e) => setEditName(e.target.value)}
+            onBlur={handleNameSubmit}
+            onKeyDown={handleNameKeyDown}
+          />
+        ) : (
+          <p className="text-sm font-semibold">{table.name}</p>
+        )}
         {filter.showComments && table.comment && (
           <p className="truncate text-xs opacity-75">{table.comment}</p>
         )}

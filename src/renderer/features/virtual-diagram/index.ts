@@ -10,6 +10,8 @@ export { ColumnEditor } from './ui/ColumnEditor';
 export { SearchOverlay } from './ui/SearchOverlay';
 export { FilterPanel } from './ui/FilterPanel';
 export { ViewSnapshotManager } from './ui/ViewSnapshotManager';
+export { DiagramListPanel } from './ui/DiagramListPanel';
+export { ForwardEngineerPanel } from './ui/ForwardEngineerPanel';
 export { useDiagrams, useDiagram, useCreateDiagram, useUpdateDiagram, useDeleteDiagram, useDiagramLayout, useSaveDiagramLayout, useDiagramVersions, useRestoreDiagramVersion } from './model/useDiagrams';
 export { useDiagramStore, DEFAULT_FILTER, FILTER_PRESETS } from './model/diagramStore';
 export type { TDiagramTab } from './model/diagramStore';

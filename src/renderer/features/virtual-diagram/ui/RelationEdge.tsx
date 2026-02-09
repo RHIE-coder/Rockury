@@ -1,6 +1,85 @@
 import { memo } from 'react';
-import { BaseEdge, EdgeLabelRenderer, getSmoothStepPath } from '@xyflow/react';
+import { BaseEdge, EdgeLabelRenderer, getSmoothStepPath, Position } from '@xyflow/react';
 import type { EdgeProps } from '@xyflow/react';
+
+interface RelationEdgeData {
+  nullable?: boolean;
+  [key: string]: unknown;
+}
+
+const ROTATION: Record<Position, number> = {
+  [Position.Right]: 0,
+  [Position.Left]: 180,
+  [Position.Top]: -90,
+  [Position.Bottom]: 90,
+};
+
+function getOffset(position: Position, distance: number): { x: number; y: number } {
+  switch (position) {
+    case Position.Right: return { x: distance, y: 0 };
+    case Position.Left: return { x: -distance, y: 0 };
+    case Position.Top: return { x: 0, y: -distance };
+    case Position.Bottom: return { x: 0, y: distance };
+  }
+}
+
+/**
+ * Crow's Foot "one" marker: ||
+ * Two perpendicular bars indicating "exactly one".
+ */
+function OneMarker({ x, y, position, color }: {
+  x: number; y: number; position: Position; color: string;
+}) {
+  const deg = ROTATION[position];
+  return (
+    <div
+      className="nodrag nopan pointer-events-none"
+      style={{
+        position: 'absolute',
+        transform: `translate(-50%, -50%) translate(${x}px,${y}px)`,
+      }}
+    >
+      <svg width="16" height="16" viewBox="-8 -8 16 16" style={{ transform: `rotate(${deg}deg)` }}>
+        <line x1="-2" y1="-5" x2="-2" y2="5" stroke={color} strokeWidth="1.5" strokeLinecap="round" />
+        <line x1="-5" y1="-5" x2="-5" y2="5" stroke={color} strokeWidth="1.5" strokeLinecap="round" />
+      </svg>
+    </div>
+  );
+}
+
+/**
+ * Crow's Foot "many" marker with optional zero/one indicator.
+ * nullable=true  → O< (zero-or-many): circle + crow's foot
+ * nullable=false → |< (one-or-many): bar + crow's foot
+ */
+function ManyMarker({ x, y, position, color, nullable }: {
+  x: number; y: number; position: Position; color: string; nullable: boolean;
+}) {
+  const deg = ROTATION[position];
+  return (
+    <div
+      className="nodrag nopan pointer-events-none"
+      style={{
+        position: 'absolute',
+        transform: `translate(-50%, -50%) translate(${x}px,${y}px)`,
+      }}
+    >
+      <svg width="24" height="18" viewBox="-12 -9 24 18" style={{ transform: `rotate(${deg}deg)` }}>
+        {/* Crow's foot: three prongs converging at a point */}
+        <line x1="4" y1="0" x2="-3" y2="-6" stroke={color} strokeWidth="1.5" strokeLinecap="round" />
+        <line x1="4" y1="0" x2="-3" y2="0" stroke={color} strokeWidth="1.5" strokeLinecap="round" />
+        <line x1="4" y1="0" x2="-3" y2="6" stroke={color} strokeWidth="1.5" strokeLinecap="round" />
+        {nullable ? (
+          /* Zero circle */
+          <circle cx="-7" cy="0" r="3" fill="var(--background, #fff)" stroke={color} strokeWidth="1.5" />
+        ) : (
+          /* One bar */
+          <line x1="-5" y1="-6" x2="-5" y2="6" stroke={color} strokeWidth="1.5" strokeLinecap="round" />
+        )}
+      </svg>
+    </div>
+  );
+}
 
 function RelationEdgeComponent({
   id,
@@ -12,6 +91,7 @@ function RelationEdgeComponent({
   targetPosition,
   label,
   selected,
+  data,
 }: EdgeProps) {
   const [edgePath, labelX, labelY] = getSmoothStepPath({
     sourceX,
@@ -24,6 +104,13 @@ function RelationEdgeComponent({
   });
 
   const strokeColor = selected ? 'hsl(var(--primary))' : 'hsl(var(--muted-foreground))';
+  const edgeData = data as RelationEdgeData | undefined;
+  const nullable = edgeData?.nullable ?? true;
+
+  // Offset markers along the edge direction so they sit on the line
+  const markerOffset = 10;
+  const srcOff = getOffset(sourcePosition, markerOffset);
+  const tgtOff = getOffset(targetPosition, markerOffset);
 
   return (
     <>
@@ -36,30 +123,22 @@ function RelationEdgeComponent({
           strokeDasharray: '5 3',
         }}
       />
-      {/* Cardinality markers */}
       <EdgeLabelRenderer>
-        {/* Source side: N (many) */}
-        <div
-          className="nodrag nopan pointer-events-none text-[10px] font-bold"
-          style={{
-            position: 'absolute',
-            transform: `translate(-50%, -50%) translate(${sourceX}px,${sourceY - 12}px)`,
-            color: strokeColor,
-          }}
-        >
-          N
-        </div>
-        {/* Target side: 1 (one) */}
-        <div
-          className="nodrag nopan pointer-events-none text-[10px] font-bold"
-          style={{
-            position: 'absolute',
-            transform: `translate(-50%, -50%) translate(${targetX}px,${targetY - 12}px)`,
-            color: strokeColor,
-          }}
-        >
-          1
-        </div>
+        {/* Source side (FK table): crow's foot "many" marker */}
+        <ManyMarker
+          x={sourceX + srcOff.x}
+          y={sourceY + srcOff.y}
+          position={sourcePosition}
+          color={strokeColor}
+          nullable={nullable}
+        />
+        {/* Target side (PK table): "one" marker */}
+        <OneMarker
+          x={targetX + tgtOff.x}
+          y={targetY + tgtOff.y}
+          position={targetPosition}
+          color={strokeColor}
+        />
       </EdgeLabelRenderer>
       {label && (
         <EdgeLabelRenderer>

@@ -56,8 +56,9 @@ function DiagramCanvasInner({
         filter,
         highlightedTableIds,
         selectedTableId,
+        onTableUpdate: readOnly ? undefined : onTableUpdate,
       }),
-    [diagram.tables, layout?.positions, filter, highlightedTableIds, selectedTableId],
+    [diagram.tables, layout?.positions, filter, highlightedTableIds, selectedTableId, readOnly, onTableUpdate],
   );
 
   const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);

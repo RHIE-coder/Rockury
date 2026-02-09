@@ -26,6 +26,7 @@ interface SchemaToNodesOptions {
   filter?: IDiagramFilter;
   highlightedTableIds?: string[];
   selectedTableId?: string | null;
+  onTableUpdate?: (table: ITable) => void;
 }
 
 /**
@@ -50,6 +51,7 @@ export function schemaToNodes(
     },
     highlightedTableIds = [],
     selectedTableId = null,
+    onTableUpdate,
   } = options;
 
   const highlightedSet = new Set(highlightedTableIds);
@@ -74,6 +76,7 @@ export function schemaToNodes(
         filter,
         isHighlighted: highlightedSet.has(table.id),
         isSelected: table.id === selectedTableId,
+        onTableUpdate,
       } satisfies TableNodeData,
       style: { width: TABLE_WIDTH },
     };
@@ -95,6 +98,7 @@ export function schemaToNodes(
             label: `${column.name} → ${column.reference.column}`,
             type: 'relationEdge',
             animated: true,
+            data: { nullable: column.nullable },
           });
         }
       }

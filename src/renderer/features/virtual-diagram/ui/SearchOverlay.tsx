@@ -79,11 +79,16 @@ export function SearchOverlay({
     inputRef.current?.focus();
   }, []);
 
+  const debounceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   const handleSearch = useCallback(
     (value: string) => {
       onQueryChange(value);
-      const found = searchTables(tables, value);
-      onResults(found);
+      if (debounceTimer.current) clearTimeout(debounceTimer.current);
+      debounceTimer.current = setTimeout(() => {
+        const found = searchTables(tables, value);
+        onResults(found);
+      }, 200);
     },
     [tables, onQueryChange, onResults],
   );

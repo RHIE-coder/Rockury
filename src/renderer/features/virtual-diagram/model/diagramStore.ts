@@ -49,6 +49,8 @@ interface DiagramStoreState {
   filter: IDiagramFilter;
 
   changeSource: 'canvas' | 'ddl' | 'external' | null;
+
+  selectedConnectionId: string | null;
 }
 
 interface DiagramStoreActions {
@@ -67,6 +69,7 @@ interface DiagramStoreActions {
   setFilter: (filter: Partial<IDiagramFilter>) => void;
   setFilterPreset: (preset: IDiagramFilter['preset']) => void;
   setChangeSource: (source: DiagramStoreState['changeSource']) => void;
+  setSelectedConnectionId: (id: string | null) => void;
 }
 
 export const useDiagramStore = create<DiagramStoreState & DiagramStoreActions>((set) => ({
@@ -86,6 +89,8 @@ export const useDiagramStore = create<DiagramStoreState & DiagramStoreActions>((
   filter: DEFAULT_FILTER,
 
   changeSource: null,
+
+  selectedConnectionId: null,
 
   setSelectedDiagramId: (id) => set({ selectedDiagramId: id }),
   setSelectedTableId: (id) =>
@@ -109,4 +114,5 @@ export const useDiagramStore = create<DiagramStoreState & DiagramStoreActions>((
       return { filter: { ...state.filter, ...presetValues, preset } };
     }),
   setChangeSource: (source) => set({ changeSource: source }),
+  setSelectedConnectionId: (id) => set({ selectedConnectionId: id }),
 }));
