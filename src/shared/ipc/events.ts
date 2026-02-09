@@ -3,8 +3,8 @@ import type { ISystemInfo } from '~/shared/types';
 import type {
   IPackage, IPackageResource, TResourceType,
   IConnection, IConnectionFormData, IConnectionTestResult,
-  IDiagram, IDiagramLayout, IDiagramVersion, TDiagramType,
-  ITable, TDbType, IDiffResult,
+  IDiagram, IDiagramLayout, IDiagramVersion, IDiagramFilter, TDiagramType,
+  ITable, TDbType, IDiffResult, IMigration, TMigrationDirection, IViewSnapshot,
   IQuery, IQueryResult, IQueryHistory,
   IDocument, TExportFormat,
   IValidationReport,
@@ -92,11 +92,15 @@ export interface IEvents {
     response: { success: boolean; data: IDiagram };
   };
   [CHANNELS.DIAGRAM_CREATE]: {
-    args: { name: string; type: TDiagramType; tables?: ITable[] };
+    args: { name: string; type: TDiagramType; version?: string; tables?: ITable[] };
     response: { success: boolean; data: IDiagram };
   };
   [CHANNELS.DIAGRAM_UPDATE]: {
-    args: { id: string; name?: string; tables?: ITable[] };
+    args: { id: string; name?: string; version?: string; tables?: ITable[] };
+    response: { success: boolean; data: IDiagram };
+  };
+  [CHANNELS.DIAGRAM_UPDATE_META]: {
+    args: { id: string; name?: string; version?: string };
     response: { success: boolean; data: IDiagram };
   };
   [CHANNELS.DIAGRAM_DELETE]: {
@@ -126,6 +130,48 @@ export interface IEvents {
     response: { success: boolean; data: IDiagram };
   };
 
+  // Migration
+  [CHANNELS.MIGRATION_LIST]: {
+    args: { diagramId: string; connectionId?: string };
+    response: { success: boolean; data: IMigration[] };
+  };
+  [CHANNELS.MIGRATION_CREATE]: {
+    args: {
+      diagramId: string;
+      connectionId: string;
+      direction: TMigrationDirection;
+      diffSnapshot: IDiffResult;
+      migrationDdl: string;
+    };
+    response: { success: boolean; data: IMigration };
+  };
+  [CHANNELS.MIGRATION_APPLY]: {
+    args: { migrationId: string };
+    response: { success: boolean; data: IMigration };
+  };
+  [CHANNELS.MIGRATION_DELETE]: {
+    args: { migrationId: string };
+    response: { success: boolean };
+  };
+
+  // View Snapshot
+  [CHANNELS.VIEW_SNAPSHOT_LIST]: {
+    args: { diagramId: string };
+    response: { success: boolean; data: IViewSnapshot[] };
+  };
+  [CHANNELS.VIEW_SNAPSHOT_CREATE]: {
+    args: { diagramId: string; name: string; filter: IDiagramFilter; layout: IDiagramLayout };
+    response: { success: boolean; data: IViewSnapshot };
+  };
+  [CHANNELS.VIEW_SNAPSHOT_RESTORE]: {
+    args: { snapshotId: string };
+    response: { success: boolean; data: IViewSnapshot };
+  };
+  [CHANNELS.VIEW_SNAPSHOT_DELETE]: {
+    args: { snapshotId: string };
+    response: { success: boolean };
+  };
+
   // Schema (Real)
   [CHANNELS.SCHEMA_FETCH_REAL]: {
     args: { connectionId: string };
@@ -136,6 +182,10 @@ export interface IEvents {
   [CHANNELS.SCHEMA_DIFF]: {
     args: { virtualDiagramId: string; connectionId: string };
     response: { success: boolean; data: IDiffResult };
+  };
+  [CHANNELS.SCHEMA_APPLY_REAL_TO_VIRTUAL]: {
+    args: { virtualDiagramId: string; connectionId: string };
+    response: { success: boolean; data: IDiagram };
   };
 
   // DDL

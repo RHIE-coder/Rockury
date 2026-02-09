@@ -1,11 +1,12 @@
-import { useState } from 'react';
-import { Plus } from 'lucide-react';
-import { Button } from '@/shared/components/ui/button';
-import { Select } from '@/shared/components/ui/select';
-import type { ITable } from '@/entities/table';
-import { useDiagrams, useDiagram, useUpdateDiagram, useCreateDiagram } from '../model/useDiagrams';
+import { useCallback } from 'react';
+import type { ITable, IDiagramLayout, ISearchResult } from '~/shared/types/db';
+import { useDiagrams, useDiagram, useUpdateDiagram, useCreateDiagram, useDiagramLayout, useSaveDiagramLayout } from '../model/useDiagrams';
 import { useDiagramStore } from '../model/diagramStore';
-import { TableEditor } from './TableEditor';
+import { DiagramCanvas } from './DiagramCanvas';
+import { DiagramToolbar } from './DiagramToolbar';
+import { TableListPanel } from './TableListPanel';
+import { TableDetailPanel } from './TableDetailPanel';
+import { SearchOverlay } from './SearchOverlay';
 
 function createEmptyTable(): ITable {
   return {
@@ -32,19 +33,37 @@ function createEmptyTable(): ITable {
 
 export function VirtualDiagramView() {
   const { data: diagrams } = useDiagrams('virtual');
-  const { selectedDiagramId, setSelectedDiagramId, selectedTableId, setSelectedTableId } =
-    useDiagramStore();
+  const {
+    selectedDiagramId,
+    setSelectedDiagramId,
+    selectedTableId,
+    setSelectedTableId,
+    filter,
+    isLeftPanelOpen,
+    toggleLeftPanel,
+    isRightPanelOpen,
+    isSearchOpen,
+    setSearchOpen,
+    searchQuery,
+    setSearchQuery,
+    searchResults,
+    setSearchResults,
+  } = useDiagramStore();
   const { data: diagram } = useDiagram(selectedDiagramId ?? '');
+  const { data: layout } = useDiagramLayout(selectedDiagramId ?? '');
   const updateDiagram = useUpdateDiagram();
   const createDiagram = useCreateDiagram();
-  const [showTableEditor, setShowTableEditor] = useState(false);
+  const saveLayout = useSaveDiagramLayout();
 
   const selectedTable = diagram?.tables.find((t) => t.id === selectedTableId) ?? null;
+
+  const highlightedTableIds = searchResults
+    .filter((r) => r.type === 'table')
+    .map((r) => r.tableId);
 
   function handleDiagramSelect(id: string) {
     setSelectedDiagramId(id);
     setSelectedTableId(null);
-    setShowTableEditor(false);
   }
 
   function handleAddTable() {
@@ -54,6 +73,48 @@ export function VirtualDiagramView() {
       id: diagram.id,
       tables: [...diagram.tables, newTable],
     });
+  }
+
+  function handleTableCreate(position: { x: number; y: number }) {
+    if (!diagram) return;
+    const newTable = createEmptyTable();
+    updateDiagram.mutate({
+      id: diagram.id,
+      tables: [...diagram.tables, newTable],
+    });
+    // Position is used by DiagramCanvas layout; auto-layout handles new table placement
+  }
+
+  function handleEdgeCreate(sourceTableId: string, targetTableId: string) {
+    if (!diagram) return;
+    const sourceTable = diagram.tables.find((t) => t.id === sourceTableId);
+    const targetTable = diagram.tables.find((t) => t.id === targetTableId);
+    if (!sourceTable || !targetTable) return;
+
+    // Create FK column on source table referencing target's PK
+    const targetPk = targetTable.columns.find((c) => c.keyType === 'PK');
+    if (!targetPk) return;
+
+    const fkColumnName = `${targetTable.name}_${targetPk.name}`;
+    const fkColumn = {
+      id: `col-${Date.now()}-fk`,
+      name: fkColumnName,
+      dataType: targetPk.dataType,
+      keyType: 'FK' as const,
+      defaultValue: null,
+      nullable: true,
+      comment: `FK to ${targetTable.name}`,
+      reference: { table: targetTable.name, column: targetPk.name },
+      constraints: [],
+      ordinalPosition: sourceTable.columns.length,
+    };
+
+    const updatedSource = {
+      ...sourceTable,
+      columns: [...sourceTable.columns, fkColumn],
+    };
+    const tables = diagram.tables.map((t) => (t.id === sourceTableId ? updatedSource : t));
+    updateDiagram.mutate({ id: diagram.id, tables });
   }
 
   function handleCreateDiagram() {
@@ -69,9 +130,23 @@ export function VirtualDiagramView() {
     );
   }
 
-  function handleTableClick(tableId: string) {
-    setSelectedTableId(tableId);
-    setShowTableEditor(true);
+  function handleDiagramNameChange(name: string) {
+    if (!diagram) return;
+    updateDiagram.mutate({ id: diagram.id, name });
+  }
+
+  function handleDiagramVersionChange(version: string) {
+    if (!diagram) return;
+    updateDiagram.mutate({ id: diagram.id, version });
+  }
+
+  function handleSearchSelect(result: ISearchResult) {
+    setSelectedTableId(result.tableId);
+    setSearchOpen(false);
+  }
+
+  function handleTableSelect(tableId: string) {
+    setSelectedTableId(tableId || null);
   }
 
   function handleTableChange(updated: ITable) {
@@ -80,83 +155,97 @@ export function VirtualDiagramView() {
     updateDiagram.mutate({ id: diagram.id, tables });
   }
 
-  return (
-    <div className="flex h-full">
-      <div className="flex flex-1 flex-col">
-        {/* Toolbar */}
-        <div className="flex items-center gap-2 border-b border-border p-2">
-          <Select
-            className="h-8 w-48 text-sm"
-            value={selectedDiagramId ?? ''}
-            onChange={(e) => handleDiagramSelect(e.target.value)}
-          >
-            <option value="">Select diagram...</option>
-            {diagrams?.map((d) => (
-              <option key={d.id} value={d.id}>{d.name}</option>
-            ))}
-          </Select>
-          <Button variant="outline" size="sm" onClick={handleCreateDiagram}>
-            New Diagram
-          </Button>
-          {diagram && (
-            <Button variant="outline" size="sm" onClick={handleAddTable}>
-              <Plus className="size-4" />
-              Add Table
-            </Button>
-          )}
-        </div>
+  function handleTableDelete() {
+    if (!diagram || !selectedTableId) return;
+    const tables = diagram.tables.filter((t) => t.id !== selectedTableId);
+    updateDiagram.mutate({ id: diagram.id, tables });
+    setSelectedTableId(null);
+  }
 
-        {/* Canvas area */}
-        <div className="flex-1 bg-muted/30">
+  const handleLayoutChange = useCallback(
+    (layoutUpdate: Pick<IDiagramLayout, 'positions' | 'zoom' | 'viewport'>) => {
+      if (!selectedDiagramId) return;
+      saveLayout.mutate({
+        diagramId: selectedDiagramId,
+        ...layoutUpdate,
+      });
+    },
+    [selectedDiagramId, saveLayout],
+  );
+
+  return (
+    <div className="flex h-full flex-col">
+      {/* Toolbar */}
+      <DiagramToolbar
+        diagrams={diagrams}
+        currentDiagram={diagram}
+        onDiagramSelect={handleDiagramSelect}
+        onDiagramCreate={handleCreateDiagram}
+        onDiagramNameChange={handleDiagramNameChange}
+        onDiagramVersionChange={handleDiagramVersionChange}
+        onAddTable={handleAddTable}
+      />
+
+      {/* 3-Panel Layout */}
+      <div className="flex flex-1 overflow-hidden">
+        {/* Left Panel: Table List */}
+        {isLeftPanelOpen && diagram && (
+          <TableListPanel
+            tables={diagram.tables}
+            selectedTableId={selectedTableId}
+            searchResults={searchResults}
+            onTableSelect={handleTableSelect}
+            onClose={toggleLeftPanel}
+          />
+        )}
+
+        {/* Center: Canvas */}
+        <div className="relative flex-1">
+          {/* Search Overlay */}
+          {isSearchOpen && diagram && (
+            <SearchOverlay
+              tables={diagram.tables}
+              query={searchQuery}
+              onQueryChange={setSearchQuery}
+              onResults={setSearchResults}
+              onSelect={handleSearchSelect}
+              onClose={() => setSearchOpen(false)}
+              results={searchResults}
+            />
+          )}
           {diagram ? (
-            <div className="grid gap-3 p-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-              {diagram.tables.map((table) => (
-                <button
-                  key={table.id}
-                  type="button"
-                  onClick={() => handleTableClick(table.id)}
-                  className={`rounded-lg border p-3 text-left transition-colors hover:border-primary ${
-                    selectedTableId === table.id ? 'border-primary bg-primary/5' : 'border-border bg-card'
-                  }`}
-                >
-                  <p className="text-sm font-semibold">{table.name}</p>
-                  <p className="text-xs text-muted-foreground">
-                    {table.columns.length} columns
-                  </p>
-                  {table.comment && (
-                    <p className="mt-1 text-xs text-muted-foreground">{table.comment}</p>
-                  )}
-                </button>
-              ))}
-              {diagram.tables.length === 0 && (
-                <p className="col-span-full text-center text-sm text-muted-foreground">
-                  No tables yet. Click "Add Table" to create one.
-                </p>
-              )}
-            </div>
+            <DiagramCanvas
+              diagram={diagram}
+              layout={layout}
+              filter={filter}
+              highlightedTableIds={highlightedTableIds}
+              selectedTableId={selectedTableId}
+              onTableSelect={handleTableSelect}
+              onTableCreate={handleTableCreate}
+              onTableUpdate={handleTableChange}
+              onEdgeCreate={handleEdgeCreate}
+              onLayoutChange={handleLayoutChange}
+            />
           ) : (
-            <div className="flex h-full items-center justify-center">
+            <div className="flex h-full items-center justify-center bg-muted/30">
               <p className="text-sm text-muted-foreground">
                 Select or create a diagram to get started.
               </p>
             </div>
           )}
         </div>
-      </div>
 
-      {/* Side panel: Table Editor */}
-      {showTableEditor && selectedTable && (
-        <div className="w-96 shrink-0">
-          <TableEditor
+        {/* Right Panel: Table Detail */}
+        {isRightPanelOpen && selectedTable && diagram && (
+          <TableDetailPanel
             table={selectedTable}
+            allTables={diagram.tables}
             onChange={handleTableChange}
-            onClose={() => {
-              setShowTableEditor(false);
-              setSelectedTableId(null);
-            }}
+            onDelete={handleTableDelete}
+            onClose={() => setSelectedTableId(null)}
           />
-        </div>
-      )}
+        )}
+      </div>
     </div>
   );
 }

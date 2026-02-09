@@ -13,11 +13,11 @@ export const virtualDiagramService = {
     return diagram;
   },
 
-  create(data: { name: string; type: 'virtual'; tables?: ITable[] }): IDiagram {
+  create(data: { name: string; type: 'virtual'; version?: string; tables?: ITable[] }): IDiagram {
     return diagramRepository.create(data);
   },
 
-  update(id: string, data: { name?: string; tables?: ITable[] }): IDiagram {
+  update(id: string, data: { name?: string; version?: string; tables?: ITable[] }): IDiagram {
     const existing = diagramRepository.getById(id);
     if (!existing) throw new Error(`Diagram not found: ${id}`);
     return diagramRepository.update(id, data);

@@ -4,4 +4,6 @@ export { diagramRepository } from './diagramRepository';
 export { diagramVersionRepository } from './diagramVersionRepository';
 export { queryRepository } from './queryRepository';
 export { queryHistoryRepository } from './queryHistoryRepository';
+export { migrationRepository } from './migrationRepository';
 export { documentRepository } from './documentRepository';
+export { viewSnapshotRepository } from './viewSnapshotRepository';

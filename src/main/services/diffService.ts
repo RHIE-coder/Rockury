@@ -1,7 +1,7 @@
 import { diagramRepository } from '#/repositories';
 import { schemaService } from './schemaService';
 import type {
-  IDiffResult, ITableDiff, IColumnDiff, IConstraintDiff,
+  IDiagram, IDiffResult, ITableDiff, IColumnDiff, IConstraintDiff,
   ITable, IColumn, IConstraint, TDiffAction,
 } from '~/shared/types/db';
 
@@ -119,6 +119,17 @@ function generateMigrationDdl(tableDiffs: ITableDiff[]): string {
 }
 
 export const diffService = {
+  async applyRealToVirtual(
+    virtualDiagramId: string,
+    connectionId: string,
+  ): Promise<IDiagram> {
+    const diagram = diagramRepository.getById(virtualDiagramId);
+    if (!diagram) throw new Error(`Diagram not found: ${virtualDiagramId}`);
+
+    const realTables = await schemaService.fetchRealSchema(connectionId);
+    return diagramRepository.update(virtualDiagramId, { tables: realTables });
+  },
+
   async compareDiagrams(
     virtualDiagramId: string,
     connectionId: string,

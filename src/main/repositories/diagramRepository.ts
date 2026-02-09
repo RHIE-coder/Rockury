@@ -4,6 +4,7 @@ import type { IDiagram, IDiagramLayout, ITable, TDiagramType } from '~/shared/ty
 interface DiagramRow {
   id: string;
   name: string;
+  version: string;
   type: string;
   tables_json: string;
   created_at: string;
@@ -21,6 +22,7 @@ function toDiagram(row: DiagramRow): IDiagram {
   return {
     id: row.id,
     name: row.name,
+    version: row.version ?? '1.0.0',
     type: row.type as TDiagramType,
     tables: JSON.parse(row.tables_json) as ITable[],
     createdAt: row.created_at,
@@ -54,22 +56,24 @@ export const diagramRepository = {
     return row ? toDiagram(row) : null;
   },
 
-  create(data: { name: string; type: TDiagramType; tables?: ITable[] }): IDiagram {
+  create(data: { name: string; type: TDiagramType; version?: string; tables?: ITable[] }): IDiagram {
     const db = getDb();
     const id = crypto.randomUUID();
     const tablesJson = JSON.stringify(data.tables ?? []);
+    const version = data.version ?? '1.0.0';
     db.prepare(
-      'INSERT INTO diagrams (id, name, type, tables_json) VALUES (?, ?, ?, ?)',
-    ).run(id, data.name, data.type, tablesJson);
+      'INSERT INTO diagrams (id, name, type, version, tables_json) VALUES (?, ?, ?, ?, ?)',
+    ).run(id, data.name, data.type, version, tablesJson);
     return this.getById(id)!;
   },
 
-  update(id: string, data: { name?: string; tables?: ITable[] }): IDiagram {
+  update(id: string, data: { name?: string; version?: string; tables?: ITable[] }): IDiagram {
     const db = getDb();
     const sets: string[] = [];
     const values: unknown[] = [];
 
     if (data.name !== undefined) { sets.push('name = ?'); values.push(data.name); }
+    if (data.version !== undefined) { sets.push('version = ?'); values.push(data.version); }
     if (data.tables !== undefined) { sets.push('tables_json = ?'); values.push(JSON.stringify(data.tables)); }
 
     if (sets.length > 0) {

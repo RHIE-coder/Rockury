@@ -98,6 +98,49 @@ CREATE TABLE IF NOT EXISTS query_history (
 );
 `;
 
+export const SQL_ADD_DIAGRAMS_VERSION = `
+ALTER TABLE diagrams ADD COLUMN version TEXT NOT NULL DEFAULT '1.0.0';
+`;
+
+export const SQL_CREATE_DIAGRAM_MIGRATIONS = `
+CREATE TABLE IF NOT EXISTS diagram_migrations (
+  id TEXT PRIMARY KEY,
+  diagram_id TEXT NOT NULL,
+  connection_id TEXT NOT NULL,
+  version_number INTEGER NOT NULL,
+  direction TEXT NOT NULL CHECK(direction IN ('virtual_to_real', 'real_to_virtual')),
+  diff_snapshot TEXT NOT NULL,
+  migration_ddl TEXT NOT NULL DEFAULT '',
+  status TEXT NOT NULL DEFAULT 'pending' CHECK(status IN ('pending', 'applied', 'failed')),
+  applied_at TEXT,
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  FOREIGN KEY (diagram_id) REFERENCES diagrams(id) ON DELETE CASCADE,
+  FOREIGN KEY (connection_id) REFERENCES connections(id) ON DELETE CASCADE,
+  UNIQUE(diagram_id, connection_id, version_number)
+);
+`;
+
+export const SQL_CREATE_DIAGRAM_MIGRATIONS_INDEXES = `
+CREATE INDEX IF NOT EXISTS idx_migrations_diagram ON diagram_migrations(diagram_id);
+CREATE INDEX IF NOT EXISTS idx_migrations_connection ON diagram_migrations(connection_id);
+`;
+
+export const SQL_CREATE_VIEW_SNAPSHOTS = `
+CREATE TABLE IF NOT EXISTS view_snapshots (
+  id TEXT PRIMARY KEY,
+  diagram_id TEXT NOT NULL,
+  name TEXT NOT NULL,
+  filter_json TEXT NOT NULL DEFAULT '{}',
+  layout_json TEXT NOT NULL DEFAULT '{}',
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  FOREIGN KEY (diagram_id) REFERENCES diagrams(id) ON DELETE CASCADE
+);
+`;
+
+export const SQL_CREATE_VIEW_SNAPSHOTS_INDEX = `
+CREATE INDEX IF NOT EXISTS idx_view_snapshots_diagram ON view_snapshots(diagram_id);
+`;
+
 export const SQL_CREATE_DOCUMENTS = `
 CREATE TABLE IF NOT EXISTS documents (
   id TEXT PRIMARY KEY,
@@ -116,6 +159,10 @@ const ALL_MIGRATIONS = [
   SQL_CREATE_DIAGRAMS,
   SQL_CREATE_DIAGRAM_LAYOUTS,
   SQL_CREATE_DIAGRAM_VERSIONS,
+  SQL_CREATE_DIAGRAM_MIGRATIONS,
+  SQL_CREATE_DIAGRAM_MIGRATIONS_INDEXES,
+  SQL_CREATE_VIEW_SNAPSHOTS,
+  SQL_CREATE_VIEW_SNAPSHOTS_INDEX,
   SQL_CREATE_QUERIES,
   SQL_CREATE_QUERY_HISTORY,
   SQL_CREATE_DOCUMENTS,
@@ -128,6 +175,16 @@ export function runMigrations(db: Database.Database): void {
   const migrate = db.transaction(() => {
     for (const sql of ALL_MIGRATIONS) {
       db.exec(sql);
+    }
+
+    // Safe ALTER TABLE migrations (ignore if column already exists)
+    const alterMigrations = [SQL_ADD_DIAGRAMS_VERSION];
+    for (const sql of alterMigrations) {
+      try {
+        db.exec(sql);
+      } catch {
+        // Column already exists - safe to ignore
+      }
     }
   });
 

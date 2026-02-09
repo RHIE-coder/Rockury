@@ -3,12 +3,15 @@ import { RefreshCw } from 'lucide-react';
 import { useMutation } from '@tanstack/react-query';
 import { Button } from '@/shared/components/ui/button';
 import { Select } from '@/shared/components/ui/select';
-import type { ITable } from '@/entities/table';
+import type { ITable, IDiagram } from '~/shared/types/db';
 import { useConnections } from '@/features/db-connection';
+import { useDiagramStore } from '@/features/virtual-diagram';
+import { DiagramCanvas } from '@/features/virtual-diagram/ui/DiagramCanvas';
 import { realDiagramApi } from '../api/realDiagramApi';
 
 export function RealDiagramView() {
   const { data: connections } = useConnections();
+  const { filter } = useDiagramStore();
   const [selectedConnectionId, setSelectedConnectionId] = useState('');
   const [tables, setTables] = useState<ITable[]>([]);
 
@@ -25,6 +28,19 @@ export function RealDiagramView() {
     if (!selectedConnectionId) return;
     fetchSchema.mutate(selectedConnectionId);
   }
+
+  // Build a synthetic IDiagram for the canvas
+  const realDiagram: IDiagram | null = tables.length > 0
+    ? {
+        id: `real-${selectedConnectionId}`,
+        name: 'Real Schema',
+        version: '0.0.0',
+        type: 'real',
+        tables,
+        createdAt: '',
+        updatedAt: '',
+      }
+    : null;
 
   return (
     <div className="flex h-full flex-col">
@@ -54,35 +70,15 @@ export function RealDiagramView() {
       </div>
 
       {/* Canvas area */}
-      <div className="flex-1 bg-muted/30">
-        {tables.length > 0 ? (
-          <div className="grid gap-3 p-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-            {tables.map((table) => (
-              <div
-                key={table.id}
-                className="rounded-lg border border-border bg-card p-3"
-              >
-                <p className="text-sm font-semibold">{table.name}</p>
-                <p className="text-xs text-muted-foreground">
-                  {table.columns.length} columns
-                </p>
-                <ul className="mt-2 space-y-0.5">
-                  {table.columns.slice(0, 5).map((col) => (
-                    <li key={col.id} className="text-xs text-muted-foreground">
-                      {col.keyType ? `[${col.keyType}] ` : ''}{col.name}: {col.dataType}
-                    </li>
-                  ))}
-                  {table.columns.length > 5 && (
-                    <li className="text-xs text-muted-foreground">
-                      ...and {table.columns.length - 5} more
-                    </li>
-                  )}
-                </ul>
-              </div>
-            ))}
-          </div>
+      <div className="flex-1">
+        {realDiagram ? (
+          <DiagramCanvas
+            diagram={realDiagram}
+            filter={filter}
+            readOnly
+          />
         ) : (
-          <div className="flex h-full items-center justify-center">
+          <div className="flex h-full items-center justify-center bg-muted/30">
             <p className="text-sm text-muted-foreground">
               {fetchSchema.isError
                 ? 'Failed to fetch schema. Please check your connection.'

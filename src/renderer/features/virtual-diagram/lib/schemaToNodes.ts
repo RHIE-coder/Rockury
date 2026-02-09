@@ -1,32 +1,66 @@
-import type { ITable } from '@/entities/table';
+import type { ITable, IDiagramFilter } from '~/shared/types/db';
 import type { Node, Edge } from '@xyflow/react';
+import type { TableNodeData } from '../ui/TableNode';
 
 const TABLE_WIDTH = 250;
-const TABLE_HEIGHT_BASE = 60;
-const COLUMN_ROW_HEIGHT = 24;
+const TABLE_HEIGHT_BASE = 40;
+const COLUMN_ROW_HEIGHT = 22;
+const CONSTRAINT_ROW_HEIGHT = 18;
 const GRID_GAP_X = 320;
 const GRID_GAP_Y = 40;
 const COLUMNS_PER_ROW = 4;
 
-export interface TableNodeData {
-  table: ITable;
-  label: string;
+function estimateNodeHeight(table: ITable, filter: IDiagramFilter): number {
+  let height = TABLE_HEIGHT_BASE;
+  if (filter.showColumns) {
+    height += table.columns.length * COLUMN_ROW_HEIGHT;
+  }
+  if (filter.showConstraints && table.constraints.length > 0) {
+    height += table.constraints.length * CONSTRAINT_ROW_HEIGHT + 8;
+  }
+  return height;
+}
+
+interface SchemaToNodesOptions {
+  positions?: Record<string, { x: number; y: number }>;
+  filter?: IDiagramFilter;
+  highlightedTableIds?: string[];
+  selectedTableId?: string | null;
 }
 
 /**
  * Convert ITable[] to React Flow nodes and edges.
- * Tables are arranged in a grid. FK references become edges.
+ * Tables are arranged in a grid if no positions provided.
+ * FK references become edges.
  */
 export function schemaToNodes(
   tables: ITable[],
-  positions?: Record<string, { x: number; y: number }>,
+  options: SchemaToNodesOptions = {},
 ): { nodes: Node[]; edges: Edge[] } {
+  const {
+    positions,
+    filter = {
+      showColumns: true,
+      showDataTypes: true,
+      showKeyIcons: true,
+      showNullable: true,
+      showComments: false,
+      showConstraints: false,
+      preset: 'full',
+    },
+    highlightedTableIds = [],
+    selectedTableId = null,
+  } = options;
+
+  const highlightedSet = new Set(highlightedTableIds);
+
   const nodes: Node[] = tables.map((table, index) => {
     const col = index % COLUMNS_PER_ROW;
     const row = Math.floor(index / COLUMNS_PER_ROW);
+    const nodeHeight = estimateNodeHeight(table, filter);
     const defaultPosition = {
       x: col * GRID_GAP_X,
-      y: row * (TABLE_HEIGHT_BASE + table.columns.length * COLUMN_ROW_HEIGHT + GRID_GAP_Y),
+      y: row * (nodeHeight + GRID_GAP_Y),
     };
     const position = positions?.[table.id] ?? defaultPosition;
 
@@ -37,6 +71,9 @@ export function schemaToNodes(
       data: {
         table,
         label: table.name,
+        filter,
+        isHighlighted: highlightedSet.has(table.id),
+        isSelected: table.id === selectedTableId,
       } satisfies TableNodeData,
       style: { width: TABLE_WIDTH },
     };
@@ -55,8 +92,8 @@ export function schemaToNodes(
             source: table.id,
             target: targetTableId,
             sourceHandle: column.id,
-            label: `${column.name} -> ${column.reference.column}`,
-            type: 'smoothstep',
+            label: `${column.name} → ${column.reference.column}`,
+            type: 'relationEdge',
             animated: true,
           });
         }

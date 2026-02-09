@@ -7,10 +7,12 @@ const api = getElectronApi();
 export const diagramApi = {
   list: (type?: TDiagramType) => api.DIAGRAM_LIST({ type }),
   get: (id: string) => api.DIAGRAM_GET({ id }),
-  create: (args: { name: string; type: TDiagramType; tables?: ITable[] }) =>
+  create: (args: { name: string; type: TDiagramType; version?: string; tables?: ITable[] }) =>
     api.DIAGRAM_CREATE(args),
-  update: (args: { id: string; name?: string; tables?: ITable[] }) =>
+  update: (args: { id: string; name?: string; version?: string; tables?: ITable[] }) =>
     api.DIAGRAM_UPDATE(args),
+  updateMeta: (args: { id: string; name?: string; version?: string }) =>
+    api.DIAGRAM_UPDATE_META(args),
   delete: (id: string) => api.DIAGRAM_DELETE({ id }),
   getLayout: (diagramId: string) => api.DIAGRAM_GET_LAYOUT({ diagramId }),
   saveLayout: (layout: IDiagramLayout) => api.DIAGRAM_SAVE_LAYOUT(layout),

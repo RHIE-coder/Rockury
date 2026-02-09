@@ -1,6 +1,6 @@
 import type { Node } from '@xyflow/react';
 import type { ITable } from '@/entities/table';
-import type { TableNodeData } from './schemaToNodes';
+import type { TableNodeData } from '../ui/TableNode';
 
 /**
  * Convert React Flow nodes back to ITable[].

@@ -5,4 +5,6 @@ const api = getElectronApi();
 export const diffApi = {
   compare: (args: { virtualDiagramId: string; connectionId: string }) =>
     api.SCHEMA_DIFF(args),
+  applyRealToVirtual: (args: { virtualDiagramId: string; connectionId: string }) =>
+    api.SCHEMA_APPLY_REAL_TO_VIRTUAL(args),
 };

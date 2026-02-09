@@ -106,6 +106,7 @@ export type TDiagramType = 'virtual' | 'real';
 export interface IDiagram {
   id: string;
   name: string;
+  version: string;
   type: TDiagramType;
   tables: ITable[];
   createdAt: string;
@@ -125,6 +126,57 @@ export interface IDiagramVersion {
   versionNumber: number;
   ddlContent: string;
   schemaSnapshot: IDiagram;
+  createdAt: string;
+}
+
+// ─── Diagram Filter ───
+export type TFilterPreset = 'compact' | 'full' | 'custom';
+
+export interface IDiagramFilter {
+  showColumns: boolean;
+  showDataTypes: boolean;
+  showKeyIcons: boolean;
+  showNullable: boolean;
+  showComments: boolean;
+  showConstraints: boolean;
+  preset: TFilterPreset;
+}
+
+// ─── Search Result ───
+export interface ISearchResult {
+  type: 'table' | 'column' | 'constraint';
+  tableId: string;
+  tableName: string;
+  columnId?: string;
+  columnName?: string;
+  constraintName?: string;
+  matchedText: string;
+}
+
+// ─── Migration ───
+export type TMigrationDirection = 'virtual_to_real' | 'real_to_virtual';
+export type TMigrationStatus = 'pending' | 'applied' | 'failed';
+
+export interface IMigration {
+  id: string;
+  diagramId: string;
+  connectionId: string;
+  versionNumber: number;
+  direction: TMigrationDirection;
+  diffSnapshot: IDiffResult;
+  migrationDdl: string;
+  status: TMigrationStatus;
+  appliedAt: string | null;
+  createdAt: string;
+}
+
+// ─── View Snapshot ───
+export interface IViewSnapshot {
+  id: string;
+  diagramId: string;
+  name: string;
+  filter: IDiagramFilter;
+  layout: IDiagramLayout;
   createdAt: string;
 }
 

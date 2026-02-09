@@ -24,16 +24,26 @@ export function registerSchemaHandlers() {
     }
   });
 
-  ipcMain.handle(CHANNELS.DIAGRAM_CREATE, async (_event, args: { name: string; type: TDiagramType; tables?: ITable[] }) => {
+  ipcMain.handle(CHANNELS.DIAGRAM_CREATE, async (_event, args: { name: string; type: TDiagramType; version?: string; tables?: ITable[] }) => {
     try {
-      const data = virtualDiagramService.create({ name: args.name, type: 'virtual', tables: args.tables });
+      const data = virtualDiagramService.create({ name: args.name, type: 'virtual', version: args.version, tables: args.tables });
       return { success: true, data };
     } catch (error) {
       return { success: false, data: null, error: (error as Error).message };
     }
   });
 
-  ipcMain.handle(CHANNELS.DIAGRAM_UPDATE, async (_event, args: { id: string; name?: string; tables?: ITable[] }) => {
+  ipcMain.handle(CHANNELS.DIAGRAM_UPDATE, async (_event, args: { id: string; name?: string; version?: string; tables?: ITable[] }) => {
+    try {
+      const { id, ...data } = args;
+      const result = virtualDiagramService.update(id, data);
+      return { success: true, data: result };
+    } catch (error) {
+      return { success: false, data: null, error: (error as Error).message };
+    }
+  });
+
+  ipcMain.handle(CHANNELS.DIAGRAM_UPDATE_META, async (_event, args: { id: string; name?: string; version?: string }) => {
     try {
       const { id, ...data } = args;
       const result = virtualDiagramService.update(id, data);
@@ -113,6 +123,16 @@ export function registerSchemaHandlers() {
   ipcMain.handle(CHANNELS.SCHEMA_DIFF, async (_event, args: { virtualDiagramId: string; connectionId: string }) => {
     try {
       const data = await diffService.compareDiagrams(args.virtualDiagramId, args.connectionId);
+      return { success: true, data };
+    } catch (error) {
+      return { success: false, data: null, error: (error as Error).message };
+    }
+  });
+
+  // ─── Apply Real to Virtual ───
+  ipcMain.handle(CHANNELS.SCHEMA_APPLY_REAL_TO_VIRTUAL, async (_event, args: { virtualDiagramId: string; connectionId: string }) => {
+    try {
+      const data = await diffService.applyRealToVirtual(args.virtualDiagramId, args.connectionId);
       return { success: true, data };
     } catch (error) {
       return { success: false, data: null, error: (error as Error).message };

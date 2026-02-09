@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { useMutation } from '@tanstack/react-query';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { GitBranch, ArrowRightLeft } from 'lucide-react';
 import { Button } from '@/shared/components/ui/button';
 import { Select } from '@/shared/components/ui/select';
 import { Badge } from '@/shared/components/ui/badge';
@@ -7,8 +8,10 @@ import { useConnections } from '@/features/db-connection';
 import { useDiagrams } from '@/features/virtual-diagram';
 import type { IDiffResult, ITableDiff } from '../model/types';
 import { diffApi } from '../api/diffApi';
+import { useCreateMigration } from '../model/useMigrations';
 import { DiffSummary } from './DiffSummary';
 import { MigrationDdlView } from './MigrationDdlView';
+import { MigrationPanel } from './MigrationPanel';
 
 const ACTION_COLORS: Record<string, string> = {
   added: 'bg-green-100 border-green-300 dark:bg-green-950 dark:border-green-800',
@@ -47,6 +50,7 @@ function TableDiffItem({ tableDiff }: { tableDiff: ITableDiff }) {
 export function DiffView() {
   const { data: diagrams } = useDiagrams('virtual');
   const { data: connections } = useConnections();
+  const queryClient = useQueryClient();
   const [selectedDiagramId, setSelectedDiagramId] = useState('');
   const [selectedConnectionId, setSelectedConnectionId] = useState('');
   const [diffResult, setDiffResult] = useState<IDiffResult | null>(null);
@@ -64,9 +68,41 @@ export function DiffView() {
     },
   });
 
+  const createMigration = useCreateMigration();
+
+  const applyToVirtualMutation = useMutation({
+    mutationFn: () =>
+      diffApi.applyRealToVirtual({
+        virtualDiagramId: selectedDiagramId,
+        connectionId: selectedConnectionId,
+      }),
+    onSuccess: (result) => {
+      if (result.success) {
+        queryClient.invalidateQueries({ queryKey: ['diagrams'] });
+        setDiffResult(null);
+      }
+    },
+  });
+
   function handleCompare() {
     if (!selectedDiagramId || !selectedConnectionId) return;
     compareMutation.mutate();
+  }
+
+  function handleCreateMigration() {
+    if (!diffResult || !selectedDiagramId || !selectedConnectionId) return;
+    createMigration.mutate({
+      diagramId: selectedDiagramId,
+      connectionId: selectedConnectionId,
+      direction: 'virtual_to_real',
+      diffSnapshot: diffResult,
+      migrationDdl: diffResult.migrationDdl,
+    });
+  }
+
+  function handleApplyToVirtual() {
+    if (!selectedDiagramId || !selectedConnectionId) return;
+    applyToVirtualMutation.mutate();
   }
 
   return (
@@ -111,12 +147,45 @@ export function DiffView() {
         {diffResult ? (
           <div className="space-y-4">
             <DiffSummary diff={diffResult} />
+
+            {/* Action buttons */}
+            {diffResult.hasDifferences && (
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleCreateMigration}
+                  disabled={createMigration.isPending}
+                >
+                  <GitBranch className="mr-1 size-3.5" />
+                  {createMigration.isPending ? 'Creating...' : 'Create Migration'}
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleApplyToVirtual}
+                  disabled={applyToVirtualMutation.isPending}
+                >
+                  <ArrowRightLeft className="mr-1 size-3.5" />
+                  {applyToVirtualMutation.isPending ? 'Applying...' : 'Apply to Virtual'}
+                </Button>
+              </div>
+            )}
+
             <div className="space-y-2">
               {diffResult.tableDiffs.map((tableDiff) => (
                 <TableDiffItem key={tableDiff.tableName} tableDiff={tableDiff} />
               ))}
             </div>
             <MigrationDdlView ddl={diffResult.migrationDdl} />
+
+            {/* Migration History */}
+            {selectedDiagramId && selectedConnectionId && (
+              <MigrationPanel
+                diagramId={selectedDiagramId}
+                connectionId={selectedConnectionId}
+              />
+            )}
           </div>
         ) : (
           <div className="flex h-full items-center justify-center">

@@ -38,7 +38,7 @@ export function useCreateDiagram() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: (args: { name: string; type: TDiagramType; tables?: ITable[] }) =>
+    mutationFn: (args: { name: string; type: TDiagramType; version?: string; tables?: ITable[] }) =>
       diagramApi.create(args),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: diagramKeys.all });
@@ -50,7 +50,7 @@ export function useUpdateDiagram() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: (args: { id: string; name?: string; tables?: ITable[] }) =>
+    mutationFn: (args: { id: string; name?: string; version?: string; tables?: ITable[] }) =>
       diagramApi.update(args),
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: diagramKeys.all });

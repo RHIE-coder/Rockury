@@ -6,14 +6,18 @@ import { registerQueryHandlers } from './queryHandlers';
 import { registerDocumentHandlers } from './documentHandlers';
 import { registerValidationHandlers } from './validationHandlers';
 import { registerMockingHandlers } from './mockingHandlers';
+import { registerMigrationHandlers } from './migrationHandlers';
+import { registerViewSnapshotHandlers } from './viewSnapshotHandlers';
 
 export function registerAllHandlers() {
   registerSystemInfoHandlers();
   registerPackageHandlers();
   registerConnectionHandlers();
   registerSchemaHandlers();
+  registerMigrationHandlers();
   registerQueryHandlers();
   registerDocumentHandlers();
   registerValidationHandlers();
   registerMockingHandlers();
+  registerViewSnapshotHandlers();
 }
