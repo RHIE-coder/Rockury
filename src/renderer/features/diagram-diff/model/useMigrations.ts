@@ -30,6 +30,7 @@ export function useCreateMigration() {
       direction: TMigrationDirection;
       diffSnapshot: IDiffResult;
       migrationDdl: string;
+      rollbackDdl?: string;
     }) => migrationApi.create(args),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: migrationKeys.all });
@@ -42,6 +43,17 @@ export function useApplyMigration() {
 
   return useMutation({
     mutationFn: (migrationId: string) => migrationApi.apply(migrationId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: migrationKeys.all });
+    },
+  });
+}
+
+export function useRollbackMigration() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (migrationId: string) => migrationApi.rollback(migrationId),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: migrationKeys.all });
     },

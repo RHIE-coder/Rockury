@@ -1,16 +1,9 @@
 import { useState } from 'react';
-import { Plus, Code, PanelLeft, PanelRight, Search, SlidersHorizontal, Camera, GitCompareArrows, FolderOpen, ArrowUpFromLine } from 'lucide-react';
+import { Plus, Code, PanelLeft, PanelRight, Search, SlidersHorizontal, Camera, GitCompareArrows, FolderOpen, ArrowUpFromLine, Workflow, Copy } from 'lucide-react';
 import { Button } from '@/shared/components/ui/button';
 import { Input } from '@/shared/components/ui/input';
 import type { IDiagram } from '~/shared/types/db';
 import { useDiagramStore } from '../model/diagramStore';
-import type { TDiagramTab } from '../model/diagramStore';
-
-const TABS: { key: TDiagramTab; label: string }[] = [
-  { key: 'virtual', label: 'Virtual' },
-  { key: 'real', label: 'Real' },
-  { key: 'diff', label: 'Diff' },
-];
 
 interface DiagramToolbarProps {
   diagrams: IDiagram[] | undefined;
@@ -27,6 +20,8 @@ interface DiagramToolbarProps {
   onToggleDiagramList?: () => void;
   isForwardEngineerOpen?: boolean;
   onToggleForwardEngineer?: () => void;
+  onAutoLayout?: () => void;
+  onCloneDiagram?: () => void;
 }
 
 export function DiagramToolbar({
@@ -44,6 +39,8 @@ export function DiagramToolbar({
   onToggleDiagramList,
   isForwardEngineerOpen = false,
   onToggleForwardEngineer,
+  onAutoLayout,
+  onCloneDiagram,
 }: DiagramToolbarProps) {
   const {
     selectedDiagramId,
@@ -57,6 +54,8 @@ export function DiagramToolbar({
     toggleRightPanel,
     isSearchOpen,
     setSearchOpen,
+    viewMode,
+    setViewMode,
   } = useDiagramStore();
 
   const [isEditingName, setIsEditingName] = useState(false);
@@ -134,6 +133,13 @@ export function DiagramToolbar({
               </span>
             )}
 
+            {/* Clone button */}
+            {onCloneDiagram && (
+              <Button variant="ghost" size="xs" onClick={onCloneDiagram} title="Clone diagram">
+                <Copy className="size-3" />
+              </Button>
+            )}
+
             {/* Version badge */}
             {isEditingVersion ? (
               <Input
@@ -161,34 +167,20 @@ export function DiagramToolbar({
       {/* Spacer */}
       <div className="flex-1" />
 
-      {/* Center: Tabs */}
-      <div className="flex rounded-md border border-border">
-        {TABS.map((tab) => (
-          <button
-            key={tab.key}
-            type="button"
-            onClick={() => setActiveTab(tab.key)}
-            className={`px-3 py-1 text-xs transition-colors ${
-              activeTab === tab.key
-                ? 'bg-primary text-primary-foreground'
-                : 'hover:bg-muted'
-            }`}
-          >
-            {tab.label}
-          </button>
-        ))}
-      </div>
-
-      {/* Spacer */}
-      <div className="flex-1" />
-
       {/* Right section: Action buttons */}
       <div className="flex items-center gap-1">
         {activeTab === 'virtual' && onAddTable && currentDiagram && (
-          <Button variant="ghost" size="xs" onClick={onAddTable} title="Add table">
-            <Plus className="size-3.5" />
-            Table
-          </Button>
+          <>
+            <Button variant="ghost" size="xs" onClick={onAddTable} title="Add table">
+              <Plus className="size-3.5" />
+              Table
+            </Button>
+            {onAutoLayout && (
+              <Button variant="ghost" size="xs" onClick={onAutoLayout} title="Auto Layout (dagre)">
+                <Workflow className="size-3.5" />
+              </Button>
+            )}
+          </>
         )}
 
         <Button
@@ -260,13 +252,23 @@ export function DiagramToolbar({
         <div className="h-4 w-px bg-border" />
 
         <Button
+          variant={viewMode === 'ddl' ? 'secondary' : 'ghost'}
+          size="xs"
+          onClick={() => setViewMode(viewMode === 'ddl' ? 'canvas' : 'ddl')}
+          title={viewMode === 'ddl' ? 'Switch to Canvas' : 'Switch to DDL'}
+        >
+          <Code className="size-3.5" />
+          {viewMode === 'ddl' ? 'Canvas' : 'DDL'}
+        </Button>
+
+        <Button
           variant={isDdlEditorOpen ? 'secondary' : 'ghost'}
           size="xs"
           onClick={toggleDdlEditor}
-          title="DDL Editor"
+          title="DDL Side Panel"
         >
           <Code className="size-3.5" />
-          DDL
+          Panel
         </Button>
       </div>
     </div>

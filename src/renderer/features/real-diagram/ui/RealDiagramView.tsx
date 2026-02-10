@@ -1,17 +1,19 @@
 import { useState, useEffect, useCallback } from 'react';
-import { RefreshCw, Search, SlidersHorizontal, PanelLeft, PanelRight, ArrowDownToLine } from 'lucide-react';
+import { RefreshCw, Search, SlidersHorizontal, PanelLeft, PanelRight, ArrowDownToLine, Code, History } from 'lucide-react';
 import { useMutation } from '@tanstack/react-query';
 import { Button } from '@/shared/components/ui/button';
 import { Select } from '@/shared/components/ui/select';
-import type { ITable, IDiagram, ISearchResult } from '~/shared/types/db';
+import type { ITable, IDiagram, IDiagramLayout, ISearchResult } from '~/shared/types/db';
 import { useConnections } from '@/features/db-connection';
-import { useDiagramStore, useCreateDiagram } from '@/features/virtual-diagram';
+import { useDiagramStore, useCreateDiagram, useDiagramLayout, useSaveDiagramLayout } from '@/features/virtual-diagram';
 import { DiagramCanvas } from '@/features/virtual-diagram/ui/DiagramCanvas';
 import { TableListPanel } from '@/features/virtual-diagram/ui/TableListPanel';
 import { TableDetailPanel } from '@/features/virtual-diagram/ui/TableDetailPanel';
 import { SearchOverlay } from '@/features/virtual-diagram/ui/SearchOverlay';
 import { FilterPanel } from '@/features/virtual-diagram/ui/FilterPanel';
+import { DdlEditorView } from '@/features/ddl-editor';
 import { realDiagramApi } from '../api/realDiagramApi';
+import { ChangelogPanel } from './ChangelogPanel';
 
 export function RealDiagramView() {
   const { data: connections } = useConnections();
@@ -25,33 +27,53 @@ export function RealDiagramView() {
     toggleRightPanel,
     selectedConnectionId: storeConnectionId,
     setSelectedConnectionId: setStoreConnectionId,
+    viewMode,
+    setViewMode,
+    // Persisted real diagram state from store
+    realTables: tables,
+    setRealTables: setTables,
+    realDiagramId,
+    setRealDiagramId,
+    realSelectedTableId: selectedTableId,
+    setRealSelectedTableId: setSelectedTableId,
+    isRealChangelogOpen: isChangelogOpen,
+    setRealChangelogOpen: setIsChangelogOpen,
+    lastRealChangelog: lastChangelog,
+    setLastRealChangelog: setLastChangelog,
   } = useDiagramStore();
 
   const selectedConnectionId = storeConnectionId ?? '';
   function setSelectedConnectionId(id: string) {
     setStoreConnectionId(id || null);
   }
-  const [tables, setTables] = useState<ITable[]>([]);
-  const [selectedTableId, setSelectedTableId] = useState<string | null>(null);
+  // Ephemeral UI state remains local
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<ISearchResult[]>([]);
   const [isFilterPanelOpen, setIsFilterPanelOpen] = useState(false);
   const createDiagram = useCreateDiagram();
 
-  const fetchSchema = useMutation({
-    mutationFn: (connectionId: string) => realDiagramApi.fetchReal(connectionId),
+  const { data: layout } = useDiagramLayout(realDiagramId ?? '');
+  const saveLayout = useSaveDiagramLayout();
+
+  const syncSchema = useMutation({
+    mutationFn: (connectionId: string) => realDiagramApi.syncReal(connectionId),
     onSuccess: (result) => {
       if (result.success) {
-        setTables(result.data);
+        setTables(result.data.diagram.tables);
+        setRealDiagramId(result.data.diagram.id);
         setSelectedTableId(null);
+        if (result.data.changelog) {
+          setLastChangelog(result.data.changelog);
+          setIsChangelogOpen(true);
+        }
       }
     },
   });
 
   function handleFetch() {
     if (!selectedConnectionId) return;
-    fetchSchema.mutate(selectedConnectionId);
+    syncSchema.mutate(selectedConnectionId);
   }
 
   // Cmd+F shortcut
@@ -73,7 +95,7 @@ export function RealDiagramView() {
 
   const handleTableSelect = useCallback((tableId: string) => {
     setSelectedTableId(tableId || null);
-  }, []);
+  }, [setSelectedTableId]);
 
   function handleImportAsVirtual() {
     if (tables.length === 0) return;
@@ -97,10 +119,21 @@ export function RealDiagramView() {
     setIsSearchOpen(false);
   }
 
-  // Build a synthetic IDiagram for the canvas
+  const handleLayoutChange = useCallback(
+    (layoutUpdate: Pick<IDiagramLayout, 'positions' | 'zoom' | 'viewport'>) => {
+      if (!realDiagramId) return;
+      saveLayout.mutate({
+        diagramId: realDiagramId,
+        ...layoutUpdate,
+      });
+    },
+    [realDiagramId, saveLayout],
+  );
+
+  // Build IDiagram for the canvas (use persisted ID if available)
   const realDiagram: IDiagram | null = tables.length > 0
     ? {
-        id: `real-${selectedConnectionId}`,
+        id: realDiagramId ?? `real-${selectedConnectionId}`,
         name: 'Real Schema',
         version: '0.0.0',
         type: 'real',
@@ -130,23 +163,33 @@ export function RealDiagramView() {
           variant="outline"
           size="xs"
           onClick={handleFetch}
-          disabled={!selectedConnectionId || fetchSchema.isPending}
+          disabled={!selectedConnectionId || syncSchema.isPending}
         >
-          <RefreshCw className={`size-3.5 ${fetchSchema.isPending ? 'animate-spin' : ''}`} />
-          {fetchSchema.isPending ? 'Fetching...' : 'Fetch'}
+          <RefreshCw className={`size-3.5 ${syncSchema.isPending ? 'animate-spin' : ''}`} />
+          {syncSchema.isPending ? 'Syncing...' : 'Sync'}
         </Button>
 
         {realDiagram && (
-          <Button
-            variant="outline"
-            size="xs"
-            onClick={handleImportAsVirtual}
-            disabled={createDiagram.isPending}
-            title="Import as Virtual Diagram (Reverse Engineering)"
-          >
-            <ArrowDownToLine className="size-3.5" />
-            {createDiagram.isPending ? 'Importing...' : 'Import as Virtual'}
-          </Button>
+          <>
+            <Button
+              variant="outline"
+              size="xs"
+              onClick={handleImportAsVirtual}
+              disabled={createDiagram.isPending}
+              title="Import as Virtual Diagram (Reverse Engineering)"
+            >
+              <ArrowDownToLine className="size-3.5" />
+              {createDiagram.isPending ? 'Importing...' : 'Import as Virtual'}
+            </Button>
+            <Button
+              variant={isChangelogOpen ? 'secondary' : 'ghost'}
+              size="xs"
+              onClick={() => setIsChangelogOpen(!isChangelogOpen)}
+              title="Changelog"
+            >
+              <History className="size-3.5" />
+            </Button>
+          </>
         )}
 
         <div className="flex-1" />
@@ -193,6 +236,18 @@ export function RealDiagramView() {
           >
             <PanelRight className="size-3.5" />
           </Button>
+
+          <div className="h-4 w-px bg-border" />
+
+          <Button
+            variant={viewMode === 'ddl' ? 'secondary' : 'ghost'}
+            size="xs"
+            onClick={() => setViewMode(viewMode === 'ddl' ? 'canvas' : 'ddl')}
+            title={viewMode === 'ddl' ? 'Switch to Canvas' : 'Switch to DDL'}
+          >
+            <Code className="size-3.5" />
+            {viewMode === 'ddl' ? 'Canvas' : 'DDL'}
+          </Button>
         </div>
       </div>
 
@@ -236,21 +291,25 @@ export function RealDiagramView() {
             />
           )}
 
-          {realDiagram ? (
+          {viewMode === 'ddl' && realDiagram ? (
+            <DdlEditorView tables={tables} readOnly />
+          ) : realDiagram ? (
             <DiagramCanvas
               diagram={realDiagram}
+              layout={layout}
               filter={filter}
               highlightedTableIds={highlightedTableIds}
               selectedTableId={selectedTableId}
               onTableSelect={handleTableSelect}
+              onLayoutChange={handleLayoutChange}
               readOnly
             />
           ) : (
             <div className="flex h-full items-center justify-center bg-muted/30">
               <p className="text-sm text-muted-foreground">
-                {fetchSchema.isError
+                {syncSchema.isError
                   ? 'Failed to fetch schema. Please check your connection.'
-                  : 'Select a connection and click "Fetch" to view the real database structure.'}
+                  : 'Select a connection and click "Sync" to view the real database structure.'}
               </p>
             </div>
           )}
@@ -265,6 +324,16 @@ export function RealDiagramView() {
             onDelete={() => {}} // read-only
             onClose={() => setSelectedTableId(null)}
           />
+        )}
+
+        {/* Changelog Panel */}
+        {isChangelogOpen && selectedConnectionId && (
+          <div className="w-72 shrink-0 border-l border-border">
+            <ChangelogPanel
+              connectionId={selectedConnectionId}
+              onClose={() => setIsChangelogOpen(false)}
+            />
+          </div>
         )}
       </div>
     </div>

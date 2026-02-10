@@ -102,6 +102,14 @@ export const SQL_ADD_DIAGRAMS_VERSION = `
 ALTER TABLE diagrams ADD COLUMN version TEXT NOT NULL DEFAULT '1.0.0';
 `;
 
+export const SQL_ADD_DIAGRAMS_HIDDEN = `
+ALTER TABLE diagrams ADD COLUMN hidden INTEGER NOT NULL DEFAULT 0;
+`;
+
+export const SQL_ADD_DIAGRAMS_CONNECTION_ID = `
+ALTER TABLE diagrams ADD COLUMN connection_id TEXT;
+`;
+
 export const SQL_CREATE_DIAGRAM_MIGRATIONS = `
 CREATE TABLE IF NOT EXISTS diagram_migrations (
   id TEXT PRIMARY KEY,
@@ -111,7 +119,7 @@ CREATE TABLE IF NOT EXISTS diagram_migrations (
   direction TEXT NOT NULL CHECK(direction IN ('virtual_to_real', 'real_to_virtual')),
   diff_snapshot TEXT NOT NULL,
   migration_ddl TEXT NOT NULL DEFAULT '',
-  status TEXT NOT NULL DEFAULT 'pending' CHECK(status IN ('pending', 'applied', 'failed')),
+  status TEXT NOT NULL DEFAULT 'pending' CHECK(status IN ('pending', 'applied', 'failed', 'rolled_back')),
   applied_at TEXT,
   created_at TEXT NOT NULL DEFAULT (datetime('now')),
   FOREIGN KEY (diagram_id) REFERENCES diagrams(id) ON DELETE CASCADE,
@@ -141,6 +149,50 @@ export const SQL_CREATE_VIEW_SNAPSHOTS_INDEX = `
 CREATE INDEX IF NOT EXISTS idx_view_snapshots_diagram ON view_snapshots(diagram_id);
 `;
 
+export const SQL_CREATE_SCHEMA_CHANGELOGS = `
+CREATE TABLE IF NOT EXISTS schema_changelogs (
+  id TEXT PRIMARY KEY,
+  connection_id TEXT NOT NULL,
+  diagram_id TEXT NOT NULL,
+  changes_json TEXT NOT NULL DEFAULT '[]',
+  synced_at TEXT NOT NULL DEFAULT (datetime('now')),
+  FOREIGN KEY (connection_id) REFERENCES connections(id) ON DELETE CASCADE,
+  FOREIGN KEY (diagram_id) REFERENCES diagrams(id) ON DELETE CASCADE
+);
+`;
+
+export const SQL_ADD_MIGRATIONS_ROLLBACK_DDL = `
+ALTER TABLE diagram_migrations ADD COLUMN rollback_ddl TEXT DEFAULT '';
+`;
+
+export const SQL_ADD_LAYOUT_HIDDEN_TABLE_IDS = `
+ALTER TABLE diagram_layouts ADD COLUMN hidden_table_ids TEXT NOT NULL DEFAULT '[]';
+`;
+
+export const SQL_ADD_LAYOUT_TABLE_COLORS = `
+ALTER TABLE diagram_layouts ADD COLUMN table_colors TEXT NOT NULL DEFAULT '{}';
+`;
+
+// Recreate diagram_migrations with 'rolled_back' in CHECK constraint (for existing DBs)
+export const SQL_FIX_MIGRATIONS_STATUS_CHECK = `
+CREATE TABLE IF NOT EXISTS diagram_migrations_new (
+  id TEXT PRIMARY KEY,
+  diagram_id TEXT NOT NULL,
+  connection_id TEXT NOT NULL,
+  version_number INTEGER NOT NULL,
+  direction TEXT NOT NULL CHECK(direction IN ('virtual_to_real', 'real_to_virtual')),
+  diff_snapshot TEXT NOT NULL,
+  migration_ddl TEXT NOT NULL DEFAULT '',
+  rollback_ddl TEXT DEFAULT '',
+  status TEXT NOT NULL DEFAULT 'pending' CHECK(status IN ('pending', 'applied', 'failed', 'rolled_back')),
+  applied_at TEXT,
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  FOREIGN KEY (diagram_id) REFERENCES diagrams(id) ON DELETE CASCADE,
+  FOREIGN KEY (connection_id) REFERENCES connections(id) ON DELETE CASCADE,
+  UNIQUE(diagram_id, connection_id, version_number)
+);
+`;
+
 export const SQL_CREATE_DOCUMENTS = `
 CREATE TABLE IF NOT EXISTS documents (
   id TEXT PRIMARY KEY,
@@ -166,6 +218,7 @@ const ALL_MIGRATIONS = [
   SQL_CREATE_QUERIES,
   SQL_CREATE_QUERY_HISTORY,
   SQL_CREATE_DOCUMENTS,
+  SQL_CREATE_SCHEMA_CHANGELOGS,
 ];
 
 export function runMigrations(db: Database.Database): void {
@@ -178,13 +231,32 @@ export function runMigrations(db: Database.Database): void {
     }
 
     // Safe ALTER TABLE migrations (ignore if column already exists)
-    const alterMigrations = [SQL_ADD_DIAGRAMS_VERSION];
+    const alterMigrations = [
+      SQL_ADD_DIAGRAMS_VERSION,
+      SQL_ADD_DIAGRAMS_HIDDEN,
+      SQL_ADD_DIAGRAMS_CONNECTION_ID,
+      SQL_ADD_MIGRATIONS_ROLLBACK_DDL,
+      SQL_ADD_LAYOUT_HIDDEN_TABLE_IDS,
+      SQL_ADD_LAYOUT_TABLE_COLORS,
+    ];
     for (const sql of alterMigrations) {
       try {
         db.exec(sql);
       } catch {
         // Column already exists - safe to ignore
       }
+    }
+
+    // Fix CHECK constraint: recreate diagram_migrations with 'rolled_back' status
+    try {
+      db.exec(SQL_FIX_MIGRATIONS_STATUS_CHECK);
+      db.exec(`INSERT OR IGNORE INTO diagram_migrations_new SELECT * FROM diagram_migrations;`);
+      db.exec(`DROP TABLE diagram_migrations;`);
+      db.exec(`ALTER TABLE diagram_migrations_new RENAME TO diagram_migrations;`);
+      db.exec(`CREATE INDEX IF NOT EXISTS idx_migrations_diagram ON diagram_migrations(diagram_id);`);
+      db.exec(`CREATE INDEX IF NOT EXISTS idx_migrations_connection ON diagram_migrations(connection_id);`);
+    } catch {
+      // Already migrated or fresh DB - safe to ignore
     }
   });
 

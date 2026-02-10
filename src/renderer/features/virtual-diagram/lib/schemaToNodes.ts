@@ -27,6 +27,8 @@ interface SchemaToNodesOptions {
   highlightedTableIds?: string[];
   selectedTableId?: string | null;
   onTableUpdate?: (table: ITable) => void;
+  hiddenTableIds?: string[];
+  tableColors?: Record<string, string>;
 }
 
 /**
@@ -52,11 +54,17 @@ export function schemaToNodes(
     highlightedTableIds = [],
     selectedTableId = null,
     onTableUpdate,
+    hiddenTableIds = [],
+    tableColors = {},
   } = options;
 
   const highlightedSet = new Set(highlightedTableIds);
+  const hiddenSet = new Set(hiddenTableIds);
 
-  const nodes: Node[] = tables.map((table, index) => {
+  // Filter out hidden tables
+  const visibleTables = tables.filter((t) => !hiddenSet.has(t.id));
+
+  const nodes: Node[] = visibleTables.map((table, index) => {
     const col = index % COLUMNS_PER_ROW;
     const row = Math.floor(index / COLUMNS_PER_ROW);
     const nodeHeight = estimateNodeHeight(table, filter);
@@ -77,15 +85,16 @@ export function schemaToNodes(
         isHighlighted: highlightedSet.has(table.id),
         isSelected: table.id === selectedTableId,
         onTableUpdate,
+        color: tableColors[table.id],
       } satisfies TableNodeData,
       style: { width: TABLE_WIDTH },
     };
   });
 
   const edges: Edge[] = [];
-  const tableNameToId = new Map(tables.map((t) => [t.name, t.id]));
+  const tableNameToId = new Map(visibleTables.map((t) => [t.name, t.id]));
 
-  for (const table of tables) {
+  for (const table of visibleTables) {
     for (const column of table.columns) {
       if (column.reference) {
         const targetTableId = tableNameToId.get(column.reference.table);

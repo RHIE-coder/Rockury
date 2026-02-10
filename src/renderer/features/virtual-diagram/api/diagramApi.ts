@@ -14,6 +14,7 @@ export const diagramApi = {
   updateMeta: (args: { id: string; name?: string; version?: string }) =>
     api.DIAGRAM_UPDATE_META(args),
   delete: (id: string) => api.DIAGRAM_DELETE({ id }),
+  clone: (id: string, newName?: string) => api.DIAGRAM_CLONE({ id, newName }),
   getLayout: (diagramId: string) => api.DIAGRAM_GET_LAYOUT({ diagramId }),
   saveLayout: (layout: IDiagramLayout) => api.DIAGRAM_SAVE_LAYOUT(layout),
 

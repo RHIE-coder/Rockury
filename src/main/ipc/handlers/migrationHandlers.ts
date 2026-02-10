@@ -1,6 +1,6 @@
 import { ipcMain } from 'electron';
 import { CHANNELS } from '~/shared/ipc/channels';
-import { migrationService, diffService } from '#/services';
+import { migrationService } from '#/services';
 import type { TMigrationDirection, IDiffResult } from '~/shared/types/db';
 
 export function registerMigrationHandlers() {
@@ -19,6 +19,7 @@ export function registerMigrationHandlers() {
     direction: TMigrationDirection;
     diffSnapshot: IDiffResult;
     migrationDdl: string;
+    rollbackDdl?: string;
   }) => {
     try {
       const data = migrationService.create(args);
@@ -30,7 +31,16 @@ export function registerMigrationHandlers() {
 
   ipcMain.handle(CHANNELS.MIGRATION_APPLY, async (_event, args: { migrationId: string }) => {
     try {
-      const data = migrationService.apply(args.migrationId);
+      const data = await migrationService.apply(args.migrationId);
+      return { success: true, data };
+    } catch (error) {
+      return { success: false, data: null, error: (error as Error).message };
+    }
+  });
+
+  ipcMain.handle(CHANNELS.MIGRATION_ROLLBACK, async (_event, args: { migrationId: string }) => {
+    try {
+      const data = await migrationService.rollback(args.migrationId);
       return { success: true, data };
     } catch (error) {
       return { success: false, data: null, error: (error as Error).message };

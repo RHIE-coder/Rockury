@@ -1,71 +1,100 @@
 import { Input } from '@/shared/components/ui/input';
 import { Select } from '@/shared/components/ui/select';
-import type { IColumn, TKeyType } from '@/entities/table';
+import type { IColumn, ITable, TKeyType } from '~/shared/types/db';
+import { ForeignKeyEditor } from './ForeignKeyEditor';
 
 interface ColumnEditorProps {
   column: IColumn;
+  allTables?: ITable[];
   onChange: (updated: IColumn) => void;
   onRemove: () => void;
 }
 
-export function ColumnEditor({ column, onChange, onRemove }: ColumnEditorProps) {
+export function ColumnEditor({ column, allTables, onChange, onRemove }: ColumnEditorProps) {
   function updateField<K extends keyof IColumn>(key: K, value: IColumn[K]) {
     onChange({ ...column, [key]: value });
   }
 
+  function handleKeyTypeChange(value: string) {
+    const keyType = (value || null) as TKeyType | null;
+    const updated: IColumn = { ...column, keyType };
+
+    // Clear reference when switching away from FK
+    if (keyType !== 'FK' && column.reference) {
+      updated.reference = null;
+    }
+    // Initialize empty reference when switching to FK
+    if (keyType === 'FK' && !column.reference) {
+      updated.reference = { table: '', column: '' };
+    }
+
+    onChange(updated);
+  }
+
   return (
-    <div className="flex items-center gap-1.5 rounded border border-border p-1.5">
-      <Input
-        className="h-7 w-28 text-xs"
-        placeholder="Column name"
-        value={column.name}
-        onChange={(e) => updateField('name', e.target.value)}
-      />
-      <Input
-        className="h-7 w-24 text-xs"
-        placeholder="Data type"
-        value={column.dataType}
-        onChange={(e) => updateField('dataType', e.target.value)}
-      />
-      <Select
-        className="h-7 w-20 text-xs"
-        value={column.keyType ?? ''}
-        onChange={(e) => updateField('keyType', (e.target.value || null) as TKeyType | null)}
-      >
-        <option value="">None</option>
-        <option value="PK">PK</option>
-        <option value="FK">FK</option>
-        <option value="UK">UK</option>
-        <option value="IDX">IDX</option>
-      </Select>
-      <Input
-        className="h-7 w-20 text-xs"
-        placeholder="Default"
-        value={column.defaultValue ?? ''}
-        onChange={(e) => updateField('defaultValue', e.target.value || null)}
-      />
-      <label className="flex items-center gap-1 text-xs">
-        <input
-          type="checkbox"
-          checked={column.nullable}
-          onChange={(e) => updateField('nullable', e.target.checked)}
-          className="size-3"
+    <div className="space-y-1.5 rounded border border-border p-1.5">
+      <div className="flex items-center gap-1.5">
+        <Input
+          className="h-7 w-28 text-xs"
+          placeholder="Column name"
+          value={column.name}
+          onChange={(e) => updateField('name', e.target.value)}
         />
-        Null
-      </label>
-      <Input
-        className="h-7 w-24 text-xs"
-        placeholder="Comment"
-        value={column.comment}
-        onChange={(e) => updateField('comment', e.target.value)}
-      />
-      <button
-        type="button"
-        onClick={onRemove}
-        className="ml-auto text-xs text-destructive hover:underline"
-      >
-        X
-      </button>
+        <Input
+          className="h-7 w-24 text-xs"
+          placeholder="Data type"
+          value={column.dataType}
+          onChange={(e) => updateField('dataType', e.target.value)}
+        />
+        <Select
+          className="h-7 w-20 text-xs"
+          value={column.keyType ?? ''}
+          onChange={(e) => handleKeyTypeChange(e.target.value)}
+        >
+          <option value="">None</option>
+          <option value="PK">PK</option>
+          <option value="FK">FK</option>
+          <option value="UK">UK</option>
+          <option value="IDX">IDX</option>
+        </Select>
+        <Input
+          className="h-7 w-20 text-xs"
+          placeholder="Default"
+          value={column.defaultValue ?? ''}
+          onChange={(e) => updateField('defaultValue', e.target.value || null)}
+        />
+        <label className="flex items-center gap-1 text-xs">
+          <input
+            type="checkbox"
+            checked={column.nullable}
+            onChange={(e) => updateField('nullable', e.target.checked)}
+            className="size-3"
+          />
+          Null
+        </label>
+        <Input
+          className="h-7 w-24 text-xs"
+          placeholder="Comment"
+          value={column.comment}
+          onChange={(e) => updateField('comment', e.target.value)}
+        />
+        <button
+          type="button"
+          onClick={onRemove}
+          className="ml-auto text-xs text-destructive hover:underline"
+        >
+          X
+        </button>
+      </div>
+
+      {/* FK Reference Editor */}
+      {column.keyType === 'FK' && allTables && (
+        <ForeignKeyEditor
+          reference={column.reference}
+          allTables={allTables}
+          onChange={(ref) => updateField('reference', ref)}
+        />
+      )}
     </div>
   );
 }

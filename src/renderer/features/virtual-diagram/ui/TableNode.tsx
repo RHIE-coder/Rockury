@@ -10,6 +10,7 @@ export interface TableNodeData {
   isHighlighted: boolean;
   isSelected: boolean;
   onTableUpdate?: (table: ITable) => void;
+  color?: string;
 }
 
 function KeyIcon({ keyType }: { keyType: IColumn['keyType'] }) {
@@ -34,7 +35,7 @@ function NullableIcon({ nullable }: { nullable: boolean }) {
 }
 
 function TableNodeComponent({ data }: NodeProps) {
-  const { table, filter, isHighlighted, isSelected, onTableUpdate } = data as unknown as TableNodeData;
+  const { table, filter, isHighlighted, isSelected, onTableUpdate, color } = data as unknown as TableNodeData;
   const [isEditing, setIsEditing] = useState(false);
   const [editName, setEditName] = useState(table.name);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -80,7 +81,8 @@ function TableNodeComponent({ data }: NodeProps) {
 
       {/* Header */}
       <div
-        className="rounded-t-lg bg-primary px-3 py-1.5 text-primary-foreground"
+        className={`rounded-t-lg px-3 py-1.5 ${color ? '' : 'bg-primary text-primary-foreground'}`}
+        style={color ? { backgroundColor: color, color: '#fff' } : undefined}
         onDoubleClick={handleHeaderDoubleClick}
       >
         {isEditing ? (

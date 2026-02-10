@@ -9,6 +9,7 @@ import type {
   IDocument, TExportFormat,
   IValidationReport,
   IMockResult,
+  ISchemaChangelog,
 } from '~/shared/types/db';
 
 export interface IEvents {
@@ -115,6 +116,10 @@ export interface IEvents {
     args: IDiagramLayout;
     response: { success: boolean };
   };
+  [CHANNELS.DIAGRAM_CLONE]: {
+    args: { id: string; newName?: string };
+    response: { success: boolean; data: IDiagram };
+  };
 
   // Diagram Versions
   [CHANNELS.DIAGRAM_VERSION_LIST]: {
@@ -142,6 +147,7 @@ export interface IEvents {
       direction: TMigrationDirection;
       diffSnapshot: IDiffResult;
       migrationDdl: string;
+      rollbackDdl?: string;
     };
     response: { success: boolean; data: IMigration };
   };
@@ -152,6 +158,10 @@ export interface IEvents {
   [CHANNELS.MIGRATION_DELETE]: {
     args: { migrationId: string };
     response: { success: boolean };
+  };
+  [CHANNELS.MIGRATION_ROLLBACK]: {
+    args: { migrationId: string };
+    response: { success: boolean; data: IMigration };
   };
 
   // View Snapshot
@@ -172,15 +182,39 @@ export interface IEvents {
     response: { success: boolean };
   };
 
+  // Diagram Hidden
+  [CHANNELS.DIAGRAM_SET_HIDDEN]: {
+    args: { id: string; hidden: boolean };
+    response: { success: boolean };
+  };
+
   // Schema (Real)
   [CHANNELS.SCHEMA_FETCH_REAL]: {
     args: { connectionId: string };
     response: { success: boolean; data: ITable[] };
   };
+  [CHANNELS.SCHEMA_SYNC_REAL]: {
+    args: { connectionId: string };
+    response: { success: boolean; data: { diagram: IDiagram; changelog?: ISchemaChangelog } };
+  };
+
+  // Changelog
+  [CHANNELS.CHANGELOG_LIST]: {
+    args: { connectionId: string };
+    response: { success: boolean; data: ISchemaChangelog[] };
+  };
+  [CHANNELS.CHANGELOG_DELETE]: {
+    args: { id: string };
+    response: { success: boolean };
+  };
 
   // Diff
   [CHANNELS.SCHEMA_DIFF]: {
     args: { virtualDiagramId: string; connectionId: string };
+    response: { success: boolean; data: IDiffResult };
+  };
+  [CHANNELS.SCHEMA_DIFF_VIRTUAL]: {
+    args: { sourceDiagramId: string; targetDiagramId: string };
     response: { success: boolean; data: IDiffResult };
   };
   [CHANNELS.SCHEMA_APPLY_REAL_TO_VIRTUAL]: {

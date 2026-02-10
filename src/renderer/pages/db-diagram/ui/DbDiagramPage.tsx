@@ -4,6 +4,7 @@ import { VirtualDiagramView } from '@/features/virtual-diagram';
 import { RealDiagramView } from '@/features/real-diagram';
 import { DiffView } from '@/features/diagram-diff';
 import { DdlEditorView } from '@/features/ddl-editor';
+import { DiagramTabBar } from './DiagramTabBar';
 import type { ITable } from '~/shared/types/db';
 
 export function DbDiagramPage() {
@@ -25,6 +26,9 @@ export function DbDiagramPage() {
 
   return (
     <div className="flex h-full flex-col">
+      {/* Global Tab Bar */}
+      <DiagramTabBar />
+
       {/* Content */}
       <div className="flex flex-1 overflow-hidden">
         <div className="flex-1">

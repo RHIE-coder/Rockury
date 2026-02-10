@@ -59,6 +59,8 @@ const API: TElectronAPI = {
     ipcRenderer.invoke(CHANNELS.DIAGRAM_GET_LAYOUT, args),
   [CHANNELS.DIAGRAM_SAVE_LAYOUT]: (args) =>
     ipcRenderer.invoke(CHANNELS.DIAGRAM_SAVE_LAYOUT, args),
+  [CHANNELS.DIAGRAM_CLONE]: (args) =>
+    ipcRenderer.invoke(CHANNELS.DIAGRAM_CLONE, args),
 
   // Diagram Versions
   [CHANNELS.DIAGRAM_VERSION_LIST]: (args) =>
@@ -77,6 +79,8 @@ const API: TElectronAPI = {
     ipcRenderer.invoke(CHANNELS.MIGRATION_APPLY, args),
   [CHANNELS.MIGRATION_DELETE]: (args) =>
     ipcRenderer.invoke(CHANNELS.MIGRATION_DELETE, args),
+  [CHANNELS.MIGRATION_ROLLBACK]: (args) =>
+    ipcRenderer.invoke(CHANNELS.MIGRATION_ROLLBACK, args),
 
   // View Snapshot
   [CHANNELS.VIEW_SNAPSHOT_LIST]: (args) =>
@@ -88,13 +92,27 @@ const API: TElectronAPI = {
   [CHANNELS.VIEW_SNAPSHOT_DELETE]: (args) =>
     ipcRenderer.invoke(CHANNELS.VIEW_SNAPSHOT_DELETE, args),
 
+  // Diagram Hidden
+  [CHANNELS.DIAGRAM_SET_HIDDEN]: (args) =>
+    ipcRenderer.invoke(CHANNELS.DIAGRAM_SET_HIDDEN, args),
+
   // Schema (Real)
   [CHANNELS.SCHEMA_FETCH_REAL]: (args) =>
     ipcRenderer.invoke(CHANNELS.SCHEMA_FETCH_REAL, args),
+  [CHANNELS.SCHEMA_SYNC_REAL]: (args) =>
+    ipcRenderer.invoke(CHANNELS.SCHEMA_SYNC_REAL, args),
+
+  // Changelog
+  [CHANNELS.CHANGELOG_LIST]: (args) =>
+    ipcRenderer.invoke(CHANNELS.CHANGELOG_LIST, args),
+  [CHANNELS.CHANGELOG_DELETE]: (args) =>
+    ipcRenderer.invoke(CHANNELS.CHANGELOG_DELETE, args),
 
   // Diff
   [CHANNELS.SCHEMA_DIFF]: (args) =>
     ipcRenderer.invoke(CHANNELS.SCHEMA_DIFF, args),
+  [CHANNELS.SCHEMA_DIFF_VIRTUAL]: (args) =>
+    ipcRenderer.invoke(CHANNELS.SCHEMA_DIFF_VIRTUAL, args),
   [CHANNELS.SCHEMA_APPLY_REAL_TO_VIRTUAL]: (args) =>
     ipcRenderer.invoke(CHANNELS.SCHEMA_APPLY_REAL_TO_VIRTUAL, args),
 

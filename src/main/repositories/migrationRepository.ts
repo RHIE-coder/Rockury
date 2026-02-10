@@ -9,6 +9,7 @@ interface MigrationRow {
   direction: string;
   diff_snapshot: string;
   migration_ddl: string;
+  rollback_ddl: string | null;
   status: string;
   applied_at: string | null;
   created_at: string;
@@ -23,6 +24,7 @@ function toMigration(row: MigrationRow): IMigration {
     direction: row.direction as TMigrationDirection,
     diffSnapshot: JSON.parse(row.diff_snapshot) as IDiffResult,
     migrationDdl: row.migration_ddl,
+    rollbackDdl: row.rollback_ddl ?? undefined,
     status: row.status as TMigrationStatus,
     appliedAt: row.applied_at,
     createdAt: row.created_at,
@@ -64,13 +66,14 @@ export const migrationRepository = {
     direction: TMigrationDirection;
     diffSnapshot: IDiffResult;
     migrationDdl: string;
+    rollbackDdl?: string;
   }): IMigration {
     const db = getDb();
     const id = crypto.randomUUID();
     const versionNumber = this.getLatestVersionNumber(data.diagramId, data.connectionId);
     db.prepare(
-      `INSERT INTO diagram_migrations (id, diagram_id, connection_id, version_number, direction, diff_snapshot, migration_ddl)
-       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO diagram_migrations (id, diagram_id, connection_id, version_number, direction, diff_snapshot, migration_ddl, rollback_ddl)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
     ).run(
       id,
       data.diagramId,
@@ -79,6 +82,7 @@ export const migrationRepository = {
       data.direction,
       JSON.stringify(data.diffSnapshot),
       data.migrationDdl,
+      data.rollbackDdl ?? '',
     );
     return this.getById(id)!;
   },

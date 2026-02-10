@@ -109,6 +109,8 @@ export interface IDiagram {
   version: string;
   type: TDiagramType;
   tables: ITable[];
+  hidden?: boolean;
+  connectionId?: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -118,6 +120,8 @@ export interface IDiagramLayout {
   positions: Record<string, { x: number; y: number }>;
   zoom: number;
   viewport: { x: number; y: number };
+  hiddenTableIds?: string[];
+  tableColors?: Record<string, string>;
 }
 
 export interface IDiagramVersion {
@@ -155,7 +159,7 @@ export interface ISearchResult {
 
 // ─── Migration ───
 export type TMigrationDirection = 'virtual_to_real' | 'real_to_virtual';
-export type TMigrationStatus = 'pending' | 'applied' | 'failed';
+export type TMigrationStatus = 'pending' | 'applied' | 'failed' | 'rolled_back';
 
 export interface IMigration {
   id: string;
@@ -165,6 +169,7 @@ export interface IMigration {
   direction: TMigrationDirection;
   diffSnapshot: IDiffResult;
   migrationDdl: string;
+  rollbackDdl?: string;
   status: TMigrationStatus;
   appliedAt: string | null;
   createdAt: string;
@@ -181,6 +186,7 @@ export interface IViewSnapshot {
 }
 
 // ─── Diff ───
+export type TDiffMode = 'virtual_vs_real' | 'virtual_vs_virtual';
 export type TDiffAction = 'added' | 'removed' | 'modified';
 
 export interface ITableDiff {
@@ -211,7 +217,34 @@ export interface IDiffResult {
   tableDiffs: ITableDiff[];
   hasDifferences: boolean;
   migrationDdl: string;
+  rollbackDdl: string;
   comparedAt: string;
+  mode?: TDiffMode;
+  sourceName?: string;
+  targetName?: string;
+}
+
+// ─── Schema Changelog ───
+export interface ISchemaChangelog {
+  id: string;
+  connectionId: string;
+  diagramId: string;
+  changes: ISchemaChange[];
+  syncedAt: string;
+}
+
+export interface ISchemaChange {
+  tableName: string;
+  action: TDiffAction;
+  columnChanges: IColumnChange[];
+}
+
+export interface IColumnChange {
+  columnName: string;
+  action: TDiffAction;
+  field?: string;
+  oldValue?: string;
+  newValue?: string;
 }
 
 // ─── Query ───

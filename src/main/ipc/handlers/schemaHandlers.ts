@@ -1,7 +1,8 @@
 import { ipcMain } from 'electron';
 import { CHANNELS } from '~/shared/ipc/channels';
 import { schemaService, virtualDiagramService, diffService } from '#/services';
-import type { ITable, TDbType, TDiagramType, IDiagramLayout } from '~/shared/types/db';
+import { diagramRepository, changelogRepository } from '#/repositories';
+import type { ITable, ISchemaChange, IColumnChange, TDbType, TDiagramType, IDiagramLayout } from '~/shared/types/db';
 
 export function registerSchemaHandlers() {
   // ─── Diagram CRUD ───
@@ -62,6 +63,16 @@ export function registerSchemaHandlers() {
     }
   });
 
+  // ─── Clone ───
+  ipcMain.handle(CHANNELS.DIAGRAM_CLONE, async (_event, args: { id: string; newName?: string }) => {
+    try {
+      const data = virtualDiagramService.clone(args.id, args.newName);
+      return { success: true, data };
+    } catch (error) {
+      return { success: false, data: null, error: (error as Error).message };
+    }
+  });
+
   // ─── Layout ───
   ipcMain.handle(CHANNELS.DIAGRAM_GET_LAYOUT, async (_event, args: { diagramId: string }) => {
     try {
@@ -119,10 +130,84 @@ export function registerSchemaHandlers() {
     }
   });
 
+  // ─── Diagram Set Hidden ───
+  ipcMain.handle(CHANNELS.DIAGRAM_SET_HIDDEN, async (_event, args: { id: string; hidden: boolean }) => {
+    try {
+      diagramRepository.setHidden(args.id, args.hidden);
+      return { success: true };
+    } catch (error) {
+      return { success: false, error: (error as Error).message };
+    }
+  });
+
+  // ─── Schema Sync Real ───
+  ipcMain.handle(CHANNELS.SCHEMA_SYNC_REAL, async (_event, args: { connectionId: string }) => {
+    try {
+      const newTables = await schemaService.fetchRealSchema(args.connectionId);
+      let existingDiagram = diagramRepository.findByConnectionId(args.connectionId);
+      let changelog = undefined;
+
+      if (existingDiagram) {
+        // Compare old vs new tables for changelog
+        const changes = compareTablesForChangelog(existingDiagram.tables, newTables);
+        if (changes.length > 0) {
+          changelog = changelogRepository.create({
+            connectionId: args.connectionId,
+            diagramId: existingDiagram.id,
+            changes,
+          });
+        }
+        // Update existing diagram with new tables (keep layout)
+        existingDiagram = diagramRepository.update(existingDiagram.id, { tables: newTables });
+      } else {
+        // Create new real diagram
+        existingDiagram = diagramRepository.create({
+          name: 'Real Schema',
+          type: 'real',
+          tables: newTables,
+          connectionId: args.connectionId,
+        });
+      }
+
+      return { success: true, data: { diagram: existingDiagram, changelog } };
+    } catch (error) {
+      return { success: false, data: null, error: (error as Error).message };
+    }
+  });
+
+  // ─── Changelog ───
+  ipcMain.handle(CHANNELS.CHANGELOG_LIST, async (_event, args: { connectionId: string }) => {
+    try {
+      const data = changelogRepository.list(args.connectionId);
+      return { success: true, data };
+    } catch (error) {
+      return { success: false, data: null, error: (error as Error).message };
+    }
+  });
+
+  ipcMain.handle(CHANNELS.CHANGELOG_DELETE, async (_event, args: { id: string }) => {
+    try {
+      changelogRepository.deleteById(args.id);
+      return { success: true };
+    } catch (error) {
+      return { success: false, error: (error as Error).message };
+    }
+  });
+
   // ─── Diff ───
   ipcMain.handle(CHANNELS.SCHEMA_DIFF, async (_event, args: { virtualDiagramId: string; connectionId: string }) => {
     try {
       const data = await diffService.compareDiagrams(args.virtualDiagramId, args.connectionId);
+      return { success: true, data };
+    } catch (error) {
+      return { success: false, data: null, error: (error as Error).message };
+    }
+  });
+
+  // ─── Diff Virtual vs Virtual ───
+  ipcMain.handle(CHANNELS.SCHEMA_DIFF_VIRTUAL, async (_event, args: { sourceDiagramId: string; targetDiagramId: string }) => {
+    try {
+      const data = diffService.compareVirtualDiagrams(args.sourceDiagramId, args.targetDiagramId);
       return { success: true, data };
     } catch (error) {
       return { success: false, data: null, error: (error as Error).message };
@@ -276,4 +361,78 @@ function generateDdl(tables: ITable[], dbType: TDbType): string {
 function quoteId(name: string, dbType: TDbType): string {
   if (dbType === 'postgresql') return `"${name}"`;
   return `\`${name}\``;
+}
+
+function compareTablesForChangelog(oldTables: ITable[], newTables: ITable[]): ISchemaChange[] {
+  const changes: ISchemaChange[] = [];
+  const oldByName = new Map(oldTables.map((t) => [t.name, t]));
+  const newByName = new Map(newTables.map((t) => [t.name, t]));
+
+  // Added tables
+  for (const [name, table] of newByName) {
+    if (!oldByName.has(name)) {
+      changes.push({
+        tableName: name,
+        action: 'added',
+        columnChanges: table.columns.map((c) => ({
+          columnName: c.name,
+          action: 'added' as const,
+        })),
+      });
+    }
+  }
+
+  // Removed tables
+  for (const [name, table] of oldByName) {
+    if (!newByName.has(name)) {
+      changes.push({
+        tableName: name,
+        action: 'removed',
+        columnChanges: table.columns.map((c) => ({
+          columnName: c.name,
+          action: 'removed' as const,
+        })),
+      });
+    }
+  }
+
+  // Modified tables
+  for (const [name, newTable] of newByName) {
+    const oldTable = oldByName.get(name);
+    if (!oldTable) continue;
+
+    const columnChanges: IColumnChange[] = [];
+    const oldColByName = new Map(oldTable.columns.map((c) => [c.name, c]));
+    const newColByName = new Map(newTable.columns.map((c) => [c.name, c]));
+
+    for (const [colName, newCol] of newColByName) {
+      const oldCol = oldColByName.get(colName);
+      if (!oldCol) {
+        columnChanges.push({ columnName: colName, action: 'added' });
+      } else {
+        // Check for modifications
+        if (oldCol.dataType !== newCol.dataType) {
+          columnChanges.push({ columnName: colName, action: 'modified', field: 'dataType', oldValue: oldCol.dataType, newValue: newCol.dataType });
+        }
+        if (oldCol.nullable !== newCol.nullable) {
+          columnChanges.push({ columnName: colName, action: 'modified', field: 'nullable', oldValue: String(oldCol.nullable), newValue: String(newCol.nullable) });
+        }
+        if (oldCol.keyType !== newCol.keyType) {
+          columnChanges.push({ columnName: colName, action: 'modified', field: 'keyType', oldValue: oldCol.keyType ?? '', newValue: newCol.keyType ?? '' });
+        }
+      }
+    }
+
+    for (const [colName] of oldColByName) {
+      if (!newColByName.has(colName)) {
+        columnChanges.push({ columnName: colName, action: 'removed' });
+      }
+    }
+
+    if (columnChanges.length > 0) {
+      changes.push({ tableName: name, action: 'modified', columnChanges });
+    }
+  }
+
+  return changes;
 }

@@ -1,12 +1,10 @@
-import { useState } from 'react';
-import { useMutation } from '@tanstack/react-query';
+import { useState, useEffect } from 'react';
 import CodeMirror from '@uiw/react-codemirror';
 import { sql } from '@codemirror/lang-sql';
 import { Button } from '@/shared/components/ui/button';
 import { Select } from '@/shared/components/ui/select';
 import type { TDbType } from '@/entities/connection';
 import type { ITable } from '@/entities/table';
-import { ddlApi } from '../api/ddlApi';
 import { parseDdl } from '../lib/ddlParser';
 import { schemaToDdl } from '../lib/schemaToDdl';
 
@@ -14,54 +12,33 @@ interface DdlEditorViewProps {
   tables?: ITable[];
   onParsed?: (tables: ITable[]) => void;
   onClose?: () => void;
+  readOnly?: boolean;
 }
 
-export function DdlEditorView({ tables = [], onParsed, onClose }: DdlEditorViewProps) {
+export function DdlEditorView({ tables = [], onParsed, onClose, readOnly = false }: DdlEditorViewProps) {
   const [ddlContent, setDdlContent] = useState('');
   const [dbType, setDbType] = useState<TDbType>('mysql');
 
-  const parseMutation = useMutation({
-    mutationFn: () => ddlApi.parse({ ddl: ddlContent, dbType }),
-    onSuccess: (result) => {
-      if (result.success) {
-        onParsed?.(result.data);
-      }
-    },
-  });
+  // Auto-generate DDL in readOnly mode when tables change
+  useEffect(() => {
+    if (readOnly && tables.length > 0) {
+      setDdlContent(schemaToDdl(tables, dbType));
+    }
+  }, [readOnly, tables, dbType]);
 
-  const generateMutation = useMutation({
-    mutationFn: () => ddlApi.generate({ tables, dbType }),
-    onSuccess: (result) => {
-      if (result.success) {
-        setDdlContent(result.data.ddl);
-      }
-    },
-  });
-
-  function handleLocalParse() {
+  function handleParse() {
     const parsed = parseDdl(ddlContent);
     onParsed?.(parsed);
   }
 
-  function handleLocalGenerate() {
-    const generated = schemaToDdl(tables, dbType);
-    setDdlContent(generated);
-  }
-
-  function handleFormat() {
-    // Simple formatting: normalize whitespace
-    setDdlContent((prev) =>
-      prev
-        .replace(/\n{3,}/g, '\n\n')
-        .replace(/;\s*(?=CREATE)/gi, ';\n\n')
-        .trim(),
-    );
+  function handleGenerate() {
+    setDdlContent(schemaToDdl(tables, dbType));
   }
 
   return (
     <div className="flex h-full flex-col border-l border-border bg-background">
       <div className="flex items-center gap-2 border-b border-border p-2">
-        <h3 className="text-sm font-semibold">DDL Editor</h3>
+        <h3 className="text-sm font-semibold">{readOnly ? 'DDL View' : 'DDL Editor'}</h3>
         <Select
           className="h-7 w-32 text-xs"
           value={dbType}
@@ -72,45 +49,28 @@ export function DdlEditorView({ tables = [], onParsed, onClose }: DdlEditorViewP
           <option value="postgresql">PostgreSQL</option>
         </Select>
         <div className="ml-auto flex gap-1">
-          <Button
-            variant="outline"
-            size="xs"
-            onClick={() => parseMutation.mutate()}
-            disabled={parseMutation.isPending || !ddlContent.trim()}
-            title="Parse DDL via IPC"
-          >
-            Parse (IPC)
-          </Button>
-          <Button
-            variant="outline"
-            size="xs"
-            onClick={handleLocalParse}
-            disabled={!ddlContent.trim()}
-            title="Parse DDL locally"
-          >
-            Parse
-          </Button>
-          <Button
-            variant="outline"
-            size="xs"
-            onClick={() => generateMutation.mutate()}
-            disabled={generateMutation.isPending || tables.length === 0}
-            title="Generate DDL via IPC"
-          >
-            Generate (IPC)
-          </Button>
-          <Button
-            variant="outline"
-            size="xs"
-            onClick={handleLocalGenerate}
-            disabled={tables.length === 0}
-            title="Generate DDL locally"
-          >
-            Generate
-          </Button>
-          <Button variant="outline" size="xs" onClick={handleFormat}>
-            Format
-          </Button>
+          {!readOnly && (
+            <>
+              <Button
+                variant="outline"
+                size="xs"
+                onClick={handleParse}
+                disabled={!ddlContent.trim()}
+                title="Parse DDL to schema"
+              >
+                Parse
+              </Button>
+              <Button
+                variant="outline"
+                size="xs"
+                onClick={handleGenerate}
+                disabled={tables.length === 0}
+                title="Regenerate DDL from schema"
+              >
+                Generate
+              </Button>
+            </>
+          )}
           {onClose && (
             <Button variant="ghost" size="xs" onClick={onClose}>
               Close
@@ -124,7 +84,9 @@ export function DdlEditorView({ tables = [], onParsed, onClose }: DdlEditorViewP
           value={ddlContent}
           height="100%"
           extensions={[sql()]}
-          onChange={(value) => setDdlContent(value)}
+          onChange={readOnly ? undefined : (value) => setDdlContent(value)}
+          readOnly={readOnly}
+          editable={!readOnly}
           className="h-full"
           theme="dark"
         />

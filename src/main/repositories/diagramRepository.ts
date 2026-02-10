@@ -7,6 +7,8 @@ interface DiagramRow {
   version: string;
   type: string;
   tables_json: string;
+  hidden: number;
+  connection_id: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -16,6 +18,8 @@ interface DiagramLayoutRow {
   positions: string;
   zoom: number;
   viewport: string;
+  hidden_table_ids?: string;
+  table_colors?: string;
 }
 
 function toDiagram(row: DiagramRow): IDiagram {
@@ -25,6 +29,8 @@ function toDiagram(row: DiagramRow): IDiagram {
     version: row.version ?? '1.0.0',
     type: row.type as TDiagramType,
     tables: JSON.parse(row.tables_json) as ITable[],
+    hidden: row.hidden === 1,
+    connectionId: row.connection_id ?? undefined,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -36,6 +42,8 @@ function toLayout(row: DiagramLayoutRow): IDiagramLayout {
     positions: JSON.parse(row.positions),
     zoom: row.zoom,
     viewport: JSON.parse(row.viewport),
+    hiddenTableIds: row.hidden_table_ids ? JSON.parse(row.hidden_table_ids) : [],
+    tableColors: row.table_colors ? JSON.parse(row.table_colors) : {},
   };
 }
 
@@ -56,15 +64,26 @@ export const diagramRepository = {
     return row ? toDiagram(row) : null;
   },
 
-  create(data: { name: string; type: TDiagramType; version?: string; tables?: ITable[] }): IDiagram {
+  create(data: { name: string; type: TDiagramType; version?: string; tables?: ITable[]; connectionId?: string }): IDiagram {
     const db = getDb();
     const id = crypto.randomUUID();
     const tablesJson = JSON.stringify(data.tables ?? []);
     const version = data.version ?? '1.0.0';
     db.prepare(
-      'INSERT INTO diagrams (id, name, type, version, tables_json) VALUES (?, ?, ?, ?, ?)',
-    ).run(id, data.name, data.type, version, tablesJson);
+      'INSERT INTO diagrams (id, name, type, version, tables_json, connection_id) VALUES (?, ?, ?, ?, ?, ?)',
+    ).run(id, data.name, data.type, version, tablesJson, data.connectionId ?? null);
     return this.getById(id)!;
+  },
+
+  findByConnectionId(connectionId: string): IDiagram | null {
+    const db = getDb();
+    const row = db.prepare('SELECT * FROM diagrams WHERE connection_id = ? AND type = ?').get(connectionId, 'real') as DiagramRow | undefined;
+    return row ? toDiagram(row) : null;
+  },
+
+  setHidden(id: string, hidden: boolean): void {
+    const db = getDb();
+    db.prepare('UPDATE diagrams SET hidden = ? WHERE id = ?').run(hidden ? 1 : 0, id);
   },
 
   update(id: string, data: { name?: string; version?: string; tables?: ITable[] }): IDiagram {
@@ -99,15 +118,17 @@ export const diagramRepository = {
   saveLayout(layout: IDiagramLayout): void {
     const db = getDb();
     db.prepare(
-      `INSERT INTO diagram_layouts (diagram_id, positions, zoom, viewport)
-       VALUES (?, ?, ?, ?)
+      `INSERT INTO diagram_layouts (diagram_id, positions, zoom, viewport, hidden_table_ids, table_colors)
+       VALUES (?, ?, ?, ?, ?, ?)
        ON CONFLICT(diagram_id)
-       DO UPDATE SET positions = excluded.positions, zoom = excluded.zoom, viewport = excluded.viewport`,
+       DO UPDATE SET positions = excluded.positions, zoom = excluded.zoom, viewport = excluded.viewport, hidden_table_ids = excluded.hidden_table_ids, table_colors = excluded.table_colors`,
     ).run(
       layout.diagramId,
       JSON.stringify(layout.positions),
       layout.zoom,
       JSON.stringify(layout.viewport),
+      JSON.stringify(layout.hiddenTableIds ?? []),
+      JSON.stringify(layout.tableColors ?? {}),
     );
   },
 };

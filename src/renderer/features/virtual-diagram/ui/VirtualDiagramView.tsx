@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useState } from 'react';
 import type { ITable, IDiagramLayout, ISearchResult, IViewSnapshot } from '~/shared/types/db';
-import { useDiagrams, useDiagram, useUpdateDiagram, useCreateDiagram, useDeleteDiagram, useDiagramLayout, useSaveDiagramLayout } from '../model/useDiagrams';
+import { useDiagrams, useDiagram, useUpdateDiagram, useCreateDiagram, useDeleteDiagram, useCloneDiagram, useDiagramLayout, useSaveDiagramLayout } from '../model/useDiagrams';
 import { useDiagramStore } from '../model/diagramStore';
+import { schemaToNodes } from '../lib/schemaToNodes';
+import { applyDagreLayout } from '../lib/autoLayout';
 import { DiagramCanvas } from './DiagramCanvas';
 import { DiagramToolbar } from './DiagramToolbar';
 import { TableListPanel } from './TableListPanel';
@@ -11,6 +13,7 @@ import { FilterPanel } from './FilterPanel';
 import { ViewSnapshotManager } from './ViewSnapshotManager';
 import { DiagramListPanel } from './DiagramListPanel';
 import { ForwardEngineerPanel } from './ForwardEngineerPanel';
+import { DdlEditorView } from '@/features/ddl-editor';
 
 function createEmptyTable(): ITable {
   return {
@@ -54,6 +57,19 @@ export function VirtualDiagramView() {
     filter,
     setFilter,
     setFilterPreset,
+    viewMode,
+    setChangeSource,
+    hiddenTableIds,
+    setHiddenTableIds,
+    toggleTableVisibility,
+    showAllTables,
+    tableColors,
+    setTableColor,
+    setTableColors,
+    rightPanelMode,
+    setRightPanelMode,
+    compareTargetDiagramId,
+    setCompareTargetDiagramId,
   } = useDiagramStore();
 
   const [isFilterPanelOpen, setIsFilterPanelOpen] = useState(false);
@@ -61,13 +77,25 @@ export function VirtualDiagramView() {
   const [isDiagramListOpen, setIsDiagramListOpen] = useState(false);
   const [isForwardEngineerOpen, setIsForwardEngineerOpen] = useState(false);
   const { data: diagram } = useDiagram(selectedDiagramId ?? '');
+  const { data: allDiagrams } = useDiagrams('virtual');
   const { data: layout } = useDiagramLayout(selectedDiagramId ?? '');
+  const { data: compareTargetDiagram } = useDiagram(compareTargetDiagramId ?? '');
   const updateDiagram = useUpdateDiagram();
   const createDiagram = useCreateDiagram();
   const deleteDiagram = useDeleteDiagram();
+  const cloneDiagram = useCloneDiagram();
   const saveLayout = useSaveDiagramLayout();
 
   const selectedTable = diagram?.tables.find((t) => t.id === selectedTableId) ?? null;
+
+  // Sync hiddenTableIds/tableColors from layout on load
+  useEffect(() => {
+    if (layout) {
+      if (layout.hiddenTableIds) setHiddenTableIds(layout.hiddenTableIds);
+      if (layout.tableColors) setTableColors(layout.tableColors);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [layout?.diagramId]);
 
   // Cmd+F shortcut to open search
   useEffect(() => {
@@ -101,6 +129,20 @@ export function VirtualDiagramView() {
       setSelectedDiagramId(null);
       setSelectedTableId(null);
     }
+  }
+
+  function handleCloneDiagram() {
+    if (!diagram) return;
+    cloneDiagram.mutate(
+      { id: diagram.id },
+      {
+        onSuccess: (result) => {
+          if (result.success) {
+            setSelectedDiagramId(result.data.id);
+          }
+        },
+      },
+    );
   }
 
   function handleAddTable() {
@@ -210,16 +252,90 @@ export function VirtualDiagramView() {
     setSelectedTableId(null);
   }
 
+  function handleAutoLayout() {
+    if (!diagram) return;
+    const { nodes, edges } = schemaToNodes(diagram.tables, { filter });
+    const layoutedNodes = applyDagreLayout(nodes, edges);
+    const positions: Record<string, { x: number; y: number }> = {};
+    for (const node of layoutedNodes) {
+      positions[node.id] = { x: node.position.x, y: node.position.y };
+    }
+    if (selectedDiagramId) {
+      saveLayout.mutate({
+        diagramId: selectedDiagramId,
+        positions,
+        zoom: 1,
+        viewport: { x: 0, y: 0 },
+      });
+    }
+  }
+
   const handleLayoutChange = useCallback(
     (layoutUpdate: Pick<IDiagramLayout, 'positions' | 'zoom' | 'viewport'>) => {
       if (!selectedDiagramId) return;
       saveLayout.mutate({
         diagramId: selectedDiagramId,
         ...layoutUpdate,
+        hiddenTableIds: useDiagramStore.getState().hiddenTableIds,
+        tableColors: useDiagramStore.getState().tableColors,
       });
     },
     [selectedDiagramId, saveLayout],
   );
+
+  function handleToggleVisibility(tableId: string) {
+    toggleTableVisibility(tableId);
+    // Save to layout after toggle
+    if (selectedDiagramId && layout) {
+      const currentHidden = useDiagramStore.getState().hiddenTableIds;
+      const newHidden = currentHidden.includes(tableId)
+        ? currentHidden.filter((id) => id !== tableId)
+        : [...currentHidden, tableId];
+      saveLayout.mutate({
+        diagramId: selectedDiagramId,
+        positions: layout.positions,
+        zoom: layout.zoom,
+        viewport: layout.viewport,
+        hiddenTableIds: newHidden,
+        tableColors,
+      });
+    }
+  }
+
+  function handleShowAll() {
+    showAllTables();
+    if (selectedDiagramId && layout) {
+      saveLayout.mutate({
+        diagramId: selectedDiagramId,
+        positions: layout.positions,
+        zoom: layout.zoom,
+        viewport: layout.viewport,
+        hiddenTableIds: [],
+        tableColors,
+      });
+    }
+  }
+
+  function handleTableColorChange(color: string | null) {
+    if (!selectedTableId) return;
+    setTableColor(selectedTableId, color);
+    if (selectedDiagramId && layout) {
+      const newColors = { ...useDiagramStore.getState().tableColors };
+      if (color) {
+        newColors[selectedTableId] = color;
+      } else {
+        delete newColors[selectedTableId];
+      }
+      saveLayout.mutate({
+        diagramId: selectedDiagramId,
+        positions: layout.positions,
+        zoom: layout.zoom,
+        viewport: layout.viewport,
+        hiddenTableIds,
+        tableColors: newColors,
+      });
+    }
+  }
 
   return (
     <div className="flex h-full flex-col">
@@ -239,6 +355,8 @@ export function VirtualDiagramView() {
         onToggleDiagramList={() => setIsDiagramListOpen((v) => !v)}
         isForwardEngineerOpen={isForwardEngineerOpen}
         onToggleForwardEngineer={() => setIsForwardEngineerOpen((v) => !v)}
+        onAutoLayout={handleAutoLayout}
+        onCloneDiagram={handleCloneDiagram}
       />
 
       {/* 3-Panel Layout */}
@@ -264,10 +382,13 @@ export function VirtualDiagramView() {
             searchResults={searchResults}
             onTableSelect={handleTableSelect}
             onClose={toggleLeftPanel}
+            hiddenTableIds={hiddenTableIds}
+            onToggleVisibility={handleToggleVisibility}
+            onShowAll={handleShowAll}
           />
         )}
 
-        {/* Center: Canvas */}
+        {/* Center: Canvas or DDL */}
         <div className="relative flex-1">
           {/* Filter Panel (floating) */}
           {isFilterPanelOpen && (
@@ -316,7 +437,16 @@ export function VirtualDiagramView() {
               results={searchResults}
             />
           )}
-          {diagram ? (
+          {viewMode === 'ddl' && diagram ? (
+            <DdlEditorView
+              tables={diagram.tables}
+              onParsed={(tables) => {
+                setChangeSource('ddl');
+                updateDiagram.mutate({ id: diagram.id, tables });
+                setTimeout(() => setChangeSource(null), 100);
+              }}
+            />
+          ) : diagram ? (
             <DiagramCanvas
               diagram={diagram}
               layout={layout}
@@ -328,6 +458,8 @@ export function VirtualDiagramView() {
               onTableUpdate={handleTableChange}
               onEdgeCreate={handleEdgeCreate}
               onLayoutChange={handleLayoutChange}
+              hiddenTableIds={hiddenTableIds}
+              tableColors={tableColors}
             />
           ) : (
             <div className="flex h-full items-center justify-center bg-muted/30">
@@ -346,6 +478,14 @@ export function VirtualDiagramView() {
             onChange={handleTableChange}
             onDelete={handleTableDelete}
             onClose={() => setSelectedTableId(null)}
+            color={selectedTableId ? tableColors[selectedTableId] : undefined}
+            onColorChange={handleTableColorChange}
+            rightPanelMode={rightPanelMode}
+            onRightPanelModeChange={setRightPanelMode}
+            compareDiagrams={allDiagrams?.filter((d) => d.id !== selectedDiagramId) ?? []}
+            compareTargetDiagramId={compareTargetDiagramId}
+            onCompareTargetChange={setCompareTargetDiagramId}
+            currentDiagramName={diagram.name}
           />
         )}
       </div>

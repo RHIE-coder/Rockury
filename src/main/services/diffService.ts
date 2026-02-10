@@ -118,6 +118,107 @@ function generateMigrationDdl(tableDiffs: ITableDiff[]): string {
   return lines.join('\n');
 }
 
+function generateRollbackDdl(tableDiffs: ITableDiff[]): string {
+  const lines: string[] = [];
+
+  for (const td of tableDiffs) {
+    if (td.action === 'added') {
+      // Forward added a table → rollback drops it
+      lines.push(`DROP TABLE IF EXISTS ${td.tableName};`);
+    } else if (td.action === 'removed') {
+      // Forward dropped a table → rollback recreates it (placeholder)
+      lines.push(`-- TODO: CREATE TABLE ${td.tableName}`);
+    } else if (td.action === 'modified') {
+      for (const cd of td.columnDiffs) {
+        if (cd.action === 'added') {
+          // Forward added a column → rollback drops it
+          lines.push(`ALTER TABLE ${td.tableName} DROP COLUMN ${cd.columnName};`);
+        } else if (cd.action === 'removed' && cd.realValue) {
+          // Forward dropped a column → rollback re-adds it
+          lines.push(`ALTER TABLE ${td.tableName} ADD COLUMN ${cd.columnName} ${cd.realValue.dataType}${cd.realValue.nullable ? '' : ' NOT NULL'}${cd.realValue.defaultValue ? ` DEFAULT ${cd.realValue.defaultValue}` : ''};`);
+        } else if (cd.action === 'modified' && cd.realValue) {
+          // Forward modified a column → rollback reverts to real value
+          lines.push(`ALTER TABLE ${td.tableName} MODIFY COLUMN ${cd.columnName} ${cd.realValue.dataType}${cd.realValue.nullable ? '' : ' NOT NULL'}${cd.realValue.defaultValue ? ` DEFAULT ${cd.realValue.defaultValue}` : ''};`);
+        }
+      }
+    }
+  }
+
+  return lines.join('\n');
+}
+
+function compareTables(
+  sourceTables: ITable[],
+  targetTables: ITable[],
+): ITableDiff[] {
+  const sourceTableMap = new Map(sourceTables.map(t => [t.name.toLowerCase(), t]));
+  const targetTableMap = new Map(targetTables.map(t => [t.name.toLowerCase(), t]));
+  const tableDiffs: ITableDiff[] = [];
+
+  // Tables in source, not in target (added)
+  for (const st of sourceTables) {
+    const key = st.name.toLowerCase();
+    if (!targetTableMap.has(key)) {
+      tableDiffs.push({
+        tableName: st.name,
+        action: 'added',
+        columnDiffs: st.columns.map(c => ({
+          columnName: c.name,
+          action: 'added' as TDiffAction,
+          virtualValue: c,
+        })),
+        constraintDiffs: st.constraints.map(c => ({
+          constraintName: c.name,
+          action: 'added' as TDiffAction,
+          virtualValue: c,
+        })),
+      });
+    }
+  }
+
+  // Tables in target, not in source (removed)
+  for (const tt of targetTables) {
+    const key = tt.name.toLowerCase();
+    if (!sourceTableMap.has(key)) {
+      tableDiffs.push({
+        tableName: tt.name,
+        action: 'removed',
+        columnDiffs: tt.columns.map(c => ({
+          columnName: c.name,
+          action: 'removed' as TDiffAction,
+          realValue: c,
+        })),
+        constraintDiffs: tt.constraints.map(c => ({
+          constraintName: c.name,
+          action: 'removed' as TDiffAction,
+          realValue: c,
+        })),
+      });
+    }
+  }
+
+  // Tables in both - compare
+  for (const st of sourceTables) {
+    const key = st.name.toLowerCase();
+    const tt = targetTableMap.get(key);
+    if (!tt) continue;
+
+    const columnDiffs = compareColumns(st.columns, tt.columns);
+    const constraintDiffs = compareConstraints(st.constraints, tt.constraints);
+
+    if (columnDiffs.length > 0 || constraintDiffs.length > 0) {
+      tableDiffs.push({
+        tableName: st.name,
+        action: 'modified',
+        columnDiffs,
+        constraintDiffs,
+      });
+    }
+  }
+
+  return tableDiffs;
+}
+
 export const diffService = {
   async applyRealToVirtual(
     virtualDiagramId: string,
@@ -134,81 +235,13 @@ export const diffService = {
     virtualDiagramId: string,
     connectionId: string,
   ): Promise<IDiffResult> {
-    // Load virtual diagram
     const diagram = diagramRepository.getById(virtualDiagramId);
     if (!diagram) throw new Error(`Diagram not found: ${virtualDiagramId}`);
 
-    // Fetch real schema
     const realTables = await schemaService.fetchRealSchema(connectionId);
-
-    // Compare
-    const virtualTableMap = new Map(diagram.tables.map(t => [t.name.toLowerCase(), t]));
-    const realTableMap = new Map(realTables.map(t => [t.name.toLowerCase(), t]));
-
-    const tableDiffs: ITableDiff[] = [];
-
-    // Tables added in virtual (not in real)
-    for (const vt of diagram.tables) {
-      const key = vt.name.toLowerCase();
-      if (!realTableMap.has(key)) {
-        tableDiffs.push({
-          tableName: vt.name,
-          action: 'added',
-          columnDiffs: vt.columns.map(c => ({
-            columnName: c.name,
-            action: 'added' as TDiffAction,
-            virtualValue: c,
-          })),
-          constraintDiffs: vt.constraints.map(c => ({
-            constraintName: c.name,
-            action: 'added' as TDiffAction,
-            virtualValue: c,
-          })),
-        });
-      }
-    }
-
-    // Tables removed from virtual (in real, not in virtual)
-    for (const rt of realTables) {
-      const key = rt.name.toLowerCase();
-      if (!virtualTableMap.has(key)) {
-        tableDiffs.push({
-          tableName: rt.name,
-          action: 'removed',
-          columnDiffs: rt.columns.map(c => ({
-            columnName: c.name,
-            action: 'removed' as TDiffAction,
-            realValue: c,
-          })),
-          constraintDiffs: rt.constraints.map(c => ({
-            constraintName: c.name,
-            action: 'removed' as TDiffAction,
-            realValue: c,
-          })),
-        });
-      }
-    }
-
-    // Tables in both - compare columns and constraints
-    for (const vt of diagram.tables) {
-      const key = vt.name.toLowerCase();
-      const rt = realTableMap.get(key);
-      if (!rt) continue;
-
-      const columnDiffs = compareColumns(vt.columns, rt.columns);
-      const constraintDiffs = compareConstraints(vt.constraints, rt.constraints);
-
-      if (columnDiffs.length > 0 || constraintDiffs.length > 0) {
-        tableDiffs.push({
-          tableName: vt.name,
-          action: 'modified',
-          columnDiffs,
-          constraintDiffs,
-        });
-      }
-    }
-
+    const tableDiffs = compareTables(diagram.tables, realTables);
     const migrationDdl = generateMigrationDdl(tableDiffs);
+    const rollbackDdl = generateRollbackDdl(tableDiffs);
 
     return {
       virtualDiagramId,
@@ -216,7 +249,38 @@ export const diffService = {
       tableDiffs,
       hasDifferences: tableDiffs.length > 0,
       migrationDdl,
+      rollbackDdl,
       comparedAt: new Date().toISOString(),
+      mode: 'virtual_vs_real',
+      sourceName: diagram.name,
+      targetName: 'Real DB',
+    };
+  },
+
+  compareVirtualDiagrams(
+    sourceDiagramId: string,
+    targetDiagramId: string,
+  ): IDiffResult {
+    const source = diagramRepository.getById(sourceDiagramId);
+    if (!source) throw new Error(`Source diagram not found: ${sourceDiagramId}`);
+    const target = diagramRepository.getById(targetDiagramId);
+    if (!target) throw new Error(`Target diagram not found: ${targetDiagramId}`);
+
+    const tableDiffs = compareTables(source.tables, target.tables);
+    const migrationDdl = generateMigrationDdl(tableDiffs);
+    const rollbackDdl = generateRollbackDdl(tableDiffs);
+
+    return {
+      virtualDiagramId: sourceDiagramId,
+      realDiagramId: targetDiagramId,
+      tableDiffs,
+      hasDifferences: tableDiffs.length > 0,
+      migrationDdl,
+      rollbackDdl,
+      comparedAt: new Date().toISOString(),
+      mode: 'virtual_vs_virtual',
+      sourceName: source.name,
+      targetName: target.name,
     };
   },
 };

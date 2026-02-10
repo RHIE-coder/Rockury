@@ -1,25 +1,28 @@
-import { Check, Clock, AlertTriangle, Trash2 } from 'lucide-react';
+import { Check, Clock, AlertTriangle, Trash2, Undo2 } from 'lucide-react';
 import { Button } from '@/shared/components/ui/button';
 import { Badge } from '@/shared/components/ui/badge';
 import type { IMigration } from '~/shared/types/db';
-import { useMigrations, useApplyMigration, useDeleteMigration } from '../model/useMigrations';
+import { useMigrations, useApplyMigration, useRollbackMigration, useDeleteMigration } from '../model/useMigrations';
 
-const STATUS_CONFIG = {
-  pending: { icon: Clock, label: 'Pending', variant: 'outline' as const },
-  applied: { icon: Check, label: 'Applied', variant: 'default' as const },
-  failed: { icon: AlertTriangle, label: 'Failed', variant: 'destructive' as const },
+const STATUS_CONFIG: Record<string, { icon: typeof Check; label: string; variant: 'outline' | 'default' | 'destructive' | 'secondary' }> = {
+  pending: { icon: Clock, label: 'Pending', variant: 'outline' },
+  applied: { icon: Check, label: 'Applied', variant: 'default' },
+  failed: { icon: AlertTriangle, label: 'Failed', variant: 'destructive' },
+  rolled_back: { icon: Undo2, label: 'Rolled Back', variant: 'secondary' },
 };
 
 function MigrationItem({
   migration,
   onApply,
+  onRollback,
   onDelete,
 }: {
   migration: IMigration;
   onApply: (id: string) => void;
+  onRollback: (id: string) => void;
   onDelete: (id: string) => void;
 }) {
-  const config = STATUS_CONFIG[migration.status];
+  const config = STATUS_CONFIG[migration.status] ?? STATUS_CONFIG.pending;
   const StatusIcon = config.icon;
 
   return (
@@ -42,8 +45,13 @@ function MigrationItem({
       </div>
       <div className="flex items-center gap-1">
         {migration.status === 'pending' && (
-          <Button variant="ghost" size="xs" onClick={() => onApply(migration.id)} title="Mark as applied">
+          <Button variant="ghost" size="xs" onClick={() => onApply(migration.id)} title="Apply migration">
             <Check className="size-3" />
+          </Button>
+        )}
+        {migration.status === 'applied' && migration.rollbackDdl && (
+          <Button variant="ghost" size="xs" onClick={() => onRollback(migration.id)} title="Rollback">
+            <Undo2 className="size-3" />
           </Button>
         )}
         <Button variant="ghost" size="xs" onClick={() => onDelete(migration.id)} title="Delete">
@@ -62,6 +70,7 @@ interface MigrationPanelProps {
 export function MigrationPanel({ diagramId, connectionId }: MigrationPanelProps) {
   const { data: migrations } = useMigrations(diagramId, connectionId);
   const applyMigration = useApplyMigration();
+  const rollbackMigration = useRollbackMigration();
   const deleteMigration = useDeleteMigration();
 
   if (!migrations || migrations.length === 0) {
@@ -81,6 +90,7 @@ export function MigrationPanel({ diagramId, connectionId }: MigrationPanelProps)
             key={m.id}
             migration={m}
             onApply={(id) => applyMigration.mutate(id)}
+            onRollback={(id) => rollbackMigration.mutate(id)}
             onDelete={(id) => deleteMigration.mutate(id)}
           />
         ))}

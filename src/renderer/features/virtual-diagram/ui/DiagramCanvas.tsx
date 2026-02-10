@@ -9,7 +9,7 @@ import {
   useEdgesState,
   useReactFlow,
 } from '@xyflow/react';
-import type { OnConnect, NodeMouseHandler, Node, XYPosition } from '@xyflow/react';
+import type { OnConnect, NodeMouseHandler, Node, XYPosition, Viewport } from '@xyflow/react';
 import type { ITable, IDiagram, IDiagramLayout, IDiagramFilter } from '~/shared/types/db';
 import { schemaToNodes } from '../lib/schemaToNodes';
 import { TableNode } from './TableNode';
@@ -31,6 +31,8 @@ interface DiagramCanvasProps {
   onTableDelete?: (tableId: string) => void;
   onLayoutChange?: (layout: Pick<IDiagramLayout, 'positions' | 'zoom' | 'viewport'>) => void;
   onEdgeCreate?: (sourceTableId: string, targetTableId: string) => void;
+  hiddenTableIds?: string[];
+  tableColors?: Record<string, string>;
 }
 
 function DiagramCanvasInner({
@@ -45,9 +47,12 @@ function DiagramCanvasInner({
   onTableUpdate,
   onLayoutChange,
   onEdgeCreate,
+  hiddenTableIds = [],
+  tableColors = {},
 }: DiagramCanvasProps) {
   const reactFlowInstance = useReactFlow();
   const layoutSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const isInitialViewportApplied = useRef(false);
 
   const { nodes: initialNodes, edges: initialEdges } = useMemo(
     () =>
@@ -57,8 +62,10 @@ function DiagramCanvasInner({
         highlightedTableIds,
         selectedTableId,
         onTableUpdate: readOnly ? undefined : onTableUpdate,
+        hiddenTableIds,
+        tableColors,
       }),
-    [diagram.tables, layout?.positions, filter, highlightedTableIds, selectedTableId, readOnly, onTableUpdate],
+    [diagram.tables, layout?.positions, filter, highlightedTableIds, selectedTableId, readOnly, onTableUpdate, hiddenTableIds, tableColors],
   );
 
   const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
@@ -130,6 +137,22 @@ function DiagramCanvasInner({
     [readOnly, onTableCreate, reactFlowInstance],
   );
 
+  // Restore saved viewport on initial load
+  useEffect(() => {
+    if (isInitialViewportApplied.current) return;
+    if (layout?.viewport && layout?.zoom) {
+      reactFlowInstance.setViewport(
+        { x: layout.viewport.x, y: layout.viewport.y, zoom: layout.zoom },
+        { duration: 0 },
+      );
+      isInitialViewportApplied.current = true;
+    } else if (nodes.length > 0) {
+      reactFlowInstance.fitView({ duration: 300, padding: 0.2 });
+      isInitialViewportApplied.current = true;
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [layout, nodes.length]);
+
   // Fit view to a specific node (called from parent via ref or store)
   useEffect(() => {
     if (selectedTableId) {
@@ -146,6 +169,29 @@ function DiagramCanvasInner({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedTableId]);
 
+  // Save viewport on pan/zoom changes
+  const handleMoveEnd = useCallback(
+    (_event: unknown, viewport: Viewport) => {
+      if (readOnly || !onLayoutChange) return;
+      if (layoutSaveTimer.current) {
+        clearTimeout(layoutSaveTimer.current);
+      }
+      layoutSaveTimer.current = setTimeout(() => {
+        const currentNodes = reactFlowInstance.getNodes();
+        const positions: Record<string, { x: number; y: number }> = {};
+        for (const node of currentNodes) {
+          positions[node.id] = { x: node.position.x, y: node.position.y };
+        }
+        onLayoutChange({
+          positions,
+          zoom: viewport.zoom,
+          viewport: { x: viewport.x, y: viewport.y },
+        });
+      }, 1000);
+    },
+    [readOnly, onLayoutChange, reactFlowInstance],
+  );
+
   return (
     <ReactFlow
       nodes={nodes}
@@ -157,12 +203,12 @@ function DiagramCanvasInner({
       onConnect={handleConnect}
       onNodeClick={handleNodeClick}
       onNodeDragStop={handleNodeDragStop}
+      onMoveEnd={handleMoveEnd}
       onPaneClick={handlePaneClick}
       onDoubleClick={handlePaneDoubleClick}
       nodesDraggable={!readOnly}
       nodesConnectable={!readOnly}
       elementsSelectable={!readOnly}
-      fitView
       minZoom={0.1}
       maxZoom={2}
       defaultEdgeOptions={{ type: 'smoothstep', animated: true }}

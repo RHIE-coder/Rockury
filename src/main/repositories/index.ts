@@ -7,3 +7,4 @@ export { queryHistoryRepository } from './queryHistoryRepository';
 export { migrationRepository } from './migrationRepository';
 export { documentRepository } from './documentRepository';
 export { viewSnapshotRepository } from './viewSnapshotRepository';
+export { changelogRepository } from './changelogRepository';

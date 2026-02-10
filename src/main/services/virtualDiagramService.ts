@@ -3,8 +3,10 @@ import { diagramVersionRepository } from '#/repositories';
 import type { IDiagram, IDiagramLayout, IDiagramVersion, ITable } from '~/shared/types/db';
 
 export const virtualDiagramService = {
-  list(): IDiagram[] {
-    return diagramRepository.list('virtual');
+  list(includeHidden = false): IDiagram[] {
+    const diagrams = diagramRepository.list('virtual');
+    if (includeHidden) return diagrams;
+    return diagrams.filter(d => !d.hidden);
   },
 
   getById(id: string): IDiagram {
@@ -50,6 +52,34 @@ export const virtualDiagramService = {
 
   listVersions(diagramId: string): IDiagramVersion[] {
     return diagramVersionRepository.list(diagramId);
+  },
+
+  clone(id: string, newName?: string): IDiagram {
+    const source = diagramRepository.getById(id);
+    if (!source) throw new Error(`Diagram not found: ${id}`);
+
+    const clonedName = newName ?? `${source.name} (copy)`;
+    const cloned = diagramRepository.create({
+      name: clonedName,
+      type: 'virtual',
+      version: source.version,
+      tables: source.tables,
+    });
+
+    // Copy layout if exists
+    const sourceLayout = diagramRepository.getLayout(id);
+    if (sourceLayout) {
+      diagramRepository.saveLayout({
+        diagramId: cloned.id,
+        positions: sourceLayout.positions,
+        zoom: sourceLayout.zoom,
+        viewport: sourceLayout.viewport,
+        hiddenTableIds: sourceLayout.hiddenTableIds,
+        tableColors: sourceLayout.tableColors,
+      });
+    }
+
+    return cloned;
   },
 
   restoreVersion(versionId: string): IDiagram {

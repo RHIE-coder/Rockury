@@ -12,9 +12,12 @@ export const migrationApi = {
     direction: TMigrationDirection;
     diffSnapshot: IDiffResult;
     migrationDdl: string;
+    rollbackDdl?: string;
   }) => api.MIGRATION_CREATE(args),
   apply: (migrationId: string) =>
     api.MIGRATION_APPLY({ migrationId }),
+  rollback: (migrationId: string) =>
+    api.MIGRATION_ROLLBACK({ migrationId }),
   delete: (migrationId: string) =>
     api.MIGRATION_DELETE({ migrationId }),
 };

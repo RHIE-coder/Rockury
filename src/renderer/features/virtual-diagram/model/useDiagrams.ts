@@ -59,6 +59,18 @@ export function useUpdateDiagram() {
   });
 }
 
+export function useCloneDiagram() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (args: { id: string; newName?: string }) =>
+      diagramApi.clone(args.id, args.newName),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: diagramKeys.all });
+    },
+  });
+}
+
 export function useDeleteDiagram() {
   const queryClient = useQueryClient();
 
