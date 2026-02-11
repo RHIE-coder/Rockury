@@ -23,7 +23,7 @@ function tableToCreateDdl(table: ITable, dbType: TDbType): string {
   }
 
   // Constraints
-  const pkColumns = table.columns.filter((c) => c.keyType === 'PK');
+  const pkColumns = table.columns.filter((c) => c.keyTypes?.includes('PK'));
   if (pkColumns.length > 0) {
     lines.push(`  PRIMARY KEY (${pkColumns.map((c) => q(c.name)).join(', ')})`);
   }
@@ -35,7 +35,7 @@ function tableToCreateDdl(table: ITable, dbType: TDbType): string {
 
   // FK from column references
   for (const col of table.columns) {
-    if (col.keyType === 'FK' && col.reference) {
+    if (col.keyTypes?.includes('FK') && col.reference) {
       const fkName = `fk_${table.name}_${col.name}`;
       let fkDdl = `CONSTRAINT ${q(fkName)} FOREIGN KEY (${q(col.name)}) REFERENCES ${q(col.reference.table)} (${q(col.reference.column)})`;
       if (col.reference.onDelete) fkDdl += ` ON DELETE ${col.reference.onDelete}`;

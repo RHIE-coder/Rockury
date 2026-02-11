@@ -13,7 +13,7 @@ function generateTableMarkdown(table: ITable): string {
   lines.push('|--------|------|----------|-----|---------|---------|');
 
   for (const col of table.columns) {
-    const key = col.keyType ?? '';
+    const key = col.keyTypes?.join(',') ?? '';
     const nullable = col.nullable ? 'YES' : 'NO';
     const defaultVal = col.defaultValue ?? '';
     const comment = col.comment ?? '';

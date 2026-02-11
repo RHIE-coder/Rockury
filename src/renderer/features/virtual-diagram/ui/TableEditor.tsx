@@ -15,7 +15,7 @@ function createEmptyColumn(ordinalPosition: number): IColumn {
     id: `col-${Date.now()}-${ordinalPosition}`,
     name: '',
     dataType: 'VARCHAR(255)',
-    keyType: null,
+    keyTypes: [],
     defaultValue: null,
     nullable: true,
     comment: '',

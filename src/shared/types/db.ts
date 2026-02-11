@@ -65,7 +65,8 @@ export interface IColumn {
   id: string;
   name: string;
   dataType: string;
-  keyType: TKeyType | null;
+  keyTypes: TKeyType[];
+  isAutoIncrement?: boolean;
   defaultValue: string | null;
   nullable: boolean;
   comment: string;
@@ -109,10 +110,21 @@ export interface IDiagram {
   version: string;
   type: TDiagramType;
   tables: ITable[];
+  description?: string;
   hidden?: boolean;
   connectionId?: string;
   createdAt: string;
   updatedAt: string;
+}
+
+export interface IDiagramSnapshot extends IDiagram {
+  layout?: {
+    positions: Record<string, { x: number; y: number }>;
+    zoom: number;
+    viewport: { x: number; y: number };
+    hiddenTableIds?: string[];
+    tableColors?: Record<string, string>;
+  };
 }
 
 export interface IDiagramLayout {
@@ -128,8 +140,10 @@ export interface IDiagramVersion {
   id: string;
   diagramId: string;
   versionNumber: number;
+  name: string;
   ddlContent: string;
-  schemaSnapshot: IDiagram;
+  schemaSnapshot: IDiagramSnapshot;
+  sortOrder: number;
   createdAt: string;
 }
 

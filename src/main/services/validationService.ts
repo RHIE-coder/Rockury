@@ -93,14 +93,16 @@ function validateTableStructure(
       });
     }
 
-    // Key type check
-    if (vCol.keyType && vCol.keyType !== rCol.keyType) {
+    // Key types check
+    const vKeys = (vCol.keyTypes ?? []).join(',') || 'none';
+    const rKeys = (rCol.keyTypes ?? []).join(',') || 'none';
+    if (vKeys !== 'none' && vKeys !== rKeys) {
       items.push({
         severity: 'warning',
         category: 'Key Mismatch',
         tableName: virtualTable.name,
         columnName: vCol.name,
-        message: `Key type mismatch: virtual="${vCol.keyType}", real="${rCol.keyType ?? 'none'}".`,
+        message: `Key types mismatch: virtual="${vKeys}", real="${rKeys}".`,
       });
     }
   }

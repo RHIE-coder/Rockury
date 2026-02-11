@@ -173,6 +173,26 @@ export const SQL_ADD_LAYOUT_TABLE_COLORS = `
 ALTER TABLE diagram_layouts ADD COLUMN table_colors TEXT NOT NULL DEFAULT '{}';
 `;
 
+export const SQL_ADD_DIAGRAMS_DESCRIPTION = `
+ALTER TABLE diagrams ADD COLUMN description TEXT DEFAULT '';
+`;
+
+export const SQL_ADD_DIAGRAM_VERSIONS_NAME = `
+ALTER TABLE diagram_versions ADD COLUMN name TEXT NOT NULL DEFAULT '';
+`;
+
+export const SQL_ADD_DIAGRAMS_DEFAULT_VERSION_ID = `
+ALTER TABLE diagrams ADD COLUMN default_version_id TEXT;
+`;
+
+export const SQL_ADD_DIAGRAM_VERSIONS_SORT_ORDER = `
+ALTER TABLE diagram_versions ADD COLUMN sort_order INTEGER NOT NULL DEFAULT 0;
+`;
+
+export const SQL_ADD_DIAGRAMS_SORT_ORDER = `
+ALTER TABLE diagrams ADD COLUMN sort_order INTEGER NOT NULL DEFAULT 0;
+`;
+
 // Recreate diagram_migrations with 'rolled_back' in CHECK constraint (for existing DBs)
 export const SQL_FIX_MIGRATIONS_STATUS_CHECK = `
 CREATE TABLE IF NOT EXISTS diagram_migrations_new (
@@ -238,6 +258,11 @@ export function runMigrations(db: Database.Database): void {
       SQL_ADD_MIGRATIONS_ROLLBACK_DDL,
       SQL_ADD_LAYOUT_HIDDEN_TABLE_IDS,
       SQL_ADD_LAYOUT_TABLE_COLORS,
+      SQL_ADD_DIAGRAMS_DESCRIPTION,
+      SQL_ADD_DIAGRAM_VERSIONS_NAME,
+      SQL_ADD_DIAGRAMS_DEFAULT_VERSION_ID,
+      SQL_ADD_DIAGRAM_VERSIONS_SORT_ORDER,
+      SQL_ADD_DIAGRAMS_SORT_ORDER,
     ];
     for (const sql of alterMigrations) {
       try {
@@ -261,4 +286,60 @@ export function runMigrations(db: Database.Database): void {
   });
 
   migrate();
+
+  // Data migration: ensure every virtual diagram has at least one version + default
+  migrateVersionData(db);
+}
+
+function migrateVersionData(db: Database.Database): void {
+  interface DiagramRow {
+    id: string;
+    name: string;
+    version: string;
+    tables_json: string;
+    description: string | null;
+  }
+
+  const diagrams = db.prepare(
+    `SELECT id, name, version, tables_json, description FROM diagrams WHERE type = 'virtual'`,
+  ).all() as DiagramRow[];
+
+  for (const d of diagrams) {
+    const versionCount = (
+      db.prepare('SELECT COUNT(*) as cnt FROM diagram_versions WHERE diagram_id = ?').get(d.id) as { cnt: number }
+    ).cnt;
+
+    if (versionCount === 0) {
+      // Create initial version from diagram.tables
+      const id = crypto.randomUUID();
+      const tables = JSON.parse(d.tables_json || '[]');
+      const snapshot = JSON.stringify({
+        id: d.id,
+        name: d.name,
+        version: d.version || '0.0.0',
+        type: 'virtual',
+        tables,
+        description: d.description || '',
+      });
+      db.prepare(
+        `INSERT INTO diagram_versions (id, diagram_id, version_number, name, ddl_content, schema_snapshot, sort_order) VALUES (?, ?, 1, ?, '', ?, 1)`,
+      ).run(id, d.id, `v${d.version || '0.0.0'}`, snapshot);
+    }
+
+    // Sync diagram.tables_json from first version's snapshot
+    const firstVer = db.prepare(
+      'SELECT schema_snapshot FROM diagram_versions WHERE diagram_id = ? ORDER BY sort_order ASC, version_number DESC LIMIT 1',
+    ).get(d.id) as { schema_snapshot: string } | undefined;
+    if (firstVer) {
+      try {
+        const snapshot = JSON.parse(firstVer.schema_snapshot);
+        if (snapshot.tables) {
+          db.prepare('UPDATE diagrams SET tables_json = ? WHERE id = ?')
+            .run(JSON.stringify(snapshot.tables), d.id);
+        }
+      } catch {
+        // Malformed snapshot - ignore
+      }
+    }
+  }
 }

@@ -38,7 +38,7 @@ export function useCreateDiagram() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: (args: { name: string; type: TDiagramType; version?: string; tables?: ITable[] }) =>
+    mutationFn: (args: { name: string; type: TDiagramType; version?: string; description?: string; tables?: ITable[] }) =>
       diagramApi.create(args),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: diagramKeys.all });
@@ -50,10 +50,11 @@ export function useUpdateDiagram() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: (args: { id: string; name?: string; version?: string; tables?: ITable[] }) =>
+    mutationFn: (args: { id: string; name?: string; version?: string; description?: string; tables?: ITable[] }) =>
       diagramApi.update(args),
     onSuccess: (_, variables) => {
-      queryClient.invalidateQueries({ queryKey: diagramKeys.all });
+      // Only invalidate lists + detail; NOT layout/versions (they are managed separately)
+      queryClient.invalidateQueries({ queryKey: ['diagrams', 'list'] });
       queryClient.invalidateQueries({ queryKey: diagramKeys.detail(variables.id) });
     },
   });
@@ -99,10 +100,12 @@ export function useSaveDiagramLayout() {
 
   return useMutation({
     mutationFn: diagramApi.saveLayout,
-    onSuccess: (_, variables) => {
-      queryClient.invalidateQueries({
-        queryKey: diagramKeys.layout(variables.diagramId),
-      });
+    onMutate: (variables) => {
+      // Optimistic: update cache SYNCHRONOUSLY so handleSave reads fresh positions
+      queryClient.setQueryData(
+        diagramKeys.layout(variables.diagramId),
+        variables,
+      );
     },
   });
 }
@@ -123,12 +126,66 @@ export function useCreateDiagramVersion() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: (args: { diagramId: string; ddlContent: string }) =>
+    mutationFn: (args: { diagramId: string; name: string; ddlContent: string; schemaSnapshot?: unknown }) =>
       diagramApi.createVersion(args),
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({
         queryKey: diagramKeys.versions(variables.diagramId),
       });
+    },
+  });
+}
+
+export function useUpdateDiagramVersion() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (args: { id: string; diagramId: string; name?: string; ddlContent?: string; schemaSnapshot?: unknown }) =>
+      diagramApi.updateVersion({ id: args.id, name: args.name, ddlContent: args.ddlContent, schemaSnapshot: args.schemaSnapshot }),
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({
+        queryKey: diagramKeys.versions(variables.diagramId),
+      });
+    },
+  });
+}
+
+export function useDeleteDiagramVersion() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (args: { id: string; diagramId: string }) =>
+      diagramApi.deleteVersion(args.id),
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({
+        queryKey: diagramKeys.versions(variables.diagramId),
+      });
+    },
+  });
+}
+
+export function useReorderVersions() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (args: { diagramId: string; orderedVersionIds: string[] }) =>
+      diagramApi.reorderVersions(args.diagramId, args.orderedVersionIds),
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({
+        queryKey: diagramKeys.versions(variables.diagramId),
+      });
+    },
+  });
+}
+
+export function useReorderDiagrams() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (args: { orderedDiagramIds: string[] }) =>
+      diagramApi.reorderDiagrams(args.orderedDiagramIds),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: diagramKeys.all });
     },
   });
 }

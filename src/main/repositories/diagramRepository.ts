@@ -7,8 +7,11 @@ interface DiagramRow {
   version: string;
   type: string;
   tables_json: string;
+  description: string | null;
   hidden: number;
   connection_id: string | null;
+  default_version_id: string | null;
+  sort_order: number;
   created_at: string;
   updated_at: string;
 }
@@ -29,6 +32,7 @@ function toDiagram(row: DiagramRow): IDiagram {
     version: row.version ?? '1.0.0',
     type: row.type as TDiagramType,
     tables: JSON.parse(row.tables_json) as ITable[],
+    description: row.description ?? '',
     hidden: row.hidden === 1,
     connectionId: row.connection_id ?? undefined,
     createdAt: row.created_at,
@@ -51,10 +55,10 @@ export const diagramRepository = {
   list(type?: TDiagramType): IDiagram[] {
     const db = getDb();
     if (type) {
-      const rows = db.prepare('SELECT * FROM diagrams WHERE type = ? ORDER BY created_at DESC').all(type) as DiagramRow[];
+      const rows = db.prepare('SELECT * FROM diagrams WHERE type = ? ORDER BY sort_order ASC, created_at DESC').all(type) as DiagramRow[];
       return rows.map(toDiagram);
     }
-    const rows = db.prepare('SELECT * FROM diagrams ORDER BY created_at DESC').all() as DiagramRow[];
+    const rows = db.prepare('SELECT * FROM diagrams ORDER BY sort_order ASC, created_at DESC').all() as DiagramRow[];
     return rows.map(toDiagram);
   },
 
@@ -64,14 +68,14 @@ export const diagramRepository = {
     return row ? toDiagram(row) : null;
   },
 
-  create(data: { name: string; type: TDiagramType; version?: string; tables?: ITable[]; connectionId?: string }): IDiagram {
+  create(data: { name: string; type: TDiagramType; version?: string; description?: string; tables?: ITable[]; connectionId?: string }): IDiagram {
     const db = getDb();
     const id = crypto.randomUUID();
     const tablesJson = JSON.stringify(data.tables ?? []);
     const version = data.version ?? '1.0.0';
     db.prepare(
-      'INSERT INTO diagrams (id, name, type, version, tables_json, connection_id) VALUES (?, ?, ?, ?, ?, ?)',
-    ).run(id, data.name, data.type, version, tablesJson, data.connectionId ?? null);
+      'INSERT INTO diagrams (id, name, type, version, description, tables_json, connection_id) VALUES (?, ?, ?, ?, ?, ?, ?)',
+    ).run(id, data.name, data.type, version, data.description ?? null, tablesJson, data.connectionId ?? null);
     return this.getById(id)!;
   },
 
@@ -86,7 +90,7 @@ export const diagramRepository = {
     db.prepare('UPDATE diagrams SET hidden = ? WHERE id = ?').run(hidden ? 1 : 0, id);
   },
 
-  update(id: string, data: { name?: string; version?: string; tables?: ITable[] }): IDiagram {
+  update(id: string, data: { name?: string; version?: string; tables?: ITable[]; description?: string }): IDiagram {
     const db = getDb();
     const sets: string[] = [];
     const values: unknown[] = [];
@@ -94,6 +98,7 @@ export const diagramRepository = {
     if (data.name !== undefined) { sets.push('name = ?'); values.push(data.name); }
     if (data.version !== undefined) { sets.push('version = ?'); values.push(data.version); }
     if (data.tables !== undefined) { sets.push('tables_json = ?'); values.push(JSON.stringify(data.tables)); }
+    if (data.description !== undefined) { sets.push('description = ?'); values.push(data.description); }
 
     if (sets.length > 0) {
       sets.push(`updated_at = datetime('now')`);
@@ -113,6 +118,17 @@ export const diagramRepository = {
     const db = getDb();
     const row = db.prepare('SELECT * FROM diagram_layouts WHERE diagram_id = ?').get(diagramId) as DiagramLayoutRow | undefined;
     return row ? toLayout(row) : null;
+  },
+
+  reorder(orderedIds: string[]): void {
+    const db = getDb();
+    const stmt = db.prepare('UPDATE diagrams SET sort_order = ? WHERE id = ?');
+    const run = db.transaction(() => {
+      orderedIds.forEach((id, index) => {
+        stmt.run(index + 1, id);
+      });
+    });
+    run();
   },
 
   saveLayout(layout: IDiagramLayout): void {

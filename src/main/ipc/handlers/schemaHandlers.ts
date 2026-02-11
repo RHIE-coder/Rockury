@@ -25,16 +25,16 @@ export function registerSchemaHandlers() {
     }
   });
 
-  ipcMain.handle(CHANNELS.DIAGRAM_CREATE, async (_event, args: { name: string; type: TDiagramType; version?: string; tables?: ITable[] }) => {
+  ipcMain.handle(CHANNELS.DIAGRAM_CREATE, async (_event, args: { name: string; type: TDiagramType; version?: string; description?: string; tables?: ITable[] }) => {
     try {
-      const data = virtualDiagramService.create({ name: args.name, type: 'virtual', version: args.version, tables: args.tables });
+      const data = virtualDiagramService.create({ name: args.name, type: 'virtual', version: args.version, description: args.description, tables: args.tables });
       return { success: true, data };
     } catch (error) {
       return { success: false, data: null, error: (error as Error).message };
     }
   });
 
-  ipcMain.handle(CHANNELS.DIAGRAM_UPDATE, async (_event, args: { id: string; name?: string; version?: string; tables?: ITable[] }) => {
+  ipcMain.handle(CHANNELS.DIAGRAM_UPDATE, async (_event, args: { id: string; name?: string; version?: string; tables?: ITable[]; description?: string }) => {
     try {
       const { id, ...data } = args;
       const result = virtualDiagramService.update(id, data);
@@ -44,7 +44,7 @@ export function registerSchemaHandlers() {
     }
   });
 
-  ipcMain.handle(CHANNELS.DIAGRAM_UPDATE_META, async (_event, args: { id: string; name?: string; version?: string }) => {
+  ipcMain.handle(CHANNELS.DIAGRAM_UPDATE_META, async (_event, args: { id: string; name?: string; version?: string; description?: string }) => {
     try {
       const { id, ...data } = args;
       const result = virtualDiagramService.update(id, data);
@@ -102,12 +102,30 @@ export function registerSchemaHandlers() {
     }
   });
 
-  ipcMain.handle(CHANNELS.DIAGRAM_VERSION_CREATE, async (_event, args: { diagramId: string; ddlContent: string }) => {
+  ipcMain.handle(CHANNELS.DIAGRAM_VERSION_CREATE, async (_event, args: { diagramId: string; name: string; ddlContent: string; schemaSnapshot?: unknown }) => {
     try {
       const data = virtualDiagramService.createVersion(args);
       return { success: true, data };
     } catch (error) {
       return { success: false, data: null, error: (error as Error).message };
+    }
+  });
+
+  ipcMain.handle(CHANNELS.DIAGRAM_VERSION_UPDATE, async (_event, args: { id: string; name?: string; ddlContent?: string; schemaSnapshot?: unknown }) => {
+    try {
+      const data = virtualDiagramService.updateVersion(args.id, { name: args.name, ddlContent: args.ddlContent, schemaSnapshot: args.schemaSnapshot });
+      return { success: true, data };
+    } catch (error) {
+      return { success: false, data: null, error: (error as Error).message };
+    }
+  });
+
+  ipcMain.handle(CHANNELS.DIAGRAM_VERSION_DELETE, async (_event, args: { id: string }) => {
+    try {
+      virtualDiagramService.deleteVersion(args.id);
+      return { success: true };
+    } catch (error) {
+      return { success: false, error: (error as Error).message };
     }
   });
 
@@ -120,10 +138,28 @@ export function registerSchemaHandlers() {
     }
   });
 
+  ipcMain.handle(CHANNELS.DIAGRAM_VERSIONS_REORDER, async (_event, args: { diagramId: string; orderedVersionIds: string[] }) => {
+    try {
+      virtualDiagramService.reorderVersions(args.diagramId, args.orderedVersionIds);
+      return { success: true };
+    } catch (error) {
+      return { success: false, error: (error as Error).message };
+    }
+  });
+
+  ipcMain.handle(CHANNELS.DIAGRAMS_REORDER, async (_event, args: { orderedDiagramIds: string[] }) => {
+    try {
+      diagramRepository.reorder(args.orderedDiagramIds);
+      return { success: true };
+    } catch (error) {
+      return { success: false, error: (error as Error).message };
+    }
+  });
+
   // ─── Schema (Real) ───
   ipcMain.handle(CHANNELS.SCHEMA_FETCH_REAL, async (_event, args: { connectionId: string }) => {
     try {
-      const data = await schemaService.fetchRealSchema(args.connectionId);
+      const data = diagramRepository.findByConnectionId(args.connectionId);
       return { success: true, data };
     } catch (error) {
       return { success: false, data: null, error: (error as Error).message };
@@ -292,7 +328,7 @@ function parseColumns(body: string): import('~/shared/types/db').IColumn[] {
       id: crypto.randomUUID(),
       name: colName,
       dataType,
-      keyType: rest.includes('primary key') ? 'PK' : null,
+      keyTypes: rest.includes('primary key') ? ['PK'] : [],
       defaultValue: null,
       nullable: !rest.includes('not null'),
       comment: '',
@@ -335,7 +371,7 @@ function generateDdl(tables: ITable[], dbType: TDbType): string {
       let def = `  ${quoteId(col.name, dbType)} ${col.dataType}`;
       if (!col.nullable) def += ' NOT NULL';
       if (col.defaultValue) def += ` DEFAULT ${col.defaultValue}`;
-      if (col.keyType === 'PK') def += ' PRIMARY KEY';
+      if (col.keyTypes?.includes('PK')) def += ' PRIMARY KEY';
       colDefs.push(def);
     }
 
@@ -417,8 +453,10 @@ function compareTablesForChangelog(oldTables: ITable[], newTables: ITable[]): IS
         if (oldCol.nullable !== newCol.nullable) {
           columnChanges.push({ columnName: colName, action: 'modified', field: 'nullable', oldValue: String(oldCol.nullable), newValue: String(newCol.nullable) });
         }
-        if (oldCol.keyType !== newCol.keyType) {
-          columnChanges.push({ columnName: colName, action: 'modified', field: 'keyType', oldValue: oldCol.keyType ?? '', newValue: newCol.keyType ?? '' });
+        const oldKeys = (oldCol.keyTypes ?? []).join(',') || '';
+        const newKeys = (newCol.keyTypes ?? []).join(',') || '';
+        if (oldKeys !== newKeys) {
+          columnChanges.push({ columnName: colName, action: 'modified', field: 'keyTypes', oldValue: oldKeys, newValue: newKeys });
         }
       }
     }

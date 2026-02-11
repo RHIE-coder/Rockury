@@ -18,7 +18,7 @@ function generateMockValue(column: IColumn, rowIndex: number): unknown {
     case 'smallint':
     case 'tinyint':
     case 'mediumint':
-      return column.keyType === 'PK' ? rowIndex + 1 : Math.floor(Math.random() * 10000);
+      return column.keyTypes?.includes('PK') ? rowIndex + 1 : Math.floor(Math.random() * 10000);
 
     case 'float':
     case 'float4':

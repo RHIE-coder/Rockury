@@ -53,8 +53,10 @@ function diffColumns(source: IColumn[], target: IColumn[]): ColumnDiffRow[] {
       if ((sCol.defaultValue ?? '') !== (tCol.defaultValue ?? '')) {
         changes.push(`default: ${tCol.defaultValue ?? 'NULL'} → ${sCol.defaultValue ?? 'NULL'}`);
       }
-      if (sCol.keyType !== tCol.keyType) {
-        changes.push(`key: ${tCol.keyType ?? 'none'} → ${sCol.keyType ?? 'none'}`);
+      const sKeys = (sCol.keyTypes ?? []).join(',') || 'none';
+      const tKeys = (tCol.keyTypes ?? []).join(',') || 'none';
+      if (sKeys !== tKeys) {
+        changes.push(`key: ${tKeys} → ${sKeys}`);
       }
 
       rows.push({

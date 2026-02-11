@@ -53,8 +53,10 @@ function compareColumns(
     if ((vCol.defaultValue ?? '') !== (rCol.defaultValue ?? '')) {
       changes.push(`defaultValue: ${rCol.defaultValue ?? 'NULL'} -> ${vCol.defaultValue ?? 'NULL'}`);
     }
-    if (vCol.keyType !== rCol.keyType) {
-      changes.push(`keyType: ${rCol.keyType ?? 'none'} -> ${vCol.keyType ?? 'none'}`);
+    const vKeys = (vCol.keyTypes ?? []).join(',') || 'none';
+    const rKeys = (rCol.keyTypes ?? []).join(',') || 'none';
+    if (vKeys !== rKeys) {
+      changes.push(`keyTypes: ${rKeys} -> ${vKeys}`);
     }
 
     if (changes.length > 0) {

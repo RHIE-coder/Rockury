@@ -93,15 +93,15 @@ export interface IEvents {
     response: { success: boolean; data: IDiagram };
   };
   [CHANNELS.DIAGRAM_CREATE]: {
-    args: { name: string; type: TDiagramType; version?: string; tables?: ITable[] };
+    args: { name: string; type: TDiagramType; version?: string; description?: string; tables?: ITable[] };
     response: { success: boolean; data: IDiagram };
   };
   [CHANNELS.DIAGRAM_UPDATE]: {
-    args: { id: string; name?: string; version?: string; tables?: ITable[] };
+    args: { id: string; name?: string; version?: string; tables?: ITable[]; description?: string };
     response: { success: boolean; data: IDiagram };
   };
   [CHANNELS.DIAGRAM_UPDATE_META]: {
-    args: { id: string; name?: string; version?: string };
+    args: { id: string; name?: string; version?: string; description?: string };
     response: { success: boolean; data: IDiagram };
   };
   [CHANNELS.DIAGRAM_DELETE]: {
@@ -127,12 +127,29 @@ export interface IEvents {
     response: { success: boolean; data: IDiagramVersion[] };
   };
   [CHANNELS.DIAGRAM_VERSION_CREATE]: {
-    args: { diagramId: string; ddlContent: string };
+    args: { diagramId: string; name: string; ddlContent: string; schemaSnapshot?: unknown };
     response: { success: boolean; data: IDiagramVersion };
+  };
+  [CHANNELS.DIAGRAM_VERSION_UPDATE]: {
+    args: { id: string; name?: string; ddlContent?: string; schemaSnapshot?: unknown };
+    response: { success: boolean; data: IDiagramVersion };
+  };
+  [CHANNELS.DIAGRAM_VERSION_DELETE]: {
+    args: { id: string };
+    response: { success: boolean };
   };
   [CHANNELS.DIAGRAM_VERSION_RESTORE]: {
     args: { versionId: string };
     response: { success: boolean; data: IDiagram };
+  };
+  [CHANNELS.DIAGRAM_VERSIONS_REORDER]: {
+    args: { diagramId: string; orderedVersionIds: string[] };
+    response: { success: boolean };
+  };
+
+  [CHANNELS.DIAGRAMS_REORDER]: {
+    args: { orderedDiagramIds: string[] };
+    response: { success: boolean };
   };
 
   // Migration
@@ -191,7 +208,7 @@ export interface IEvents {
   // Schema (Real)
   [CHANNELS.SCHEMA_FETCH_REAL]: {
     args: { connectionId: string };
-    response: { success: boolean; data: ITable[] };
+    response: { success: boolean; data: IDiagram | null };
   };
   [CHANNELS.SCHEMA_SYNC_REAL]: {
     args: { connectionId: string };

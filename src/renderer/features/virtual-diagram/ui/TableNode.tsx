@@ -1,6 +1,7 @@
 import { memo, useState, useCallback, useRef, useEffect } from 'react';
 import { Handle, Position } from '@xyflow/react';
 import type { NodeProps } from '@xyflow/react';
+import { Lock, LockOpen } from 'lucide-react';
 import type { ITable, IColumn, IDiagramFilter } from '~/shared/types/db';
 
 export interface TableNodeData {
@@ -11,9 +12,11 @@ export interface TableNodeData {
   isSelected: boolean;
   onTableUpdate?: (table: ITable) => void;
   color?: string;
+  isLocked?: boolean;
+  onLockToggle?: (id: string) => void;
 }
 
-function KeyIcon({ keyType }: { keyType: IColumn['keyType'] }) {
+function SingleKeyIcon({ keyType }: { keyType: string }) {
   switch (keyType) {
     case 'PK':
       return <span className="shrink-0 text-amber-500" title="Primary Key">🔑</span>;
@@ -24,8 +27,21 @@ function KeyIcon({ keyType }: { keyType: IColumn['keyType'] }) {
     case 'IDX':
       return <span className="shrink-0 text-purple-500" title="Index">📇</span>;
     default:
-      return <span className="inline-block w-4 shrink-0" />;
+      return null;
   }
+}
+
+function KeyIcons({ keyTypes }: { keyTypes: string[] }) {
+  if (!keyTypes || keyTypes.length === 0) {
+    return <span className="inline-block w-4 shrink-0" />;
+  }
+  return (
+    <span className="flex shrink-0 items-center">
+      {keyTypes.map((kt) => (
+        <SingleKeyIcon key={kt} keyType={kt} />
+      ))}
+    </span>
+  );
 }
 
 function NullableIcon({ nullable }: { nullable: boolean }) {
@@ -35,7 +51,7 @@ function NullableIcon({ nullable }: { nullable: boolean }) {
 }
 
 function TableNodeComponent({ data }: NodeProps) {
-  const { table, filter, isHighlighted, isSelected, onTableUpdate, color } = data as unknown as TableNodeData;
+  const { table, filter, isHighlighted, isSelected, onTableUpdate, color, isLocked, onLockToggle } = data as unknown as TableNodeData;
   const [isEditing, setIsEditing] = useState(false);
   const [editName, setEditName] = useState(table.name);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -85,20 +101,45 @@ function TableNodeComponent({ data }: NodeProps) {
         style={color ? { backgroundColor: color, color: '#fff' } : undefined}
         onDoubleClick={handleHeaderDoubleClick}
       >
-        {isEditing ? (
-          <input
-            ref={inputRef}
-            className="nodrag w-full rounded bg-primary-foreground/20 px-1 text-sm font-semibold text-primary-foreground outline-none"
-            value={editName}
-            onChange={(e) => setEditName(e.target.value)}
-            onBlur={handleNameSubmit}
-            onKeyDown={handleNameKeyDown}
-          />
-        ) : (
-          <p className="text-sm font-semibold">{table.name}</p>
-        )}
-        {filter.showComments && table.comment && (
-          <p className="truncate text-xs opacity-75">{table.comment}</p>
+        <div className="flex items-center gap-1">
+          <div className="flex-1 min-w-0">
+            {isEditing ? (
+              <input
+                ref={inputRef}
+                className="nodrag w-full rounded bg-primary-foreground/20 px-1 text-sm font-semibold text-primary-foreground outline-none"
+                value={editName}
+                onChange={(e) => setEditName(e.target.value)}
+                onBlur={handleNameSubmit}
+                onKeyDown={handleNameKeyDown}
+              />
+            ) : (
+              <p className="text-sm font-semibold truncate" title={table.name}>{table.name}</p>
+            )}
+          </div>
+          {onLockToggle && (
+            <button
+              type="button"
+              className="nodrag shrink-0 rounded p-0.5"
+              onClick={(e) => {
+                e.stopPropagation();
+                onLockToggle(table.id);
+              }}
+              title={isLocked ? 'Unlock position' : 'Lock position'}
+            >
+              {isLocked ? (
+                <span className="flex size-5 items-center justify-center rounded-full bg-red-500/80">
+                  <Lock className="size-3 text-white" />
+                </span>
+              ) : (
+                <LockOpen className="size-3 opacity-40" />
+              )}
+            </button>
+          )}
+        </div>
+        {filter.showComments && (
+          <p className="truncate text-xs opacity-75" title={table.comment || '(no comment)'}>
+            {table.comment || '(no comment)'}
+          </p>
         )}
       </div>
 
@@ -108,13 +149,18 @@ function TableNodeComponent({ data }: NodeProps) {
           {table.columns.map((column) => (
             <div
               key={column.id}
-              className="relative flex items-center gap-1 px-2 py-0.5 text-xs"
+              className="group/row relative flex items-center gap-1 px-2 py-0.5 text-xs"
             >
-              {filter.showKeyIcons && <KeyIcon keyType={column.keyType} />}
+              {filter.showKeyIcons && <KeyIcons keyTypes={column.keyTypes} />}
               {filter.showNullable && <NullableIcon nullable={column.nullable} />}
-              <span className="flex-1 truncate font-medium">{column.name}</span>
+              <span className="flex-1 truncate font-medium" title={column.name}>{column.name}</span>
               {filter.showDataTypes && (
                 <span className="shrink-0 text-muted-foreground">{column.dataType}</span>
+              )}
+              {filter.showComments && column.comment && (
+                <span className="max-w-[60px] shrink-0 truncate text-[10px] text-muted-foreground" title={column.comment}>
+                  {column.comment}
+                </span>
               )}
               {/* FK source handle per column */}
               {column.reference && (
@@ -126,6 +172,20 @@ function TableNodeComponent({ data }: NodeProps) {
                   style={{ top: 'auto', right: -4 }}
                 />
               )}
+              {/* Hover expansion card */}
+              <div className="pointer-events-none invisible absolute left-0 top-0 z-50 min-w-full rounded border border-border bg-popover px-2 py-1 shadow-lg group-hover/row:visible">
+                <div className="flex items-center gap-1 text-xs">
+                  {filter.showKeyIcons && <KeyIcons keyTypes={column.keyTypes} />}
+                  {filter.showNullable && <NullableIcon nullable={column.nullable} />}
+                  <span className="whitespace-nowrap font-medium">{column.name}</span>
+                  {filter.showDataTypes && (
+                    <span className="whitespace-nowrap text-muted-foreground">{column.dataType}</span>
+                  )}
+                </div>
+                {filter.showComments && column.comment && (
+                  <p className="mt-0.5 max-w-[250px] whitespace-normal text-[10px] text-muted-foreground">{column.comment}</p>
+                )}
+              </div>
             </div>
           ))}
         </div>
@@ -133,12 +193,26 @@ function TableNodeComponent({ data }: NodeProps) {
 
       {/* Constraints */}
       {filter.showConstraints && table.constraints.length > 0 && (
-        <div className="border-t border-border/50 px-2 py-1 text-xs text-muted-foreground">
-          {table.constraints.map((c) => (
-            <div key={c.name}>
-              <span className="font-medium">{c.type}</span>: {c.columns.join(', ')}
-            </div>
-          ))}
+        <div className="border-t border-border/50 px-2 py-1 text-xs text-muted-foreground space-y-0.5">
+          {table.constraints.map((c) => {
+            const badge = c.type === 'PRIMARY KEY' ? 'PK'
+              : c.type === 'FOREIGN KEY' ? 'FK'
+              : c.type === 'UNIQUE' ? 'UQ'
+              : c.type;
+            const badgeColor = c.type === 'PRIMARY KEY' ? 'bg-amber-500/20 text-amber-700'
+              : c.type === 'FOREIGN KEY' ? 'bg-blue-500/20 text-blue-700'
+              : c.type === 'UNIQUE' ? 'bg-green-500/20 text-green-700'
+              : 'bg-muted text-muted-foreground';
+            return (
+              <div key={c.name} className="flex items-center gap-1">
+                <span className={`shrink-0 rounded px-1 py-0.5 text-[9px] font-bold leading-none ${badgeColor}`}>
+                  {badge}
+                </span>
+                <span className="truncate font-medium">{c.name}</span>
+                <span className="shrink-0 text-muted-foreground">({c.columns.join(', ')})</span>
+              </div>
+            );
+          })}
         </div>
       )}
 

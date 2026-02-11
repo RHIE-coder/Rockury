@@ -13,15 +13,10 @@ interface ConstraintEditorProps {
   allTables: ITable[];
   onChange: (updated: IConstraint) => void;
   onRemove: () => void;
+  readOnly?: boolean;
 }
 
 const CONSTRAINT_TYPES: TConstraintType[] = ['PK', 'FK', 'UK', 'IDX', 'CHECK'];
-
-function generateName(type: TConstraintType, tableName: string, cols: string[]): string {
-  const prefix = type.toLowerCase();
-  const colPart = cols.slice(0, 2).join('_') || 'unnamed';
-  return `${prefix}_${tableName}_${colPart}`;
-}
 
 export function ConstraintEditor({
   constraint,
@@ -29,8 +24,10 @@ export function ConstraintEditor({
   allTables,
   onChange,
   onRemove,
+  readOnly,
 }: ConstraintEditorProps) {
   const [isExpanded, setIsExpanded] = useState(true);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   function handleTypeChange(type: string) {
     const t = type as TConstraintType;
@@ -68,9 +65,30 @@ export function ConstraintEditor({
         </span>
         <span className="flex-1 truncate font-medium">{constraint.name}</span>
         <span className="text-muted-foreground">{constraint.columns.join(', ')}</span>
-        <Button variant="ghost" size="xs" onClick={onRemove}>
-          <Trash2 className="size-3 text-destructive" />
-        </Button>
+        {!readOnly && (
+          isDeleting ? (
+            <div className="flex shrink-0 items-center gap-1">
+              <button
+                type="button"
+                onClick={onRemove}
+                className="text-[10px] font-medium text-destructive hover:underline"
+              >
+                Delete?
+              </button>
+              <button
+                type="button"
+                onClick={() => setIsDeleting(false)}
+                className="text-[10px] text-muted-foreground hover:underline"
+              >
+                No
+              </button>
+            </div>
+          ) : (
+            <Button variant="ghost" size="xs" onClick={() => setIsDeleting(true)}>
+              <Trash2 className="size-3 text-destructive" />
+            </Button>
+          )
+        )}
       </div>
 
       {isExpanded && (
@@ -81,6 +99,7 @@ export function ConstraintEditor({
               className="h-6 w-24 text-[10px]"
               value={constraint.type}
               onChange={(e) => handleTypeChange(e.target.value)}
+              disabled={readOnly}
             >
               {CONSTRAINT_TYPES.map((t) => (
                 <option key={t} value={t}>{t}</option>
@@ -91,6 +110,7 @@ export function ConstraintEditor({
               placeholder="Constraint name"
               value={constraint.name}
               onChange={(e) => handleNameChange(e.target.value)}
+              readOnly={readOnly}
             />
           </div>
 
@@ -121,6 +141,7 @@ export function ConstraintEditor({
                 placeholder="e.g. age > 0"
                 value={constraint.checkExpression ?? ''}
                 onChange={(e) => onChange({ ...constraint, checkExpression: e.target.value })}
+                readOnly={readOnly}
               />
             </div>
           )}

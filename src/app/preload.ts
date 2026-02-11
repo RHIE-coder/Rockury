@@ -67,8 +67,16 @@ const API: TElectronAPI = {
     ipcRenderer.invoke(CHANNELS.DIAGRAM_VERSION_LIST, args),
   [CHANNELS.DIAGRAM_VERSION_CREATE]: (args) =>
     ipcRenderer.invoke(CHANNELS.DIAGRAM_VERSION_CREATE, args),
+  [CHANNELS.DIAGRAM_VERSION_UPDATE]: (args) =>
+    ipcRenderer.invoke(CHANNELS.DIAGRAM_VERSION_UPDATE, args),
+  [CHANNELS.DIAGRAM_VERSION_DELETE]: (args) =>
+    ipcRenderer.invoke(CHANNELS.DIAGRAM_VERSION_DELETE, args),
   [CHANNELS.DIAGRAM_VERSION_RESTORE]: (args) =>
     ipcRenderer.invoke(CHANNELS.DIAGRAM_VERSION_RESTORE, args),
+  [CHANNELS.DIAGRAM_VERSIONS_REORDER]: (args) =>
+    ipcRenderer.invoke(CHANNELS.DIAGRAM_VERSIONS_REORDER, args),
+  [CHANNELS.DIAGRAMS_REORDER]: (args) =>
+    ipcRenderer.invoke(CHANNELS.DIAGRAMS_REORDER, args),
 
   // Migration
   [CHANNELS.MIGRATION_LIST]: (args) =>

@@ -1,3 +1,4 @@
+import { ArrowUp, ArrowDown, GripVertical } from 'lucide-react';
 import type { IColumn } from '~/shared/types/db';
 
 interface CompositeKeyBuilderProps {
@@ -30,52 +31,73 @@ export function CompositeKeyBuilder({ columns, selectedColumns, onChange }: Comp
   }
 
   return (
-    <div className="space-y-1">
-      <p className="text-[9px] text-muted-foreground">Select columns (order matters for composite keys):</p>
+    <div className="space-y-2">
+      {/* Selected columns - reorderable list */}
+      {selectedColumns.length > 0 && (
+        <div className="space-y-0.5">
+          <p className="text-[9px] font-medium uppercase tracking-wider text-muted-foreground">
+            Column order
+          </p>
+          <div className="rounded border border-border bg-muted/30">
+            {selectedColumns.map((colName, index) => (
+              <div
+                key={colName}
+                className="flex items-center gap-1 border-b border-border/50 px-1.5 py-1 last:border-b-0"
+              >
+                <GripVertical className="size-3 shrink-0 text-muted-foreground/50" />
+                <span className="flex size-4 shrink-0 items-center justify-center rounded bg-primary text-[9px] font-bold text-primary-foreground">
+                  {index + 1}
+                </span>
+                <span className="flex-1 truncate text-xs font-medium">{colName}</span>
+                <div className="flex shrink-0 gap-0.5">
+                  <button
+                    type="button"
+                    onClick={() => handleMoveUp(index)}
+                    disabled={index === 0}
+                    className="rounded p-0.5 text-muted-foreground hover:bg-muted hover:text-foreground disabled:opacity-30"
+                  >
+                    <ArrowUp className="size-3" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleMoveDown(index)}
+                    disabled={index >= selectedColumns.length - 1}
+                    className="rounded p-0.5 text-muted-foreground hover:bg-muted hover:text-foreground disabled:opacity-30"
+                  >
+                    <ArrowDown className="size-3" />
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* All columns - checkbox list */}
       <div className="space-y-0.5">
+        <p className="text-[9px] font-medium uppercase tracking-wider text-muted-foreground">
+          {selectedColumns.length > 0 ? 'Add / remove columns' : 'Select columns'}
+        </p>
         {columns.map((col) => {
           const isSelected = selectedColumns.includes(col.name);
-          const selectedIndex = selectedColumns.indexOf(col.name);
           return (
-            <div key={col.id} className="flex items-center gap-1.5 text-xs">
+            <label
+              key={col.id}
+              className={`flex cursor-pointer items-center gap-1.5 rounded px-1 py-0.5 text-xs hover:bg-muted ${
+                isSelected ? 'font-medium' : 'text-muted-foreground'
+              }`}
+            >
               <input
                 type="checkbox"
                 checked={isSelected}
                 onChange={() => handleToggle(col.name)}
                 className="size-3"
               />
-              <span className={`flex-1 ${isSelected ? 'font-medium' : 'text-muted-foreground'}`}>
-                {col.name}
-              </span>
-              {isSelected && (
-                <div className="flex gap-0.5">
-                  <button
-                    type="button"
-                    onClick={() => handleMoveUp(selectedIndex)}
-                    className="text-[10px] text-muted-foreground hover:text-foreground"
-                    disabled={selectedIndex === 0}
-                  >
-                    &uarr;
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => handleMoveDown(selectedIndex)}
-                    className="text-[10px] text-muted-foreground hover:text-foreground"
-                    disabled={selectedIndex >= selectedColumns.length - 1}
-                  >
-                    &darr;
-                  </button>
-                </div>
-              )}
-            </div>
+              {col.name}
+            </label>
           );
         })}
       </div>
-      {selectedColumns.length > 0 && (
-        <p className="text-[9px] text-muted-foreground">
-          Order: {selectedColumns.join(', ')}
-        </p>
-      )}
     </div>
   );
 }

@@ -141,24 +141,24 @@ function buildTablesFromMysql(
     }
     const entry = tableMap.get(row.TABLE_NAME)!;
 
-    // Determine key type from constraint rows
+    // Determine key types from constraint rows
     const colConstraints = constraintMap.get(row.TABLE_NAME)?.get(row.COLUMN_NAME) ?? [];
-    let keyType: TKeyType | null = null;
+    const keyTypes: TKeyType[] = [];
     let reference: IForeignKeyRef | null = null;
 
     for (const c of colConstraints) {
       const resolved = resolveKeyType(c.CONSTRAINT_TYPE);
-      if (resolved === 'PK') { keyType = 'PK'; }
+      if (resolved === 'PK' && !keyTypes.includes('PK')) { keyTypes.push('PK'); }
       else if (resolved === 'FK') {
-        keyType = keyType ?? 'FK';
+        if (!keyTypes.includes('FK')) keyTypes.push('FK');
         reference = {
           table: c.REFERENCED_TABLE_NAME!,
           column: c.REFERENCED_COLUMN_NAME!,
           onDelete: resolveRefAction(c.DELETE_RULE),
           onUpdate: resolveRefAction(c.UPDATE_RULE),
         };
-      } else if (resolved === 'UK' && keyType !== 'PK') {
-        keyType = 'UK';
+      } else if (resolved === 'UK' && !keyTypes.includes('UK')) {
+        keyTypes.push('UK');
       }
     }
 
@@ -166,7 +166,7 @@ function buildTablesFromMysql(
       id: crypto.randomUUID(),
       name: row.COLUMN_NAME,
       dataType: row.COLUMN_TYPE,
-      keyType,
+      keyTypes,
       defaultValue: row.COLUMN_DEFAULT,
       nullable: row.IS_NULLABLE === 'YES',
       comment: row.COLUMN_COMMENT ?? '',
@@ -324,22 +324,22 @@ function buildTablesFromPg(
     const entry = tableMap.get(row.table_name)!;
 
     const colConstraints = constraintLookup.get(row.table_name)?.get(row.column_name) ?? [];
-    let keyType: TKeyType | null = null;
+    const keyTypes: TKeyType[] = [];
     let reference: IForeignKeyRef | null = null;
 
     for (const c of colConstraints) {
       const resolved = resolveKeyType(c.constraint_type);
-      if (resolved === 'PK') { keyType = 'PK'; }
+      if (resolved === 'PK' && !keyTypes.includes('PK')) { keyTypes.push('PK'); }
       else if (resolved === 'FK') {
-        keyType = keyType ?? 'FK';
+        if (!keyTypes.includes('FK')) keyTypes.push('FK');
         reference = {
           table: c.foreign_table_name!,
           column: c.foreign_column_name!,
           onDelete: resolveRefAction(c.delete_rule),
           onUpdate: resolveRefAction(c.update_rule),
         };
-      } else if (resolved === 'UK' && keyType !== 'PK') {
-        keyType = 'UK';
+      } else if (resolved === 'UK' && !keyTypes.includes('UK')) {
+        keyTypes.push('UK');
       }
     }
 
@@ -349,7 +349,7 @@ function buildTablesFromPg(
       id: crypto.randomUUID(),
       name: row.column_name,
       dataType: row.udt_name,
-      keyType,
+      keyTypes,
       defaultValue: row.column_default,
       nullable: row.is_nullable === 'YES',
       comment,

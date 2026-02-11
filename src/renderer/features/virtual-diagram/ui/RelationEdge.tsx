@@ -4,6 +4,8 @@ import type { EdgeProps } from '@xyflow/react';
 
 interface RelationEdgeData {
   nullable?: boolean;
+  onDelete?: string;
+  onUpdate?: string;
   [key: string]: unknown;
 }
 
@@ -106,6 +108,9 @@ function RelationEdgeComponent({
   const strokeColor = selected ? 'hsl(var(--primary))' : 'hsl(var(--muted-foreground))';
   const edgeData = data as RelationEdgeData | undefined;
   const nullable = edgeData?.nullable ?? true;
+  const onDelete = edgeData?.onDelete;
+  const onUpdate = edgeData?.onUpdate;
+  const hasPolicies = !!onDelete || !!onUpdate;
 
   // Offset markers along the edge direction so they sit on the line
   const markerOffset = 10;
@@ -140,16 +145,28 @@ function RelationEdgeComponent({
           color={strokeColor}
         />
       </EdgeLabelRenderer>
-      {label && (
+      {(label || hasPolicies) && (
         <EdgeLabelRenderer>
           <div
-            className="nodrag nopan pointer-events-auto rounded bg-background/90 px-1.5 py-0.5 text-[10px] text-muted-foreground shadow-sm"
+            className="nodrag nopan pointer-events-auto rounded border border-border/50 bg-background/95 px-1.5 py-0.5 shadow-sm"
             style={{
               position: 'absolute',
               transform: `translate(-50%, -50%) translate(${labelX}px,${labelY}px)`,
             }}
           >
-            {label}
+            {label && (
+              <div className="text-[10px] text-muted-foreground">{label}</div>
+            )}
+            {hasPolicies && (
+              <div className="flex gap-2 text-[9px]">
+                {onDelete && (
+                  <span className="text-red-500 dark:text-red-400">D:{onDelete}</span>
+                )}
+                {onUpdate && (
+                  <span className="text-blue-500 dark:text-blue-400">U:{onUpdate}</span>
+                )}
+              </div>
+            )}
           </div>
         </EdgeLabelRenderer>
       )}

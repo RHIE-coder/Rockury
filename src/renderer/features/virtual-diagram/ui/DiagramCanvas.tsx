@@ -18,6 +18,10 @@ import { RelationEdge } from './RelationEdge';
 const nodeTypes = { tableNode: TableNode };
 const edgeTypes = { relationEdge: RelationEdge };
 
+// Stable default references to prevent useMemo invalidation on every render
+const EMPTY_STRING_ARRAY: string[] = [];
+const EMPTY_COLOR_MAP: Record<string, string> = {};
+
 interface DiagramCanvasProps {
   diagram: IDiagram;
   layout?: IDiagramLayout | null;
@@ -33,6 +37,9 @@ interface DiagramCanvasProps {
   onEdgeCreate?: (sourceTableId: string, targetTableId: string) => void;
   hiddenTableIds?: string[];
   tableColors?: Record<string, string>;
+  lockedNodeIds?: string[];
+  onNodeLockToggle?: (nodeId: string) => void;
+  onNodeDragStart?: (positions: Record<string, { x: number; y: number }>) => void;
 }
 
 function DiagramCanvasInner({
@@ -40,19 +47,38 @@ function DiagramCanvasInner({
   layout,
   filter,
   readOnly = false,
-  highlightedTableIds = [],
+  highlightedTableIds = EMPTY_STRING_ARRAY,
   selectedTableId = null,
   onTableSelect,
   onTableCreate,
   onTableUpdate,
   onLayoutChange,
   onEdgeCreate,
-  hiddenTableIds = [],
-  tableColors = {},
+  hiddenTableIds = EMPTY_STRING_ARRAY,
+  tableColors = EMPTY_COLOR_MAP,
+  lockedNodeIds = EMPTY_STRING_ARRAY,
+  onNodeLockToggle,
+  onNodeDragStart,
 }: DiagramCanvasProps) {
   const reactFlowInstance = useReactFlow();
   const layoutSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isInitialViewportApplied = useRef(false);
+
+  // Use ref for onTableUpdate to keep useMemo deps stable (callback doesn't affect node structure)
+  const onTableUpdateRef = useRef(onTableUpdate);
+  onTableUpdateRef.current = onTableUpdate;
+  const stableOnTableUpdate = useCallback(
+    (table: ITable) => onTableUpdateRef.current?.(table),
+    [],
+  );
+
+  // Use ref for onNodeLockToggle to keep useMemo deps stable
+  const onNodeLockToggleRef = useRef(onNodeLockToggle);
+  onNodeLockToggleRef.current = onNodeLockToggle;
+  const stableOnNodeLockToggle = useCallback(
+    (id: string) => onNodeLockToggleRef.current?.(id),
+    [],
+  );
 
   const { nodes: initialNodes, edges: initialEdges } = useMemo(
     () =>
@@ -61,19 +87,29 @@ function DiagramCanvasInner({
         filter,
         highlightedTableIds,
         selectedTableId,
-        onTableUpdate: readOnly ? undefined : onTableUpdate,
+        onTableUpdate: readOnly ? undefined : stableOnTableUpdate,
         hiddenTableIds,
         tableColors,
+        lockedNodeIds,
+        onNodeLockToggle: stableOnNodeLockToggle,
       }),
-    [diagram.tables, layout?.positions, filter, highlightedTableIds, selectedTableId, readOnly, onTableUpdate, hiddenTableIds, tableColors],
+    [diagram.tables, layout?.positions, filter, highlightedTableIds, selectedTableId, readOnly, stableOnTableUpdate, hiddenTableIds, tableColors, lockedNodeIds, stableOnNodeLockToggle],
   );
 
   const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
 
-  // Sync when diagram/filter/highlights change
+  // Sync when diagram/filter/highlights change (preserve measured dimensions to avoid #015 warning)
   useEffect(() => {
-    setNodes(initialNodes);
+    setNodes((prev) => {
+      const prevMap = new Map(prev.map((n) => [n.id, n]));
+      return initialNodes.map((node) => {
+        const existing = prevMap.get(node.id);
+        return existing?.measured
+          ? { ...node, measured: existing.measured }
+          : node;
+      });
+    });
     setEdges(initialEdges);
   }, [initialNodes, initialEdges, setNodes, setEdges]);
 
@@ -84,27 +120,35 @@ function DiagramCanvasInner({
     [onTableSelect],
   );
 
+  const handleNodeDragStartCb: NodeMouseHandler = useCallback(
+    () => {
+      if (readOnly || !onNodeDragStart) return;
+      const currentNodes = reactFlowInstance.getNodes();
+      const positions: Record<string, { x: number; y: number }> = {};
+      for (const node of currentNodes) {
+        positions[node.id] = { x: node.position.x, y: node.position.y };
+      }
+      onNodeDragStart(positions);
+    },
+    [readOnly, onNodeDragStart, reactFlowInstance],
+  );
+
   const handleNodeDragStop: NodeMouseHandler = useCallback(
     () => {
       if (readOnly || !onLayoutChange) return;
 
-      if (layoutSaveTimer.current) {
-        clearTimeout(layoutSaveTimer.current);
+      // Save immediately on drag stop (no debounce) to ensure cache is fresh before save
+      const currentNodes = reactFlowInstance.getNodes();
+      const positions: Record<string, { x: number; y: number }> = {};
+      for (const node of currentNodes) {
+        positions[node.id] = { x: node.position.x, y: node.position.y };
       }
-
-      layoutSaveTimer.current = setTimeout(() => {
-        const currentNodes = reactFlowInstance.getNodes();
-        const positions: Record<string, { x: number; y: number }> = {};
-        for (const node of currentNodes) {
-          positions[node.id] = { x: node.position.x, y: node.position.y };
-        }
-        const viewport = reactFlowInstance.getViewport();
-        onLayoutChange({
-          positions,
-          zoom: viewport.zoom,
-          viewport: { x: viewport.x, y: viewport.y },
-        });
-      }, 1000);
+      const viewport = reactFlowInstance.getViewport();
+      onLayoutChange({
+        positions,
+        zoom: viewport.zoom,
+        viewport: { x: viewport.x, y: viewport.y },
+      });
     },
     [readOnly, onLayoutChange, reactFlowInstance],
   );
@@ -123,18 +167,12 @@ function DiagramCanvasInner({
     onTableSelect?.(null as unknown as string);
   }, [onTableSelect]);
 
-  const handlePaneDoubleClick = useCallback(
-    (event: React.MouseEvent) => {
-      if (readOnly || !onTableCreate) return;
-      const bounds = (event.target as HTMLElement).closest('.react-flow')?.getBoundingClientRect();
-      if (!bounds) return;
-      const position: XYPosition = reactFlowInstance.screenToFlowPosition({
-        x: event.clientX,
-        y: event.clientY,
-      });
-      onTableCreate(position);
-    },
-    [readOnly, onTableCreate, reactFlowInstance],
+  // Double-click table creation removed — use "+ Table" button instead
+
+  // Stable key tracking table ID set (changes on sync, add/remove table)
+  const tableIdKey = useMemo(
+    () => diagram.tables.map(t => t.id).join(','),
+    [diagram.tables],
   );
 
   // Restore saved viewport on initial load
@@ -152,6 +190,20 @@ function DiagramCanvasInner({
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [layout, nodes.length]);
+
+  // Re-fit when table IDs change but saved positions are stale (e.g., after real schema sync)
+  useEffect(() => {
+    if (!isInitialViewportApplied.current) return;
+    if (diagram.tables.length === 0) return;
+
+    const hasMatchingPositions = layout?.positions &&
+      diagram.tables.some(t => t.id in layout.positions);
+
+    if (!hasMatchingPositions) {
+      reactFlowInstance.fitView({ duration: 300, padding: 0.2 });
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tableIdKey]);
 
   // Fit view to a specific node (called from parent via ref or store)
   useEffect(() => {
@@ -202,12 +254,12 @@ function DiagramCanvasInner({
       onEdgesChange={readOnly ? undefined : onEdgesChange}
       onConnect={handleConnect}
       onNodeClick={handleNodeClick}
+      onNodeDragStart={handleNodeDragStartCb}
       onNodeDragStop={handleNodeDragStop}
       onMoveEnd={handleMoveEnd}
       onPaneClick={handlePaneClick}
-      onDoubleClick={handlePaneDoubleClick}
       nodesDraggable={!readOnly}
-      nodesConnectable={!readOnly}
+      nodesConnectable={!readOnly && !!onEdgeCreate}
       elementsSelectable={!readOnly}
       minZoom={0.1}
       maxZoom={2}

@@ -15,11 +15,11 @@ export const virtualDiagramService = {
     return diagram;
   },
 
-  create(data: { name: string; type: 'virtual'; version?: string; tables?: ITable[] }): IDiagram {
+  create(data: { name: string; type: 'virtual'; version?: string; description?: string; tables?: ITable[] }): IDiagram {
     return diagramRepository.create(data);
   },
 
-  update(id: string, data: { name?: string; version?: string; tables?: ITable[] }): IDiagram {
+  update(id: string, data: { name?: string; version?: string; tables?: ITable[]; description?: string }): IDiagram {
     const existing = diagramRepository.getById(id);
     if (!existing) throw new Error(`Diagram not found: ${id}`);
     return diagramRepository.update(id, data);
@@ -39,19 +39,34 @@ export const virtualDiagramService = {
 
   createVersion(data: {
     diagramId: string;
+    name: string;
     ddlContent: string;
+    schemaSnapshot?: unknown;
   }): IDiagramVersion {
-    const diagram = diagramRepository.getById(data.diagramId);
-    if (!diagram) throw new Error(`Diagram not found: ${data.diagramId}`);
+    const snapshot = data.schemaSnapshot ?? diagramRepository.getById(data.diagramId);
+    if (!snapshot) throw new Error(`Diagram not found: ${data.diagramId}`);
     return diagramVersionRepository.create({
       diagramId: data.diagramId,
+      name: data.name,
       ddlContent: data.ddlContent,
-      schemaSnapshot: diagram,
+      schemaSnapshot: snapshot,
     });
+  },
+
+  updateVersion(id: string, data: { name?: string; ddlContent?: string; schemaSnapshot?: unknown }): IDiagramVersion {
+    return diagramVersionRepository.update(id, data);
+  },
+
+  deleteVersion(id: string): void {
+    diagramVersionRepository.deleteById(id);
   },
 
   listVersions(diagramId: string): IDiagramVersion[] {
     return diagramVersionRepository.list(diagramId);
+  },
+
+  reorderVersions(diagramId: string, orderedVersionIds: string[]): void {
+    diagramVersionRepository.reorder(diagramId, orderedVersionIds);
   },
 
   clone(id: string, newName?: string): IDiagram {

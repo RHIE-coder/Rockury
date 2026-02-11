@@ -29,6 +29,8 @@ interface SchemaToNodesOptions {
   onTableUpdate?: (table: ITable) => void;
   hiddenTableIds?: string[];
   tableColors?: Record<string, string>;
+  lockedNodeIds?: string[];
+  onNodeLockToggle?: (id: string) => void;
 }
 
 /**
@@ -56,10 +58,13 @@ export function schemaToNodes(
     onTableUpdate,
     hiddenTableIds = [],
     tableColors = {},
+    lockedNodeIds = [],
+    onNodeLockToggle,
   } = options;
 
   const highlightedSet = new Set(highlightedTableIds);
   const hiddenSet = new Set(hiddenTableIds);
+  const lockedSet = new Set(lockedNodeIds);
 
   // Filter out hidden tables
   const visibleTables = tables.filter((t) => !hiddenSet.has(t.id));
@@ -74,10 +79,13 @@ export function schemaToNodes(
     };
     const position = positions?.[table.id] ?? defaultPosition;
 
+    const isLocked = lockedSet.has(table.id);
+
     return {
       id: table.id,
       type: 'tableNode',
       position,
+      draggable: !isLocked,
       data: {
         table,
         label: table.name,
@@ -86,8 +94,12 @@ export function schemaToNodes(
         isSelected: table.id === selectedTableId,
         onTableUpdate,
         color: tableColors[table.id],
+        isLocked,
+        onLockToggle: onNodeLockToggle,
       } satisfies TableNodeData,
       style: { width: TABLE_WIDTH },
+      width: TABLE_WIDTH,
+      height: nodeHeight,
     };
   });
 
@@ -107,7 +119,11 @@ export function schemaToNodes(
             label: `${column.name} → ${column.reference.column}`,
             type: 'relationEdge',
             animated: true,
-            data: { nullable: column.nullable },
+            data: {
+              nullable: column.nullable,
+              onDelete: column.reference.onDelete,
+              onUpdate: column.reference.onUpdate,
+            },
           });
         }
       }

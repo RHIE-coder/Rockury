@@ -60,26 +60,26 @@ function parseTableBody(
     }
   }
 
-  // Apply PK constraints to columns
+  // Apply constraints to columns as keyTypes
   for (const constraint of constraints) {
     if (constraint.type === 'PK') {
       for (const colName of constraint.columns) {
         const col = columns.find((c) => c.name === colName);
-        if (col) col.keyType = 'PK';
+        if (col && !col.keyTypes.includes('PK')) col.keyTypes.push('PK');
       }
     }
     if (constraint.type === 'FK' && constraint.reference) {
       const colName = constraint.columns[0];
       const col = columns.find((c) => c.name === colName);
       if (col) {
-        col.keyType = 'FK';
+        if (!col.keyTypes.includes('FK')) col.keyTypes.push('FK');
         col.reference = constraint.reference;
       }
     }
     if (constraint.type === 'UK') {
       for (const colName of constraint.columns) {
         const col = columns.find((c) => c.name === colName);
-        if (col && !col.keyType) col.keyType = 'UK';
+        if (col && !col.keyTypes.includes('UK')) col.keyTypes.push('UK');
       }
     }
   }
@@ -118,7 +118,7 @@ function parseColumnLine(line: string, ordinal: number): IColumn | null {
   const upper = line.toUpperCase();
 
   const nullable = !upper.includes('NOT NULL');
-  const keyType: TKeyType | null = upper.includes('PRIMARY KEY') ? 'PK' : null;
+  const keyTypes: TKeyType[] = upper.includes('PRIMARY KEY') ? ['PK'] : [];
 
   let defaultValue: string | null = null;
   const defaultMatch = /DEFAULT\s+('(?:[^']*)'|"(?:[^"]*)"|[^\s,]+)/i.exec(line);
@@ -136,7 +136,7 @@ function parseColumnLine(line: string, ordinal: number): IColumn | null {
     id: `col-${name}-${Date.now()}-${ordinal}`,
     name,
     dataType,
-    keyType,
+    keyTypes,
     defaultValue,
     nullable,
     comment,

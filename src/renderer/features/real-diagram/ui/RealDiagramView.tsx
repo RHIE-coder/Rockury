@@ -1,11 +1,11 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { RefreshCw, Search, SlidersHorizontal, PanelLeft, PanelRight, ArrowDownToLine, Code, History } from 'lucide-react';
 import { useMutation } from '@tanstack/react-query';
 import { Button } from '@/shared/components/ui/button';
 import { Select } from '@/shared/components/ui/select';
 import type { ITable, IDiagram, IDiagramLayout, ISearchResult } from '~/shared/types/db';
 import { useConnections } from '@/features/db-connection';
-import { useDiagramStore, useCreateDiagram, useDiagramLayout, useSaveDiagramLayout } from '@/features/virtual-diagram';
+import { useDiagramStore, useCreateDiagram, useDiagramLayout, useSaveDiagramLayout, useCreateDiagramVersion } from '@/features/virtual-diagram';
 import { DiagramCanvas } from '@/features/virtual-diagram/ui/DiagramCanvas';
 import { TableListPanel } from '@/features/virtual-diagram/ui/TableListPanel';
 import { TableDetailPanel } from '@/features/virtual-diagram/ui/TableDetailPanel';
@@ -52,16 +52,49 @@ export function RealDiagramView() {
   const [searchResults, setSearchResults] = useState<ISearchResult[]>([]);
   const [isFilterPanelOpen, setIsFilterPanelOpen] = useState(false);
   const createDiagram = useCreateDiagram();
+  const createVersion = useCreateDiagramVersion();
 
   const { data: layout } = useDiagramLayout(realDiagramId ?? '');
   const saveLayout = useSaveDiagramLayout();
+
+  // Track latest layout in ref so sync can read up-to-date positions (survives debounce race)
+  const latestLayoutRef = useRef<Pick<IDiagramLayout, 'positions' | 'zoom' | 'viewport'> | null>(null);
 
   const syncSchema = useMutation({
     mutationFn: (connectionId: string) => realDiagramApi.syncReal(connectionId),
     onSuccess: (result) => {
       if (result.success) {
-        setTables(result.data.diagram.tables);
-        setRealDiagramId(result.data.diagram.id);
+        const newTables = result.data.diagram.tables;
+        const newDiagramId = result.data.diagram.id;
+
+        // Remap saved positions from old table IDs to new table IDs by table name
+        const oldTables = useDiagramStore.getState().realTables;
+        const savedLayout = latestLayoutRef.current ?? layout;
+        const oldPositions = savedLayout?.positions;
+
+        if (oldPositions && oldTables.length > 0) {
+          const oldNameToId = new Map(oldTables.map((t) => [t.name, t.id]));
+          const newPositions: Record<string, { x: number; y: number }> = {};
+
+          for (const t of newTables) {
+            const oldId = oldNameToId.get(t.name);
+            if (oldId && oldPositions[oldId]) {
+              newPositions[t.id] = oldPositions[oldId];
+            }
+          }
+
+          if (Object.keys(newPositions).length > 0) {
+            saveLayout.mutate({
+              diagramId: newDiagramId,
+              positions: newPositions,
+              zoom: savedLayout?.zoom ?? 1,
+              viewport: savedLayout?.viewport ?? { x: 0, y: 0 },
+            });
+          }
+        }
+
+        setTables(newTables);
+        setRealDiagramId(newDiagramId);
         setSelectedTableId(null);
         if (result.data.changelog) {
           setLastChangelog(result.data.changelog);
@@ -70,6 +103,30 @@ export function RealDiagramView() {
       }
     },
   });
+
+  // Auto-load saved diagram from local DB when connection is selected
+  useEffect(() => {
+    if (!selectedConnectionId) {
+      setTables([]);
+      setRealDiagramId(null);
+      setSelectedTableId(null);
+      latestLayoutRef.current = null;
+      return;
+    }
+
+    realDiagramApi.fetchReal(selectedConnectionId).then((result) => {
+      if (result.success && result.data && result.data.tables?.length > 0) {
+        setTables(result.data.tables);
+        setRealDiagramId(result.data.id);
+      } else {
+        setTables([]);
+        setRealDiagramId(null);
+      }
+      setSelectedTableId(null);
+      latestLayoutRef.current = null;
+    });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedConnectionId]);
 
   function handleFetch() {
     if (!selectedConnectionId) return;
@@ -89,9 +146,10 @@ export function RealDiagramView() {
   }, []);
 
   const selectedTable = tables.find((t) => t.id === selectedTableId) ?? null;
-  const highlightedTableIds = searchResults
-    .filter((r) => r.type === 'table')
-    .map((r) => r.tableId);
+  const highlightedTableIds = useMemo(
+    () => searchResults.filter((r) => r.type === 'table').map((r) => r.tableId),
+    [searchResults],
+  );
 
   const handleTableSelect = useCallback((tableId: string) => {
     setSelectedTableId(tableId || null);
@@ -101,13 +159,21 @@ export function RealDiagramView() {
     if (tables.length === 0) return;
     const connName = connections?.find((c) => c.id === selectedConnectionId)?.name ?? 'Imported';
     createDiagram.mutate(
-      { name: `${connName} (imported)`, type: 'virtual', tables },
+      { name: `${connName} (imported)`, type: 'virtual', version: '0.0.0', tables },
       {
         onSuccess: (result) => {
           if (result.success) {
+            const newDiagram = result.data;
+            // Auto-create initial version with imported tables
+            createVersion.mutate({
+              diagramId: newDiagram.id,
+              name: 'v0.0.0',
+              ddlContent: '',
+              schemaSnapshot: { ...newDiagram, tables },
+            });
             // Switch to virtual tab
             useDiagramStore.getState().setActiveTab('virtual');
-            useDiagramStore.getState().setSelectedDiagramId(result.data.id);
+            useDiagramStore.getState().setSelectedDiagramId(newDiagram.id);
           }
         },
       },
@@ -122,6 +188,7 @@ export function RealDiagramView() {
   const handleLayoutChange = useCallback(
     (layoutUpdate: Pick<IDiagramLayout, 'positions' | 'zoom' | 'viewport'>) => {
       if (!realDiagramId) return;
+      latestLayoutRef.current = layoutUpdate;
       saveLayout.mutate({
         diagramId: realDiagramId,
         ...layoutUpdate,
@@ -302,7 +369,6 @@ export function RealDiagramView() {
               selectedTableId={selectedTableId}
               onTableSelect={handleTableSelect}
               onLayoutChange={handleLayoutChange}
-              readOnly
             />
           ) : (
             <div className="flex h-full items-center justify-center bg-muted/30">
