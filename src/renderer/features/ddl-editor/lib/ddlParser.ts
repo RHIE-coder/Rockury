@@ -69,11 +69,16 @@ function parseTableBody(
       }
     }
     if (constraint.type === 'FK' && constraint.reference) {
-      const colName = constraint.columns[0];
-      const col = columns.find((c) => c.name === colName);
-      if (col) {
-        if (!col.keyTypes.includes('FK')) col.keyTypes.push('FK');
-        col.reference = constraint.reference;
+      const refCols = constraint.reference.column.split(',').map((c) => c.trim().replace(/[`"']/g, ''));
+      for (let i = 0; i < constraint.columns.length; i++) {
+        const col = columns.find((c) => c.name === constraint.columns[i]);
+        if (col) {
+          if (!col.keyTypes.includes('FK')) col.keyTypes.push('FK');
+          col.reference = {
+            ...constraint.reference,
+            column: refCols[i] || refCols[0],
+          };
+        }
       }
     }
     if (constraint.type === 'UK') {

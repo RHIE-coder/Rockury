@@ -305,14 +305,16 @@ function parseDdl(ddl: string): ITable[] {
 
 function parseColumns(body: string): import('~/shared/types/db').IColumn[] {
   const columns: import('~/shared/types/db').IColumn[] = [];
+  const constraintLines: string[] = [];
   // Split by comma, but careful with nested parentheses
   const lines = splitColumnDefs(body);
   let position = 0;
 
   for (const line of lines) {
     const trimmed = line.trim();
-    // Skip constraints lines (PRIMARY KEY, FOREIGN KEY, UNIQUE, INDEX, KEY, CONSTRAINT)
+    // Collect constraint lines for post-processing
     if (/^(PRIMARY\s+KEY|FOREIGN\s+KEY|UNIQUE|INDEX|KEY|CONSTRAINT|CHECK)\s/i.test(trimmed)) {
+      constraintLines.push(trimmed);
       continue;
     }
 
@@ -336,6 +338,62 @@ function parseColumns(body: string): import('~/shared/types/db').IColumn[] {
       constraints: [],
       ordinalPosition: position,
     });
+  }
+
+  // Apply constraint lines to columns
+  for (const cl of constraintLines) {
+    const upper = cl.toUpperCase();
+
+    // PRIMARY KEY (col1, col2, ...)
+    if (upper.includes('PRIMARY KEY')) {
+      const pkMatch = /PRIMARY\s+KEY\s*\(([^)]+)\)/i.exec(cl);
+      if (pkMatch) {
+        const pkCols = pkMatch[1].split(',').map((c) => c.trim().replace(/[`"']/g, ''));
+        for (const pkCol of pkCols) {
+          const col = columns.find((c) => c.name === pkCol);
+          if (col && !col.keyTypes.includes('PK')) col.keyTypes.push('PK');
+        }
+      }
+    }
+
+    // FOREIGN KEY (col) REFERENCES ref_table(ref_col) ON DELETE/UPDATE ...
+    if (upper.includes('FOREIGN KEY')) {
+      const fkRegex =
+        /FOREIGN\s+KEY\s*\(([^)]+)\)\s*REFERENCES\s+[`"']?(\w+)[`"']?\s*\(([^)]+)\)(?:\s+ON\s+DELETE\s+(CASCADE|SET\s+NULL|RESTRICT|NO\s+ACTION))?(?:\s+ON\s+UPDATE\s+(CASCADE|SET\s+NULL|RESTRICT|NO\s+ACTION))?/i;
+      const fkMatch = fkRegex.exec(cl);
+      if (fkMatch) {
+        const fkCols = fkMatch[1].split(',').map((c) => c.trim().replace(/[`"']/g, ''));
+        const refTable = fkMatch[2];
+        const refCols = fkMatch[3].split(',').map((c) => c.trim().replace(/[`"']/g, ''));
+        const onDelete = fkMatch[4]?.replace(/\s+/g, ' ').toUpperCase() as 'CASCADE' | 'SET NULL' | 'RESTRICT' | 'NO ACTION' | undefined;
+        const onUpdate = fkMatch[5]?.replace(/\s+/g, ' ').toUpperCase() as 'CASCADE' | 'SET NULL' | 'RESTRICT' | 'NO ACTION' | undefined;
+
+        for (let i = 0; i < fkCols.length; i++) {
+          const col = columns.find((c) => c.name === fkCols[i]);
+          if (col) {
+            if (!col.keyTypes.includes('FK')) col.keyTypes.push('FK');
+            col.reference = {
+              table: refTable,
+              column: refCols[i] || refCols[0],
+              onDelete,
+              onUpdate,
+            };
+          }
+        }
+      }
+    }
+
+    // UNIQUE (col1, col2, ...)
+    if (upper.includes('UNIQUE')) {
+      const ukMatch = /UNIQUE\s*(?:KEY|INDEX)?\s*(?:[`"']?\w+[`"']?\s*)?\(([^)]+)\)/i.exec(cl);
+      if (ukMatch) {
+        const ukCols = ukMatch[1].split(',').map((c) => c.trim().replace(/[`"']/g, ''));
+        for (const ukCol of ukCols) {
+          const col = columns.find((c) => c.name === ukCol);
+          if (col && !col.keyTypes.includes('UK')) col.keyTypes.push('UK');
+        }
+      }
+    }
   }
 
   return columns;

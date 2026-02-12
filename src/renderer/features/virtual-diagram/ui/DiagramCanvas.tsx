@@ -9,8 +9,9 @@ import {
   useEdgesState,
   useReactFlow,
 } from '@xyflow/react';
-import type { OnConnect, NodeMouseHandler, Node, XYPosition, Viewport } from '@xyflow/react';
+import type { OnConnect, NodeMouseHandler, Node, XYPosition, Viewport, NodeProps } from '@xyflow/react';
 import type { ITable, IDiagram, IDiagramLayout, IDiagramFilter } from '~/shared/types/db';
+import type { ICascadeResult } from '../lib/cascadeTraversal';
 import { schemaToNodes } from '../lib/schemaToNodes';
 import { TableNode } from './TableNode';
 import { RelationEdge } from './RelationEdge';
@@ -40,6 +41,8 @@ interface DiagramCanvasProps {
   lockedNodeIds?: string[];
   onNodeLockToggle?: (nodeId: string) => void;
   onNodeDragStart?: (positions: Record<string, { x: number; y: number }>) => void;
+  onNodeContextMenu?: (event: React.MouseEvent, tableId: string, tableName: string) => void;
+  cascadeSimulation?: ICascadeResult | null;
 }
 
 function DiagramCanvasInner({
@@ -59,6 +62,8 @@ function DiagramCanvasInner({
   lockedNodeIds = EMPTY_STRING_ARRAY,
   onNodeLockToggle,
   onNodeDragStart,
+  onNodeContextMenu,
+  cascadeSimulation = null,
 }: DiagramCanvasProps) {
   const reactFlowInstance = useReactFlow();
   const layoutSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -92,8 +97,9 @@ function DiagramCanvasInner({
         tableColors,
         lockedNodeIds,
         onNodeLockToggle: stableOnNodeLockToggle,
+        cascadeSimulation,
       }),
-    [diagram.tables, layout?.positions, filter, highlightedTableIds, selectedTableId, readOnly, stableOnTableUpdate, hiddenTableIds, tableColors, lockedNodeIds, stableOnNodeLockToggle],
+    [diagram.tables, layout?.positions, filter, highlightedTableIds, selectedTableId, readOnly, stableOnTableUpdate, hiddenTableIds, tableColors, lockedNodeIds, stableOnNodeLockToggle, cascadeSimulation],
   );
 
   const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
@@ -118,6 +124,15 @@ function DiagramCanvasInner({
       onTableSelect?.(node.id);
     },
     [onTableSelect],
+  );
+
+  const handleNodeContextMenu: NodeMouseHandler = useCallback(
+    (event, node: Node) => {
+      event.preventDefault();
+      const tableData = node.data as { table?: { name?: string } };
+      onNodeContextMenu?.(event as unknown as React.MouseEvent, node.id, tableData?.table?.name ?? node.id);
+    },
+    [onNodeContextMenu],
   );
 
   const handleNodeDragStartCb: NodeMouseHandler = useCallback(
@@ -254,6 +269,7 @@ function DiagramCanvasInner({
       onEdgesChange={readOnly ? undefined : onEdgesChange}
       onConnect={handleConnect}
       onNodeClick={handleNodeClick}
+      onNodeContextMenu={handleNodeContextMenu}
       onNodeDragStart={handleNodeDragStartCb}
       onNodeDragStop={handleNodeDragStop}
       onMoveEnd={handleMoveEnd}

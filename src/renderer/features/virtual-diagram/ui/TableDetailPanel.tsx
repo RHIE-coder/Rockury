@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react';
 import { createPortal } from 'react-dom';
-import { Plus, Trash2, X, ChevronDown, ChevronRight, GripVertical } from 'lucide-react';
+import { Trash2, X, ChevronDown, ChevronRight, GripVertical } from 'lucide-react';
 import {
   DndContext,
   closestCenter,
@@ -26,7 +26,9 @@ import type { ITable, IColumn, IDiagramVersion, IConstraint } from '~/shared/typ
 import { ColumnEditor } from './ColumnEditor';
 import { ColorPicker } from './ColorPicker';
 import { ConstraintEditor } from './ConstraintEditor';
+import { AddConstraintModal } from './AddConstraintModal';
 import { InlineDiffPanel } from '@/features/diagram-diff/ui/InlineDiffPanel';
+import { syncKeyTypesFromConstraints } from '../lib/syncKeyTypes';
 
 interface TableDetailPanelProps {
   table: ITable;
@@ -177,7 +179,7 @@ function SortableConstraintItem({
 }
 
 export function TableDetailPanel({
-  table,
+  table: tableProp,
   allTables,
   onChange,
   onDelete,
@@ -192,11 +194,16 @@ export function TableDetailPanel({
   onCompareTargetChange,
   currentDiagramName,
 }: TableDetailPanelProps) {
+  // Always derive keyTypes from constraints for display
+  const table = useMemo(() => syncKeyTypesFromConstraints(tableProp), [tableProp]);
+
   const [isColumnsOpen, setIsColumnsOpen] = useState(true);
   const [isConstraintsOpen, setIsConstraintsOpen] = useState(true);
   const [isDeleteConfirm, setIsDeleteConfirm] = useState(false);
   const [activeColDragId, setActiveColDragId] = useState<string | null>(null);
   const [activeConDragId, setActiveConDragId] = useState<string | null>(null);
+  const [constraintModalOpen, setConstraintModalOpen] = useState(false);
+  const [editingConstraint, setEditingConstraint] = useState<{ index: number; constraint: IConstraint } | null>(null);
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
@@ -228,23 +235,32 @@ export function TableDetailPanel({
   }
 
   function handleConstraintChange(index: number, updated: IConstraint) {
-    const constraints = [...table.constraints];
-    constraints[index] = updated;
-    onChange({ ...table, constraints });
+    const newConstraints = [...table.constraints];
+    newConstraints[index] = updated;
+    onChange(syncKeyTypesFromConstraints({ ...table, constraints: newConstraints }));
   }
 
   function handleConstraintRemove(index: number) {
-    const constraints = table.constraints.filter((_, i) => i !== index);
-    onChange({ ...table, constraints });
+    const newConstraints = table.constraints.filter((_, i) => i !== index);
+    onChange(syncKeyTypesFromConstraints({ ...table, constraints: newConstraints }));
   }
 
   function handleAddConstraint() {
-    const newConstraint: IConstraint = {
-      type: 'UK',
-      name: `uk_${table.name}_${Date.now()}`,
-      columns: [],
-    };
-    onChange({ ...table, constraints: [...table.constraints, newConstraint] });
+    setEditingConstraint(null);
+    setConstraintModalOpen(true);
+  }
+
+  function handleConstraintSave(constraint: IConstraint) {
+    let newConstraints: IConstraint[];
+    if (editingConstraint) {
+      newConstraints = [...table.constraints];
+      newConstraints[editingConstraint.index] = constraint;
+    } else {
+      newConstraints = [...table.constraints, constraint];
+    }
+    onChange(syncKeyTypesFromConstraints({ ...table, constraints: newConstraints }));
+    setConstraintModalOpen(false);
+    setEditingConstraint(null);
   }
 
   function handleDelete() {
@@ -595,6 +611,17 @@ export function TableDetailPanel({
           )}
         </>
       )}
+
+      {/* Add/Edit Constraint Modal */}
+      <AddConstraintModal
+        open={constraintModalOpen}
+        onOpenChange={setConstraintModalOpen}
+        columns={table.columns}
+        allTables={allTables}
+        tableName={table.name}
+        onSave={handleConstraintSave}
+        editingConstraint={editingConstraint?.constraint ?? null}
+      />
     </div>
   );
 }

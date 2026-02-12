@@ -84,3 +84,25 @@ body {
   color: hsl(var(--foreground));
   font-family: system-ui, -apple-system, sans-serif;
 }
+
+/* Cascade simulation pulse animation */
+@keyframes cascade-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 var(--cascade-pulse-color, rgba(249, 115, 22, 0.4)); }
+  50% { box-shadow: 0 0 0 8px transparent; }
+}
+
+.cascade-pulse {
+  animation: cascade-pulse 1.5s ease-in-out infinite;
+  animation-delay: var(--cascade-pulse-delay, 0ms);
+}
+
+/* Cascade blocked: diagonal stripes background */
+.cascade-blocked-bg {
+  background-image: repeating-linear-gradient(
+    -45deg,
+    transparent,
+    transparent 4px,
+    rgba(220, 38, 38, 0.08) 4px,
+    rgba(220, 38, 38, 0.08) 8px
+  );
+}

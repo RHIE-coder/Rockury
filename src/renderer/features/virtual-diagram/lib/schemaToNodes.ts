@@ -1,6 +1,11 @@
 import type { ITable, IDiagramFilter } from '~/shared/types/db';
 import type { Node, Edge } from '@xyflow/react';
 import type { TableNodeData } from '../ui/TableNode';
+import type { ICascadeResult } from './cascadeTraversal';
+import { syncKeyTypesFromConstraints } from './syncKeyTypes';
+
+export type TSimulationNodeRole = 'source' | 'cascade' | 'setNull' | 'blocked' | 'unaffected' | null;
+export type TSimulationEdgeRole = 'active' | 'unaffected' | null;
 
 const TABLE_WIDTH = 250;
 const TABLE_HEIGHT_BASE = 40;
@@ -31,6 +36,7 @@ interface SchemaToNodesOptions {
   tableColors?: Record<string, string>;
   lockedNodeIds?: string[];
   onNodeLockToggle?: (id: string) => void;
+  cascadeSimulation?: ICascadeResult | null;
 }
 
 /**
@@ -60,14 +66,47 @@ export function schemaToNodes(
     tableColors = {},
     lockedNodeIds = [],
     onNodeLockToggle,
+    cascadeSimulation = null,
   } = options;
 
   const highlightedSet = new Set(highlightedTableIds);
   const hiddenSet = new Set(hiddenTableIds);
   const lockedSet = new Set(lockedNodeIds);
 
-  // Filter out hidden tables
-  const visibleTables = tables.filter((t) => !hiddenSet.has(t.id));
+  // Build cascade action lookup: tableId -> action
+  const cascadeActionMap = new Map<string, 'CASCADE' | 'SET NULL'>();
+  if (cascadeSimulation) {
+    for (const node of cascadeSimulation.affectedNodes) {
+      if (node.action === 'CASCADE') cascadeActionMap.set(node.tableId, 'CASCADE');
+      else if (node.action === 'SET NULL') cascadeActionMap.set(node.tableId, 'SET NULL');
+    }
+  }
+
+  // Build cascade depth lookup for animation delay
+  const cascadeDepthMap = new Map<string, number>();
+  if (cascadeSimulation) {
+    for (const node of [...cascadeSimulation.affectedNodes, ...cascadeSimulation.blockedNodes]) {
+      cascadeDepthMap.set(node.tableId, node.depth);
+    }
+  }
+
+  function getNodeSimulationRole(tableId: string): TSimulationNodeRole {
+    if (!cascadeSimulation) return null;
+    if (tableId === cascadeSimulation.sourceTableId) return 'source';
+    if (cascadeSimulation.blockedTableIds.has(tableId)) return 'blocked';
+    const action = cascadeActionMap.get(tableId);
+    if (action === 'CASCADE') return 'cascade';
+    if (action === 'SET NULL') return 'setNull';
+    return 'unaffected';
+  }
+
+  function getEdgeSimulationRole(edgeId: string): TSimulationEdgeRole {
+    if (!cascadeSimulation) return null;
+    return cascadeSimulation.affectedEdgeIds.has(edgeId) ? 'active' : 'unaffected';
+  }
+
+  // Filter out hidden tables, then sync keyTypes from constraints
+  const visibleTables = tables.filter((t) => !hiddenSet.has(t.id)).map(syncKeyTypesFromConstraints);
 
   const nodes: Node[] = visibleTables.map((table, index) => {
     const col = index % COLUMNS_PER_ROW;
@@ -80,6 +119,9 @@ export function schemaToNodes(
     const position = positions?.[table.id] ?? defaultPosition;
 
     const isLocked = lockedSet.has(table.id);
+
+    const simulationRole = getNodeSimulationRole(table.id);
+    const simulationDepth = cascadeDepthMap.get(table.id) ?? 0;
 
     return {
       id: table.id,
@@ -96,6 +138,9 @@ export function schemaToNodes(
         color: tableColors[table.id],
         isLocked,
         onLockToggle: onNodeLockToggle,
+        simulationRole,
+        simulationDepth,
+        simulationType: cascadeSimulation?.simulationType ?? null,
       } satisfies TableNodeData,
       style: { width: TABLE_WIDTH },
       width: TABLE_WIDTH,
@@ -111,18 +156,20 @@ export function schemaToNodes(
       if (column.reference) {
         const targetTableId = tableNameToId.get(column.reference.table);
         if (targetTableId) {
+          const edgeId = `${table.id}-${column.id}-${targetTableId}`;
           edges.push({
-            id: `${table.id}-${column.id}-${targetTableId}`,
+            id: edgeId,
             source: table.id,
             target: targetTableId,
             sourceHandle: column.id,
             label: `${column.name} → ${column.reference.column}`,
             type: 'relationEdge',
-            animated: true,
+            animated: !cascadeSimulation,
             data: {
               nullable: column.nullable,
               onDelete: column.reference.onDelete,
               onUpdate: column.reference.onUpdate,
+              simulationRole: getEdgeSimulationRole(edgeId),
             },
           });
         }

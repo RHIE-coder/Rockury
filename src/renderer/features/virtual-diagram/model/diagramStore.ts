@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import type { IDiagramFilter, ISearchResult, ITable, IColumn, ISchemaChangelog } from '~/shared/types/db';
+import type { ICascadeResult } from '../lib/cascadeTraversal';
 
 export type TDiagramTab = 'virtual' | 'real' | 'diff';
 export type TViewMode = 'canvas' | 'ddl';
@@ -87,6 +88,9 @@ interface DiagramStoreState {
   realSelectedTableId: string | null;
   isRealChangelogOpen: boolean;
   lastRealChangelog: ISchemaChangelog | null;
+
+  // Cascade simulation
+  cascadeSimulation: ICascadeResult | null;
 }
 
 interface UndoState {
@@ -175,6 +179,10 @@ interface DiagramStoreActions {
   setRealSelectedTableId: (id: string | null) => void;
   setRealChangelogOpen: (open: boolean) => void;
   setLastRealChangelog: (changelog: ISchemaChangelog | null) => void;
+
+  // Cascade simulation
+  setCascadeSimulation: (result: ICascadeResult | null) => void;
+  clearCascadeSimulation: () => void;
 }
 
 export const useDiagramStore = create<DiagramStoreState & DiagramStoreActions>((set) => ({
@@ -231,6 +239,9 @@ export const useDiagramStore = create<DiagramStoreState & DiagramStoreActions>((
   realSelectedTableId: null,
   isRealChangelogOpen: false,
   lastRealChangelog: null,
+
+  // Cascade simulation
+  cascadeSimulation: null,
 
   setSelectedDiagramId: (id) => set({ selectedDiagramId: id }),
   setSelectedTableId: (id) =>
@@ -365,4 +376,8 @@ export const useDiagramStore = create<DiagramStoreState & DiagramStoreActions>((
   setRealSelectedTableId: (id) => set({ realSelectedTableId: id }),
   setRealChangelogOpen: (open) => set({ isRealChangelogOpen: open }),
   setLastRealChangelog: (changelog) => set({ lastRealChangelog: changelog }),
+
+  // Cascade simulation
+  setCascadeSimulation: (result) => set({ cascadeSimulation: result }),
+  clearCascadeSimulation: () => set({ cascadeSimulation: null }),
 }));

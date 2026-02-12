@@ -3,6 +3,8 @@ import { Handle, Position } from '@xyflow/react';
 import type { NodeProps } from '@xyflow/react';
 import { Lock, LockOpen } from 'lucide-react';
 import type { ITable, IColumn, IDiagramFilter } from '~/shared/types/db';
+import type { TSimulationNodeRole } from '../lib/schemaToNodes';
+import type { TSimulationType } from '../lib/cascadeTraversal';
 
 export interface TableNodeData {
   table: ITable;
@@ -14,6 +16,9 @@ export interface TableNodeData {
   color?: string;
   isLocked?: boolean;
   onLockToggle?: (id: string) => void;
+  simulationRole?: TSimulationNodeRole;
+  simulationDepth?: number;
+  simulationType?: TSimulationType | null;
 }
 
 function SingleKeyIcon({ keyType }: { keyType: string }) {
@@ -50,8 +55,41 @@ function NullableIcon({ nullable }: { nullable: boolean }) {
     : <span className="shrink-0 text-foreground" title="NOT NULL">◆</span>;
 }
 
+function getSimulationClasses(role: TSimulationNodeRole, simType: TSimulationType | null | undefined): string {
+  switch (role) {
+    case 'source':
+      return simType === 'DELETE'
+        ? 'border-red-500 ring-2 ring-red-500/40 cascade-pulse'
+        : 'border-teal-500 ring-2 ring-teal-500/40 cascade-pulse';
+    case 'cascade':
+      return 'border-orange-500 ring-2 ring-orange-500/40 cascade-pulse';
+    case 'setNull':
+      return 'border-yellow-400 ring-2 ring-yellow-400/40';
+    case 'blocked':
+      return 'border-red-600 ring-2 ring-red-600/40 cascade-blocked-bg';
+    case 'unaffected':
+      return 'opacity-25';
+    default:
+      return '';
+  }
+}
+
+function getSimulationCssVars(role: TSimulationNodeRole, simType: TSimulationType | null | undefined, depth: number): React.CSSProperties {
+  const vars: React.CSSProperties = {};
+  if (role === 'source' || role === 'cascade') {
+    (vars as Record<string, string>)['--cascade-pulse-delay'] = `${depth * 150}ms`;
+    if (role === 'source') {
+      (vars as Record<string, string>)['--cascade-pulse-color'] = simType === 'DELETE'
+        ? 'rgba(239, 68, 68, 0.4)' : 'rgba(20, 184, 166, 0.4)';
+    } else {
+      (vars as Record<string, string>)['--cascade-pulse-color'] = 'rgba(249, 115, 22, 0.4)';
+    }
+  }
+  return vars;
+}
+
 function TableNodeComponent({ data }: NodeProps) {
-  const { table, filter, isHighlighted, isSelected, onTableUpdate, color, isLocked, onLockToggle } = data as unknown as TableNodeData;
+  const { table, filter, isHighlighted, isSelected, onTableUpdate, color, isLocked, onLockToggle, simulationRole, simulationDepth = 0, simulationType } = data as unknown as TableNodeData;
   const [isEditing, setIsEditing] = useState(false);
   const [editName, setEditName] = useState(table.name);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -80,14 +118,22 @@ function TableNodeComponent({ data }: NodeProps) {
     if (e.key === 'Escape') setIsEditing(false);
   }, [handleNameSubmit]);
 
-  const borderClasses = isSelected
-    ? 'border-primary ring-2 ring-primary/30'
-    : isHighlighted
-      ? 'ring-2 ring-yellow-400/50 border-yellow-400'
-      : 'border-border';
+  const simClasses = simulationRole ? getSimulationClasses(simulationRole, simulationType) : '';
+  const simVars = simulationRole ? getSimulationCssVars(simulationRole, simulationType, simulationDepth) : {};
+
+  const borderClasses = simulationRole
+    ? simClasses
+    : isSelected
+      ? 'border-primary ring-2 ring-primary/30'
+      : isHighlighted
+        ? 'ring-2 ring-yellow-400/50 border-yellow-400'
+        : 'border-border';
 
   return (
-    <div className={`min-w-[200px] rounded-lg border bg-card shadow-sm ${borderClasses}`}>
+    <div
+      className={`min-w-[200px] rounded-lg border bg-card shadow-sm transition-all duration-300 ${borderClasses}`}
+      style={simVars}
+    >
       {/* Target handle for incoming FK edges */}
       <Handle
         type="target"

@@ -4,6 +4,8 @@ import { useDiagrams, useDiagram, useUpdateDiagram, useCreateDiagram, useDeleteD
 import { useDiagramStore } from '../model/diagramStore';
 import { schemaToNodes } from '../lib/schemaToNodes';
 import { applyDagreLayout } from '../lib/autoLayout';
+import { simulateCascade, getReferencedColumns } from '../lib/cascadeTraversal';
+import type { TSimulationType } from '../lib/cascadeTraversal';
 import { DiagramCanvas } from './DiagramCanvas';
 import { DiagramToolbar } from './DiagramToolbar';
 import { CanvasToolbar } from './CanvasToolbar';
@@ -18,6 +20,8 @@ import { DdlEditorView } from '@/features/ddl-editor';
 import { schemaToDdl } from '@/features/ddl-editor/lib/schemaToDdl';
 import { ExportMenu } from './ExportMenu';
 import { VersionFormModal } from './VersionFormModal';
+import { NodeContextMenu } from './NodeContextMenu';
+import { CascadeInfoPanel } from './CascadeInfoPanel';
 import { useNavigationGuard } from '../hooks/useNavigationGuard';
 
 function createEmptyTable(): ITable {
@@ -103,6 +107,10 @@ export function VirtualDiagramView() {
     // DDL filter
     ddlIncludedTableIds,
     setDdlIncludedTableIds,
+    // Cascade simulation
+    cascadeSimulation,
+    setCascadeSimulation,
+    clearCascadeSimulation,
   } = useDiagramStore();
 
   const [isFilterPanelOpen, setIsFilterPanelOpen] = useState(false);
@@ -122,6 +130,9 @@ export function VirtualDiagramView() {
   const [versionModalMode, setVersionModalMode] = useState<'create' | 'edit'>('create');
   const [versionModalInitialName, setVersionModalInitialName] = useState('');
   const [editingVersionId, setEditingVersionId] = useState<string | null>(null);
+
+  // Context menu state
+  const [contextMenu, setContextMenu] = useState<{ position: { x: number; y: number }; tableId: string; tableName: string } | null>(null);
 
   const { data: diagram } = useDiagram(selectedDiagramId ?? '');
   const { data: diagramVersions } = useDiagramVersions(selectedDiagramId ?? '');
@@ -236,10 +247,26 @@ export function VirtualDiagramView() {
     }
   }
 
+  // --- Cascade simulation handlers ---
+  function handleNodeContextMenu(event: React.MouseEvent, tableId: string, tableName: string) {
+    setContextMenu({ position: { x: event.clientX, y: event.clientY }, tableId, tableName });
+  }
+
+  function handleSimulate(tableId: string, type: TSimulationType, columnName?: string) {
+    const result = simulateCascade(localTables, tableId, type, columnName);
+    setCascadeSimulation(result);
+  }
+
   // --- Keyboard shortcuts ---
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
       const isMod = e.metaKey || e.ctrlKey;
+
+      // ESC: close cascade simulation first, then other overlays
+      if (e.key === 'Escape' && cascadeSimulation) {
+        clearCascadeSimulation();
+        return;
+      }
 
       if (isMod && e.key === 'f') {
         e.preventDefault();
@@ -272,7 +299,7 @@ export function VirtualDiagramView() {
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isDirty, isLayoutDirty, localTables, diagram?.id]);
+  }, [isDirty, isLayoutDirty, localTables, diagram?.id, cascadeSimulation]);
 
   // Navigation guard
   useNavigationGuard({ isDirty: isDirty || isLayoutDirty });
@@ -549,6 +576,10 @@ export function VirtualDiagramView() {
 
   function handleTableSelect(tableId: string) {
     setSelectedTableId(tableId || null);
+    // Clear cascade simulation when clicking pane (empty area)
+    if (!tableId && cascadeSimulation) {
+      clearCascadeSimulation();
+    }
   }
 
   function handleTableChange(updated: ITable) {
@@ -825,6 +856,8 @@ export function VirtualDiagramView() {
                 lockedNodeIds={lockedNodeIds}
                 onNodeLockToggle={toggleNodeLock}
                 onNodeDragStart={handleNodeDragStart}
+                onNodeContextMenu={handleNodeContextMenu}
+                cascadeSimulation={cascadeSimulation}
               />
             ) : (
               <div className="flex h-full items-center justify-center bg-muted/30">
@@ -847,6 +880,14 @@ export function VirtualDiagramView() {
               includedTableIds={ddlIncludedTableIds}
               onIncludedTableIdsChange={setDdlIncludedTableIds}
               allTables={localTables}
+            />
+          )}
+
+          {/* Cascade simulation info panel */}
+          {cascadeSimulation && (
+            <CascadeInfoPanel
+              simulation={cascadeSimulation}
+              onClose={clearCascadeSimulation}
             />
           )}
         </div>
@@ -889,6 +930,17 @@ export function VirtualDiagramView() {
         initialName={versionModalInitialName}
         onSubmit={handleVersionFormSubmit}
       />
+
+      {/* Node Context Menu */}
+      {contextMenu && (
+        <NodeContextMenu
+          position={contextMenu.position}
+          tableName={contextMenu.tableName}
+          referencedColumns={getReferencedColumns(localTables, contextMenu.tableId)}
+          onSimulate={(type, columnName) => handleSimulate(contextMenu.tableId, type, columnName)}
+          onClose={() => setContextMenu(null)}
+        />
+      )}
     </div>
   );
 }

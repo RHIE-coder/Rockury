@@ -1,6 +1,6 @@
 {
   "version": "2.0",
-  "lastUpdated": "2026-02-11T07:16:38.394Z",
+  "lastUpdated": "2026-02-11T14:57:49.662Z",
   "activeFeatures": [
     "db-tool",
     "config",
@@ -505,9 +505,9 @@
       "documents": {},
       "timestamps": {
         "started": "2026-02-08T16:01:39.388Z",
-        "lastUpdated": "2026-02-11T07:16:38.394Z"
+        "lastUpdated": "2026-02-11T14:57:49.662Z"
       },
-      "lastFile": "/Users/rhiemh/Workspace/@_focus_@/rockury/mvp/src/renderer/features/virtual-diagram/ui/RelationEdge.tsx"
+      "lastFile": "/Users/rhiemh/Workspace/@_focus_@/rockury/mvp/src/renderer/features/virtual-diagram/ui/TableDetailPanel.tsx"
     },
     "diffService.ts": {
       "phase": "do",
@@ -622,7 +622,7 @@
       "documents": {},
       "timestamps": {
         "started": "2026-02-08T16:03:02.185Z",
-        "lastUpdated": "2026-02-11T01:12:19.884Z"
+        "lastUpdated": "2026-02-11T14:28:13.887Z"
       },
       "lastFile": "/Users/rhiemh/Workspace/@_focus_@/rockury/mvp/src/main/ipc/handlers/schemaHandlers.ts"
     },
@@ -635,7 +635,7 @@
       "documents": {},
       "timestamps": {
         "started": "2026-02-08T16:03:30.435Z",
-        "lastUpdated": "2026-02-11T01:08:23.140Z"
+        "lastUpdated": "2026-02-11T14:28:16.218Z"
       },
       "lastFile": "/Users/rhiemh/Workspace/@_focus_@/rockury/mvp/src/renderer/features/ddl-editor/lib/ddlParser.ts"
     },
@@ -726,7 +726,7 @@
   "session": {
     "startedAt": "2026-02-08T14:23:15.479Z",
     "onboardingCompleted": false,
-    "lastActivity": "2026-02-11T07:16:38.394Z"
+    "lastActivity": "2026-02-11T14:57:49.662Z"
   },
   "history": [
     {
@@ -6248,6 +6248,378 @@
     },
     {
       "timestamp": "2026-02-11T07:16:38.394Z",
+      "feature": "virtual-diagram",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-02-11T13:50:49.803Z",
+      "feature": "virtual-diagram",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-02-11T13:50:55.627Z",
+      "feature": "virtual-diagram",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-02-11T13:51:00.655Z",
+      "feature": "virtual-diagram",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-02-11T13:51:05.866Z",
+      "feature": "virtual-diagram",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-02-11T13:51:10.877Z",
+      "feature": "virtual-diagram",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-02-11T13:51:16.436Z",
+      "feature": "virtual-diagram",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-02-11T13:51:23.198Z",
+      "feature": "virtual-diagram",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-02-11T13:51:28.996Z",
+      "feature": "virtual-diagram",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-02-11T13:51:35.764Z",
+      "feature": "virtual-diagram",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-02-11T13:51:45.400Z",
+      "feature": "virtual-diagram",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-02-11T13:51:54.118Z",
+      "feature": "virtual-diagram",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-02-11T13:52:00.899Z",
+      "feature": "virtual-diagram",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-02-11T13:52:09.373Z",
+      "feature": "virtual-diagram",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-02-11T13:52:27.426Z",
+      "feature": "virtual-diagram",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-02-11T13:52:32.805Z",
+      "feature": "virtual-diagram",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-02-11T13:52:40.249Z",
+      "feature": "virtual-diagram",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-02-11T13:52:45.442Z",
+      "feature": "virtual-diagram",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-02-11T13:53:03.628Z",
+      "feature": "virtual-diagram",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-02-11T13:53:24.521Z",
+      "feature": "virtual-diagram",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-02-11T13:53:31.075Z",
+      "feature": "virtual-diagram",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-02-11T13:53:36.524Z",
+      "feature": "virtual-diagram",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-02-11T13:53:41.297Z",
+      "feature": "virtual-diagram",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-02-11T13:53:49.846Z",
+      "feature": "virtual-diagram",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-02-11T13:53:55.648Z",
+      "feature": "virtual-diagram",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-02-11T13:54:00.149Z",
+      "feature": "virtual-diagram",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-02-11T13:54:16.678Z",
+      "feature": "virtual-diagram",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-02-11T13:54:22.201Z",
+      "feature": "virtual-diagram",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-02-11T13:54:28.447Z",
+      "feature": "virtual-diagram",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-02-11T13:54:41.197Z",
+      "feature": "virtual-diagram",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-02-11T13:54:46.840Z",
+      "feature": "virtual-diagram",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-02-11T13:54:55.249Z",
+      "feature": "virtual-diagram",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-02-11T13:55:04.471Z",
+      "feature": "virtual-diagram",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-02-11T13:55:11.133Z",
+      "feature": "virtual-diagram",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-02-11T13:56:09.773Z",
+      "feature": "virtual-diagram",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-02-11T14:09:01.097Z",
+      "feature": "virtual-diagram",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-02-11T14:09:21.615Z",
+      "feature": "virtual-diagram",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-02-11T14:09:27.056Z",
+      "feature": "virtual-diagram",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-02-11T14:09:32.923Z",
+      "feature": "virtual-diagram",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-02-11T14:09:38.135Z",
+      "feature": "virtual-diagram",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-02-11T14:09:43.374Z",
+      "feature": "virtual-diagram",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-02-11T14:09:49.790Z",
+      "feature": "virtual-diagram",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-02-11T14:10:04.057Z",
+      "feature": "virtual-diagram",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-02-11T14:10:29.645Z",
+      "feature": "virtual-diagram",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-02-11T14:10:52.642Z",
+      "feature": "virtual-diagram",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-02-11T14:13:12.620Z",
+      "feature": "virtual-diagram",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-02-11T14:17:47.877Z",
+      "feature": "virtual-diagram",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-02-11T14:25:00.140Z",
+      "feature": "virtual-diagram",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-02-11T14:28:13.887Z",
+      "feature": "handlers",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-02-11T14:28:16.218Z",
+      "feature": "ddl-editor",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-02-11T14:44:41.220Z",
+      "feature": "virtual-diagram",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-02-11T14:45:06.251Z",
+      "feature": "virtual-diagram",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-02-11T14:46:20.023Z",
+      "feature": "virtual-diagram",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-02-11T14:46:30.420Z",
+      "feature": "virtual-diagram",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-02-11T14:51:24.289Z",
+      "feature": "virtual-diagram",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-02-11T14:51:29.766Z",
+      "feature": "virtual-diagram",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-02-11T14:51:34.505Z",
+      "feature": "virtual-diagram",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-02-11T14:51:44.125Z",
+      "feature": "virtual-diagram",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-02-11T14:51:50.679Z",
+      "feature": "virtual-diagram",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-02-11T14:51:57.951Z",
+      "feature": "virtual-diagram",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-02-11T14:52:04.657Z",
+      "feature": "virtual-diagram",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-02-11T14:57:44.062Z",
+      "feature": "virtual-diagram",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-02-11T14:57:49.662Z",
       "feature": "virtual-diagram",
       "phase": "do",
       "action": "updated"

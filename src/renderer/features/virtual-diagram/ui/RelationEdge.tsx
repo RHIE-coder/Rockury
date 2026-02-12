@@ -2,10 +2,13 @@ import { memo } from 'react';
 import { BaseEdge, EdgeLabelRenderer, getSmoothStepPath, Position } from '@xyflow/react';
 import type { EdgeProps } from '@xyflow/react';
 
+import type { TSimulationEdgeRole } from '../lib/schemaToNodes';
+
 interface RelationEdgeData {
   nullable?: boolean;
   onDelete?: string;
   onUpdate?: string;
+  simulationRole?: TSimulationEdgeRole;
   [key: string]: unknown;
 }
 
@@ -105,12 +108,22 @@ function RelationEdgeComponent({
     borderRadius: 8,
   });
 
-  const strokeColor = selected ? 'hsl(var(--primary))' : 'hsl(var(--muted-foreground))';
   const edgeData = data as RelationEdgeData | undefined;
   const nullable = edgeData?.nullable ?? true;
   const onDelete = edgeData?.onDelete;
   const onUpdate = edgeData?.onUpdate;
   const hasPolicies = !!onDelete || !!onUpdate;
+  const simRole = edgeData?.simulationRole ?? null;
+
+  const strokeColor = simRole === 'active'
+    ? '#f97316'
+    : simRole === 'unaffected'
+      ? 'hsl(var(--muted-foreground))'
+      : selected
+        ? 'hsl(var(--primary))'
+        : 'hsl(var(--muted-foreground))';
+  const strokeWidth = simRole === 'active' ? 3 : simRole === 'unaffected' ? 1 : selected ? 2 : 1.5;
+  const strokeOpacity = simRole === 'unaffected' ? 0.15 : 1;
 
   // Offset markers along the edge direction so they sit on the line
   const markerOffset = 10;
@@ -124,8 +137,10 @@ function RelationEdgeComponent({
         path={edgePath}
         style={{
           stroke: strokeColor,
-          strokeWidth: selected ? 2 : 1.5,
-          strokeDasharray: '5 3',
+          strokeWidth,
+          strokeDasharray: simRole === 'active' ? undefined : '5 3',
+          opacity: strokeOpacity,
+          transition: 'all 0.3s ease',
         }}
       />
       <EdgeLabelRenderer>

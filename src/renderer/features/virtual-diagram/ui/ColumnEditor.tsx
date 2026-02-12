@@ -1,7 +1,6 @@
 import { useState } from 'react';
 import { Input } from '@/shared/components/ui/input';
 import type { IColumn, ITable, TKeyType } from '~/shared/types/db';
-import { ForeignKeyEditor } from './ForeignKeyEditor';
 
 interface ColumnEditorProps {
   column: IColumn;
@@ -11,7 +10,12 @@ interface ColumnEditorProps {
   readOnly?: boolean;
 }
 
-const KEY_TYPES: TKeyType[] = ['PK', 'FK', 'UK', 'IDX'];
+const BADGE_COLORS: Record<TKeyType, string> = {
+  PK: 'bg-amber-500/20 text-amber-700 dark:text-amber-400',
+  FK: 'bg-blue-500/20 text-blue-700 dark:text-blue-400',
+  UK: 'bg-green-500/20 text-green-700 dark:text-green-400',
+  IDX: 'bg-purple-500/20 text-purple-700 dark:text-purple-400',
+};
 
 export function ColumnEditor({ column, allTables, onChange, onRemove, readOnly }: ColumnEditorProps) {
   const [isDeletingCol, setIsDeletingCol] = useState(false);
@@ -21,38 +25,6 @@ export function ColumnEditor({ column, allTables, onChange, onRemove, readOnly }
 
   function updateField<K extends keyof IColumn>(key: K, value: IColumn[K]) {
     onChange({ ...column, [key]: value });
-  }
-
-  function handleKeyToggle(key: TKeyType, checked: boolean) {
-    let newKeys = checked
-      ? [...keyTypes, key]
-      : keyTypes.filter((k) => k !== key);
-
-    // Deduplicate
-    newKeys = [...new Set(newKeys)];
-
-    const updated: IColumn = { ...column, keyTypes: newKeys };
-
-    // PK checked → nullable false
-    if (key === 'PK' && checked) {
-      updated.nullable = false;
-    }
-
-    // FK unchecked → clear reference
-    if (key === 'FK' && !checked && column.reference) {
-      updated.reference = null;
-    }
-    // FK checked → init reference
-    if (key === 'FK' && checked && !column.reference) {
-      updated.reference = { table: '', column: '' };
-    }
-
-    // Auto increment only valid with PK
-    if (!newKeys.includes('PK')) {
-      updated.isAutoIncrement = false;
-    }
-
-    onChange(updated);
   }
 
   return (
@@ -103,20 +75,20 @@ export function ColumnEditor({ column, allTables, onChange, onRemove, readOnly }
         )}
       </div>
 
-      {/* Row 2: Key checkboxes */}
-      <div className="flex items-center gap-2">
-        {KEY_TYPES.map((k) => (
-          <label key={k} className="flex items-center gap-0.5 text-xs">
-            <input
-              type="checkbox"
-              checked={keyTypes.includes(k)}
-              onChange={(e) => handleKeyToggle(k, e.target.checked)}
-              className="size-3"
-              disabled={readOnly}
-            />
-            {k}
-          </label>
-        ))}
+      {/* Row 2: Key badges (read-only, derived from constraints) */}
+      <div className="flex items-center gap-1">
+        {keyTypes.length > 0 ? (
+          keyTypes.map((k) => (
+            <span
+              key={k}
+              className={`rounded px-1.5 py-0.5 text-[10px] font-bold leading-none ${BADGE_COLORS[k]}`}
+            >
+              {k}
+            </span>
+          ))
+        ) : (
+          <span className="text-[10px] text-muted-foreground">No keys</span>
+        )}
       </div>
 
       {/* Row 3: Default + Null + AutoIncrement */}
@@ -162,13 +134,20 @@ export function ColumnEditor({ column, allTables, onChange, onRemove, readOnly }
         readOnly={readOnly}
       />
 
-      {/* FK Reference Editor */}
-      {keyTypes.includes('FK') && allTables && (
-        <ForeignKeyEditor
-          reference={column.reference}
-          allTables={allTables}
-          onChange={(ref) => updateField('reference', ref)}
-        />
+      {/* FK Reference (read-only display when FK key exists) */}
+      {keyTypes.includes('FK') && column.reference && (
+        <div className="rounded-md border-2 border-blue-400 bg-blue-50 p-2 dark:border-blue-500 dark:bg-blue-500/15">
+          <p className="text-[10px] font-semibold text-foreground">
+            FK &rarr; {column.reference.table}.{column.reference.column}
+          </p>
+          {(column.reference.onDelete || column.reference.onUpdate) && (
+            <p className="mt-0.5 text-[9px] text-muted-foreground">
+              {column.reference.onDelete && `ON DELETE ${column.reference.onDelete}`}
+              {column.reference.onDelete && column.reference.onUpdate && ' | '}
+              {column.reference.onUpdate && `ON UPDATE ${column.reference.onUpdate}`}
+            </p>
+          )}
+        </div>
       )}
     </div>
   );
