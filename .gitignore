@@ -93,3 +93,8 @@ out/
 
 # IDE
 .vscode/*
+
+# bkit (AI agent metadata)
+docs/.bkit-memory.json
+docs/.pdca-status.json
+docs/.pdca-snapshots/
