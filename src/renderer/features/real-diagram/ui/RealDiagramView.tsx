@@ -359,7 +359,11 @@ export function RealDiagramView() {
           )}
 
           {viewMode === 'ddl' && realDiagram ? (
-            <DdlEditorView tables={tables} readOnly />
+            <DdlEditorView
+              tables={tables}
+              readOnly
+              focusTableName={selectedTableId ? tables.find((t) => t.id === selectedTableId)?.name ?? null : null}
+            />
           ) : realDiagram ? (
             <DiagramCanvas
               diagram={realDiagram}

@@ -104,9 +104,6 @@ export function VirtualDiagramView() {
     clearHistory,
     pendingLayoutRestore,
     clearPendingLayoutRestore,
-    // DDL filter
-    ddlIncludedTableIds,
-    setDdlIncludedTableIds,
     // Cascade simulation
     cascadeSimulation,
     setCascadeSimulation,
@@ -575,6 +572,11 @@ export function VirtualDiagramView() {
   }
 
   function handleTableSelect(tableId: string) {
+    if (viewMode === 'ddl') {
+      // In DDL mode: only update selectedTableId for DDL scroll, don't open right panel
+      useDiagramStore.setState({ selectedTableId: tableId || null });
+      return;
+    }
     setSelectedTableId(tableId || null);
     // Clear cascade simulation when clicking pane (empty area)
     if (!tableId && cascadeSimulation) {
@@ -844,7 +846,7 @@ export function VirtualDiagramView() {
                 layout={layout}
                 filter={filter}
                 highlightedTableIds={highlightedTableIds}
-                selectedTableId={selectedTableId}
+                selectedTableId={viewMode === 'canvas' ? selectedTableId : null}
                 onTableSelect={handleTableSelect}
                 onTableCreate={isDiagramLocked ? undefined : handleTableCreate}
                 onTableUpdate={isDiagramLocked ? undefined : handleTableChange}
@@ -870,16 +872,30 @@ export function VirtualDiagramView() {
           {/* DDL Editor: rendered only when active (lightweight, re-mount OK) */}
           {viewMode === 'ddl' && diagram && (
             <DdlEditorView
-              tables={localTables}
-              onParsed={(tables) => {
+              tables={hiddenTableIds.length > 0
+                ? localTables.filter((t) => !hiddenTableIds.includes(t.id))
+                : localTables}
+              onParsed={(parsedTables) => {
                 pushUndoState(localTables);
                 setChangeSource('ddl');
-                setLocalTables(tables);
+                // Preserve existing table/column IDs by matching on name
+                const existingByName = new Map(localTables.map((t) => [t.name, t]));
+                const merged = parsedTables.map((parsed) => {
+                  const existing = existingByName.get(parsed.name);
+                  if (!existing) return parsed;
+                  const existingColByName = new Map(existing.columns.map((c) => [c.name, c]));
+                  const mergedColumns = parsed.columns.map((col) => {
+                    const existingCol = existingColByName.get(col.name);
+                    return existingCol ? { ...col, id: existingCol.id } : col;
+                  });
+                  return { ...parsed, id: existing.id, columns: mergedColumns };
+                });
+                // Keep hidden tables intact, only replace visible ones
+                const hiddenTables = localTables.filter((t) => hiddenTableIds.includes(t.id));
+                setLocalTables([...merged, ...hiddenTables]);
                 setTimeout(() => setChangeSource(null), 100);
               }}
-              includedTableIds={ddlIncludedTableIds}
-              onIncludedTableIdsChange={setDdlIncludedTableIds}
-              allTables={localTables}
+              focusTableName={selectedTableId ? localTables.find((t) => t.id === selectedTableId)?.name ?? null : null}
             />
           )}
 
@@ -892,8 +908,8 @@ export function VirtualDiagramView() {
           )}
         </div>
 
-        {/* Right Panel: Table Detail */}
-        {isRightPanelOpen && selectedTable && diagram && (
+        {/* Right Panel: Table Detail (hidden in DDL mode) */}
+        {viewMode !== 'ddl' && isRightPanelOpen && selectedTable && diagram && (
           <TableDetailPanel
             table={selectedTable}
             allTables={localTables}
