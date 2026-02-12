@@ -144,6 +144,7 @@ export interface IDiagramVersion {
   ddlContent: string;
   schemaSnapshot: IDiagramSnapshot;
   sortOrder: number;
+  isLocked: boolean;
   createdAt: string;
 }
 

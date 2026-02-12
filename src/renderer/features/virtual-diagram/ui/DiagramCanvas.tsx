@@ -12,6 +12,7 @@ import {
 import type { OnConnect, NodeMouseHandler, Node, XYPosition, Viewport, NodeProps } from '@xyflow/react';
 import type { ITable, IDiagram, IDiagramLayout, IDiagramFilter } from '~/shared/types/db';
 import type { ICascadeResult } from '../lib/cascadeTraversal';
+import type { ICompareResult } from '../lib/compareVersions';
 import { schemaToNodes } from '../lib/schemaToNodes';
 import { TableNode } from './TableNode';
 import { RelationEdge } from './RelationEdge';
@@ -43,6 +44,9 @@ interface DiagramCanvasProps {
   onNodeDragStart?: (positions: Record<string, { x: number; y: number }>) => void;
   onNodeContextMenu?: (event: React.MouseEvent, tableId: string, tableName: string) => void;
   cascadeSimulation?: ICascadeResult | null;
+  compareResult?: ICompareResult | null;
+  /** Increment to trigger fitView (e.g., on compare mode entry) */
+  fitViewTrigger?: number;
 }
 
 function DiagramCanvasInner({
@@ -64,6 +68,8 @@ function DiagramCanvasInner({
   onNodeDragStart,
   onNodeContextMenu,
   cascadeSimulation = null,
+  compareResult = null,
+  fitViewTrigger = 0,
 }: DiagramCanvasProps) {
   const reactFlowInstance = useReactFlow();
   const layoutSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -98,8 +104,9 @@ function DiagramCanvasInner({
         lockedNodeIds,
         onNodeLockToggle: stableOnNodeLockToggle,
         cascadeSimulation,
+        compareResult,
       }),
-    [diagram.tables, layout?.positions, filter, highlightedTableIds, selectedTableId, readOnly, stableOnTableUpdate, hiddenTableIds, tableColors, lockedNodeIds, stableOnNodeLockToggle, cascadeSimulation],
+    [diagram.tables, layout?.positions, filter, highlightedTableIds, selectedTableId, readOnly, stableOnTableUpdate, hiddenTableIds, tableColors, lockedNodeIds, stableOnNodeLockToggle, cascadeSimulation, compareResult],
   );
 
   const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
@@ -220,6 +227,17 @@ function DiagramCanvasInner({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tableIdKey]);
 
+  // Fit view when triggered externally (e.g., entering compare mode)
+  useEffect(() => {
+    if (fitViewTrigger > 0) {
+      // Small delay to let new nodes (ghost nodes) render first
+      setTimeout(() => {
+        reactFlowInstance.fitView({ duration: 400, padding: 0.15 });
+      }, 50);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [fitViewTrigger]);
+
   // Fit view to a specific node (called from parent via ref or store)
   useEffect(() => {
     if (selectedTableId) {
@@ -279,11 +297,12 @@ function DiagramCanvasInner({
       elementsSelectable={!readOnly}
       minZoom={0.1}
       maxZoom={2}
+      deleteKeyCode={null}
       defaultEdgeOptions={{ type: 'smoothstep', animated: true }}
       proOptions={{ hideAttribution: true }}
     >
       <Background gap={16} size={1} />
-      <Controls showInteractive={!readOnly} />
+      <Controls showInteractive={false} />
       <MiniMap
         zoomable
         pannable

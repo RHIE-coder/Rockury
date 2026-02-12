@@ -82,7 +82,6 @@ interface DiagramStoreState {
   isLayoutDirty: boolean;
 
   // Lock
-  isDiagramLocked: boolean;
   lockedNodeIds: string[];
 
   // Undo/Redo
@@ -115,9 +114,17 @@ function deepClone<T>(obj: T): T {
   return JSON.parse(JSON.stringify(obj));
 }
 
-/** Migrate legacy keyType (singular) → keyTypes (array) for backward compatibility */
+
+/** Migrate legacy keyType (singular) → keyTypes (array) and deduplicate by ID */
 function normalizeTables(tables: ITable[]): ITable[] {
-  return tables.map((t) => ({
+  // Deduplicate by ID (first occurrence wins)
+  const seen = new Set<string>();
+  const unique = tables.filter((t) => {
+    if (seen.has(t.id)) return false;
+    seen.add(t.id);
+    return true;
+  });
+  return unique.map((t) => ({
     ...t,
     columns: t.columns.map((c) => {
       const col = c as IColumn & { keyType?: string | null };
@@ -160,7 +167,7 @@ interface DiagramStoreActions {
 
   // Right panel mode
   setRightPanelMode: (mode: 'detail' | 'compare') => void;
-  setCompareTargetDiagramId: (id: string | null) => void;
+  setCompareTargetVersionId: (id: string | null) => void;
 
   // Local buffer (manual save)
   setLocalTables: (tables: ITable[]) => void;
@@ -171,7 +178,6 @@ interface DiagramStoreActions {
   setLayoutDirty: (dirty: boolean) => void;
 
   // Lock
-  toggleDiagramLock: () => void;
   toggleNodeLock: (nodeId: string) => void;
 
   // Undo/Redo
@@ -233,7 +239,6 @@ export const useDiagramStore = create<DiagramStoreState & DiagramStoreActions>((
   isLayoutDirty: false,
 
   // Lock
-  isDiagramLocked: false,
   lockedNodeIds: [],
 
   // Undo/Redo
@@ -304,7 +309,7 @@ export const useDiagramStore = create<DiagramStoreState & DiagramStoreActions>((
 
   // Right panel mode
   setRightPanelMode: (mode) => set({ rightPanelMode: mode }),
-  setCompareTargetDiagramId: (id) => set({ compareTargetVersionId: id }),
+  setCompareTargetVersionId: (id) => set({ compareTargetVersionId: id }),
 
   // Local buffer (manual save)
   setLocalTables: (tables) => set({ localTables: normalizeTables(tables), isDirty: true }),
@@ -328,8 +333,6 @@ export const useDiagramStore = create<DiagramStoreState & DiagramStoreActions>((
   setLayoutDirty: (dirty) => set({ isLayoutDirty: dirty }),
 
   // Lock
-  toggleDiagramLock: () =>
-    set((state) => ({ isDiagramLocked: !state.isDiagramLocked })),
   toggleNodeLock: (nodeId) =>
     set((state) => ({
       lockedNodeIds: state.lockedNodeIds.includes(nodeId)

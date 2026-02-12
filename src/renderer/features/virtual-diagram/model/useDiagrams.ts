@@ -140,8 +140,8 @@ export function useUpdateDiagramVersion() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: (args: { id: string; diagramId: string; name?: string; ddlContent?: string; schemaSnapshot?: unknown }) =>
-      diagramApi.updateVersion({ id: args.id, name: args.name, ddlContent: args.ddlContent, schemaSnapshot: args.schemaSnapshot }),
+    mutationFn: (args: { id: string; diagramId: string; name?: string; ddlContent?: string; schemaSnapshot?: unknown; isLocked?: boolean }) =>
+      diagramApi.updateVersion({ id: args.id, name: args.name, ddlContent: args.ddlContent, schemaSnapshot: args.schemaSnapshot, isLocked: args.isLocked }),
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({
         queryKey: diagramKeys.versions(variables.diagramId),

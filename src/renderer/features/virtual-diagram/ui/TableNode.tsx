@@ -5,6 +5,7 @@ import { Lock, LockOpen } from 'lucide-react';
 import type { ITable, IColumn, IDiagramFilter } from '~/shared/types/db';
 import type { TSimulationNodeRole } from '../lib/schemaToNodes';
 import type { TSimulationType } from '../lib/cascadeTraversal';
+import type { TDiffAction } from '../lib/compareVersions';
 
 export interface TableNodeData {
   table: ITable;
@@ -19,6 +20,7 @@ export interface TableNodeData {
   simulationRole?: TSimulationNodeRole;
   simulationDepth?: number;
   simulationType?: TSimulationType | null;
+  compareAction?: TDiffAction;
 }
 
 function SingleKeyIcon({ keyType }: { keyType: string }) {
@@ -88,8 +90,37 @@ function getSimulationCssVars(role: TSimulationNodeRole, simType: TSimulationTyp
   return vars;
 }
 
+function getCompareClasses(action: TDiffAction): string {
+  switch (action) {
+    case 'added':
+      return 'border-2 border-green-500 ring-4 ring-green-500/30 shadow-[0_0_12px_rgba(34,197,94,0.4)]';
+    case 'removed':
+      return 'border-2 border-red-500 ring-4 ring-red-500/30 border-dashed opacity-60 shadow-[0_0_12px_rgba(239,68,68,0.4)]';
+    case 'modified':
+      return 'border-2 border-yellow-500 ring-4 ring-yellow-500/30 shadow-[0_0_12px_rgba(234,179,8,0.4)]';
+    case 'unchanged':
+      return 'opacity-20';
+    default:
+      return '';
+  }
+}
+
+const COMPARE_HEADER_BG: Record<TDiffAction, string> = {
+  added: 'bg-green-600',
+  removed: 'bg-red-600',
+  modified: 'bg-yellow-600',
+  unchanged: '',
+};
+
+const COMPARE_BADGE: Record<TDiffAction, string> = {
+  added: '+ ADDED',
+  removed: '- REMOVED',
+  modified: '~ MODIFIED',
+  unchanged: '',
+};
+
 function TableNodeComponent({ data }: NodeProps) {
-  const { table, filter, isHighlighted, isSelected, onTableUpdate, color, isLocked, onLockToggle, simulationRole, simulationDepth = 0, simulationType } = data as unknown as TableNodeData;
+  const { table, filter, isHighlighted, isSelected, onTableUpdate, color, isLocked, onLockToggle, simulationRole, simulationDepth = 0, simulationType, compareAction } = data as unknown as TableNodeData;
   const [isEditing, setIsEditing] = useState(false);
   const [editName, setEditName] = useState(table.name);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -121,13 +152,17 @@ function TableNodeComponent({ data }: NodeProps) {
   const simClasses = simulationRole ? getSimulationClasses(simulationRole, simulationType) : '';
   const simVars = simulationRole ? getSimulationCssVars(simulationRole, simulationType, simulationDepth) : {};
 
-  const borderClasses = simulationRole
-    ? simClasses
-    : isSelected
-      ? 'border-primary ring-2 ring-primary/30'
-      : isHighlighted
-        ? 'ring-2 ring-yellow-400/50 border-yellow-400'
-        : 'border-border';
+  const compareClasses = compareAction ? getCompareClasses(compareAction) : '';
+
+  const borderClasses = compareAction
+    ? compareClasses
+    : simulationRole
+      ? simClasses
+      : isSelected
+        ? 'border-primary ring-2 ring-primary/30'
+        : isHighlighted
+          ? 'ring-2 ring-yellow-400/50 border-yellow-400'
+          : 'border-border';
 
   return (
     <div
@@ -143,8 +178,12 @@ function TableNodeComponent({ data }: NodeProps) {
 
       {/* Header */}
       <div
-        className={`rounded-t-lg px-3 py-1.5 ${color ? '' : 'bg-primary text-primary-foreground'}`}
-        style={color ? { backgroundColor: color, color: '#fff' } : undefined}
+        className={`rounded-t-lg px-3 py-1.5 ${
+          compareAction && compareAction !== 'unchanged' && COMPARE_HEADER_BG[compareAction]
+            ? `${COMPARE_HEADER_BG[compareAction]} text-white`
+            : color ? '' : 'bg-primary text-primary-foreground'
+        }`}
+        style={!compareAction || compareAction === 'unchanged' ? (color ? { backgroundColor: color, color: '#fff' } : undefined) : undefined}
         onDoubleClick={handleHeaderDoubleClick}
       >
         <div className="flex items-center gap-1">
@@ -162,6 +201,11 @@ function TableNodeComponent({ data }: NodeProps) {
               <p className="text-sm font-semibold truncate" title={table.name}>{table.name}</p>
             )}
           </div>
+          {compareAction && compareAction !== 'unchanged' && (
+            <span className="shrink-0 rounded bg-white/20 px-1 py-0.5 text-[8px] font-bold leading-none tracking-wider">
+              {COMPARE_BADGE[compareAction]}
+            </span>
+          )}
           {onLockToggle && (
             <button
               type="button"

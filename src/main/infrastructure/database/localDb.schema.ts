@@ -193,6 +193,10 @@ export const SQL_ADD_DIAGRAMS_SORT_ORDER = `
 ALTER TABLE diagrams ADD COLUMN sort_order INTEGER NOT NULL DEFAULT 0;
 `;
 
+export const SQL_ADD_DIAGRAM_VERSIONS_IS_LOCKED = `
+ALTER TABLE diagram_versions ADD COLUMN is_locked INTEGER NOT NULL DEFAULT 0;
+`;
+
 // Recreate diagram_migrations with 'rolled_back' in CHECK constraint (for existing DBs)
 export const SQL_FIX_MIGRATIONS_STATUS_CHECK = `
 CREATE TABLE IF NOT EXISTS diagram_migrations_new (
@@ -263,6 +267,7 @@ export function runMigrations(db: Database.Database): void {
       SQL_ADD_DIAGRAMS_DEFAULT_VERSION_ID,
       SQL_ADD_DIAGRAM_VERSIONS_SORT_ORDER,
       SQL_ADD_DIAGRAMS_SORT_ORDER,
+      SQL_ADD_DIAGRAM_VERSIONS_IS_LOCKED,
     ];
     for (const sql of alterMigrations) {
       try {

@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { createPortal } from 'react-dom';
-import { Plus, Pencil, Trash2, Check, X, ChevronRight, ChevronDown, History, GripVertical } from 'lucide-react';
+import { Plus, Pencil, Trash2, Check, X, ChevronRight, ChevronDown, History, GripVertical, Lock } from 'lucide-react';
 import { DndContext, closestCenter, PointerSensor, useSensor, useSensors, type DragEndEvent, DragOverlay } from '@dnd-kit/core';
 import { SortableContext, verticalListSortingStrategy, useSortable, arrayMove } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
@@ -21,15 +21,19 @@ interface DiagramListPanelProps {
   activeVersionId?: string | null;
   onVersionSelect?: (version: IDiagramVersion) => void;
   onReorderVersions?: (orderedIds: string[]) => void;
+  // Per-version lock
+  lockedVersionIds?: string[];
 }
 
 function SortableVersionTreeItem({
   version,
   isActive,
+  isLocked,
   onSelect,
 }: {
   version: IDiagramVersion;
   isActive: boolean;
+  isLocked: boolean;
   onSelect: () => void;
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: version.id });
@@ -60,7 +64,7 @@ function SortableVersionTreeItem({
         onClick={onSelect}
         className="flex min-w-0 flex-1 items-center py-1 pr-1"
       >
-        <History className="mr-1 size-2.5 shrink-0" />
+        <Lock className={`mr-1 size-2.5 shrink-0 ${isLocked ? 'text-amber-500' : 'invisible'}`} />
         <span className="min-w-0 flex-1 truncate">{version.name || `#${version.versionNumber}`}</span>
         <span className="w-5 shrink-0 text-right text-[9px]">
           {version.schemaSnapshot?.tables?.length ?? 0}t
@@ -223,6 +227,7 @@ export function DiagramListPanel({
   activeVersionId,
   onVersionSelect,
   onReorderVersions,
+  lockedVersionIds = [],
 }: DiagramListPanelProps) {
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [expandedDiagramId, setExpandedDiagramId] = useState<string | null>(null);
@@ -318,6 +323,7 @@ export function DiagramListPanel({
                               key={v.id}
                               version={v}
                               isActive={activeVersionId === v.id}
+                              isLocked={lockedVersionIds.includes(v.id)}
                               onSelect={() => onVersionSelect?.(v)}
                             />
                           ))}

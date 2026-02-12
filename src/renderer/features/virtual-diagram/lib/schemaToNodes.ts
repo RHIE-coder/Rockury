@@ -2,6 +2,7 @@ import type { ITable, IDiagramFilter } from '~/shared/types/db';
 import type { Node, Edge } from '@xyflow/react';
 import type { TableNodeData } from '../ui/TableNode';
 import type { ICascadeResult } from './cascadeTraversal';
+import type { ICompareResult } from './compareVersions';
 import { syncKeyTypesFromConstraints } from './syncKeyTypes';
 
 export type TSimulationNodeRole = 'source' | 'cascade' | 'setNull' | 'blocked' | 'unaffected' | null;
@@ -37,6 +38,7 @@ interface SchemaToNodesOptions {
   lockedNodeIds?: string[];
   onNodeLockToggle?: (id: string) => void;
   cascadeSimulation?: ICascadeResult | null;
+  compareResult?: ICompareResult | null;
 }
 
 /**
@@ -67,6 +69,7 @@ export function schemaToNodes(
     lockedNodeIds = [],
     onNodeLockToggle,
     cascadeSimulation = null,
+    compareResult = null,
   } = options;
 
   const highlightedSet = new Set(highlightedTableIds);
@@ -105,8 +108,18 @@ export function schemaToNodes(
     return cascadeSimulation.affectedEdgeIds.has(edgeId) ? 'active' : 'unaffected';
   }
 
+  // Deduplicate tables by ID (defensive against snapshot/DDL corruption)
+  const deduped: ITable[] = [];
+  const seenTableIds = new Set<string>();
+  for (const t of tables) {
+    if (!seenTableIds.has(t.id)) {
+      seenTableIds.add(t.id);
+      deduped.push(t);
+    }
+  }
+
   // Filter out hidden tables, then sync keyTypes from constraints
-  const visibleTables = tables.filter((t) => !hiddenSet.has(t.id)).map(syncKeyTypesFromConstraints);
+  const visibleTables = deduped.filter((t) => !hiddenSet.has(t.id)).map(syncKeyTypesFromConstraints);
 
   const nodes: Node[] = visibleTables.map((table, index) => {
     const col = index % COLUMNS_PER_ROW;
@@ -141,12 +154,72 @@ export function schemaToNodes(
         simulationRole,
         simulationDepth,
         simulationType: cascadeSimulation?.simulationType ?? null,
+        compareAction: compareResult?.actionMap.get(table.id) ?? undefined,
       } satisfies TableNodeData,
       style: { width: TABLE_WIDTH },
       width: TABLE_WIDTH,
       height: nodeHeight,
     };
   });
+
+  // Append ghost nodes for removed tables (compare mode)
+  // Place in a grid to the right of existing nodes
+  if (compareResult?.removedTables.length) {
+    const existingNodeIds = new Set(nodes.map((n) => n.id));
+
+    // Compute bounding box of existing nodes
+    let maxX = 0;
+    let minY = 0;
+    for (const node of nodes) {
+      const right = node.position.x + TABLE_WIDTH;
+      if (right > maxX) maxX = right;
+      if (node.position.y < minY) minY = node.position.y;
+    }
+    const ghostStartX = maxX + GRID_GAP_X * 1.5;
+    const GHOST_COLS = Math.min(COLUMNS_PER_ROW, Math.max(2, Math.ceil(Math.sqrt(compareResult.removedTables.length))));
+
+    let col = 0;
+    let rowY = minY;
+    let rowMaxHeight = 0;
+
+    for (const rawTable of compareResult.removedTables) {
+      const table = syncKeyTypesFromConstraints(rawTable);
+      const ghostId = `ghost-${table.id}`;
+      if (existingNodeIds.has(ghostId)) continue;
+      existingNodeIds.add(ghostId);
+
+      const nodeHeight = estimateNodeHeight(table, filter);
+
+      nodes.push({
+        id: ghostId,
+        type: 'tableNode',
+        position: { x: ghostStartX + col * GRID_GAP_X, y: rowY },
+        draggable: false,
+        connectable: false,
+        selectable: false,
+        data: {
+          table,
+          label: table.name,
+          filter,
+          isHighlighted: false,
+          isSelected: false,
+          onTableUpdate: undefined,
+          compareAction: 'removed',
+        } satisfies TableNodeData,
+        style: { width: TABLE_WIDTH },
+        width: TABLE_WIDTH,
+        height: nodeHeight,
+      });
+
+      if (nodeHeight > rowMaxHeight) rowMaxHeight = nodeHeight;
+      col++;
+      if (col >= GHOST_COLS) {
+        col = 0;
+        rowY += rowMaxHeight + GRID_GAP_Y;
+        rowMaxHeight = 0;
+      }
+    }
+  }
 
   const edges: Edge[] = [];
   const tableNameToId = new Map(visibleTables.map((t) => [t.name, t.id]));

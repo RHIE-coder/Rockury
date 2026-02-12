@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { createPortal } from 'react-dom';
-import { FolderOpen, Table2, Save, Lock, LockOpen, Undo2, Redo2, Info, HelpCircle, Code, ChevronDown, Plus, Pencil, Trash2, Check, X, GripVertical } from 'lucide-react';
+import { FolderOpen, Table2, Save, Lock, LockOpen, Undo2, Redo2, Info, HelpCircle, Code, ChevronDown, Plus, Pencil, Trash2, Check, X, GripVertical, GitCompareArrows } from 'lucide-react';
 import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors, type DragEndEvent, DragOverlay } from '@dnd-kit/core';
 import { SortableContext, verticalListSortingStrategy, useSortable, arrayMove } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
@@ -36,12 +36,18 @@ interface DiagramToolbarProps {
   onRenameVersion?: (version: IDiagramVersion) => void;
   onDeleteVersion?: (version: IDiagramVersion) => void;
   onReorderVersions?: (orderedIds: string[]) => void;
+  // Compare
+  compareTargetVersionId?: string | null;
+  onCompareTargetChange?: (id: string | null) => void;
+  // Per-version lock
+  lockedVersionIds?: string[];
 }
 
 function SortableVersionItem({
   version,
   isCurrent,
   isDeleting,
+  isLocked,
   onSelect,
   onRename,
   onStartDelete,
@@ -51,6 +57,7 @@ function SortableVersionItem({
   version: IDiagramVersion;
   isCurrent: boolean;
   isDeleting: boolean;
+  isLocked: boolean;
   onSelect: () => void;
   onRename?: () => void;
   onStartDelete?: () => void;
@@ -114,6 +121,7 @@ function SortableVersionItem({
         onClick={onSelect}
         className="flex min-w-0 flex-1 items-center py-1.5 pr-1"
       >
+        <Lock className={`mr-1 size-2.5 shrink-0 ${isLocked ? 'text-amber-500' : 'invisible'}`} />
         <span className="min-w-0 flex-1 truncate">
           {version.name || `#${version.versionNumber}`}
         </span>
@@ -191,6 +199,11 @@ export function DiagramToolbar({
   onRenameVersion,
   onDeleteVersion,
   onReorderVersions,
+  // Compare
+  compareTargetVersionId,
+  onCompareTargetChange,
+  // Per-version lock
+  lockedVersionIds = [],
 }: DiagramToolbarProps) {
   const [deletingVersionId, setDeletingVersionId] = useState<string | null>(null);
   const [activeId, setActiveId] = useState<string | null>(null);
@@ -321,6 +334,9 @@ export function DiagramToolbar({
                 className="flex items-center gap-0.5 rounded-full bg-muted px-2 py-0.5 text-[10px] font-medium text-muted-foreground hover:bg-muted/80 hover:text-foreground"
                 title="Version history"
               >
+                {activeVersionId && lockedVersionIds.includes(activeVersionId) && (
+                  <Lock className="size-2.5 text-amber-500" />
+                )}
                 {activeVersion
                   ? (activeVersion.name || `#${activeVersion.versionNumber}`)
                   : `v${currentDiagram.version ?? '1.0.0'}`}
@@ -351,6 +367,7 @@ export function DiagramToolbar({
                           version={v}
                           isCurrent={activeVersionId === v.id}
                           isDeleting={deletingVersionId === v.id}
+                          isLocked={lockedVersionIds.includes(v.id)}
                           onSelect={() => onVersionSelect?.(v)}
                           onRename={onRenameVersion ? () => onRenameVersion(v) : undefined}
                           onStartDelete={onDeleteVersion ? () => setDeletingVersionId(v.id) : undefined}
@@ -382,6 +399,63 @@ export function DiagramToolbar({
               )}
             </PopoverContent>
           </Popover>
+
+          {/* Compare button (only when 2+ versions exist) */}
+          {versions.length >= 2 && onCompareTargetChange && (
+            compareTargetVersionId ? (
+              <Button
+                variant="secondary"
+                size="xs"
+                onClick={() => onCompareTargetChange(null)}
+                title="Exit compare mode"
+                className="gap-1"
+              >
+                <GitCompareArrows className="size-3.5" />
+                <span className="max-w-[80px] truncate text-[10px]">
+                  vs {versions.find((v) => v.id === compareTargetVersionId)?.name
+                    || `#${versions.find((v) => v.id === compareTargetVersionId)?.versionNumber ?? '?'}`}
+                </span>
+                <X className="size-2.5" />
+              </Button>
+            ) : (
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="xs"
+                    className="opacity-50"
+                    title="Compare with another version"
+                  >
+                    <GitCompareArrows className="size-3.5" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-56 p-1" align="start">
+                  <div className="px-2 py-1 text-[10px] font-medium text-muted-foreground">
+                    Compare with...
+                  </div>
+                  <div className="max-h-48 overflow-y-auto">
+                    {versions
+                      .filter((v) => v.id !== activeVersionId)
+                      .map((v) => (
+                        <button
+                          key={v.id}
+                          type="button"
+                          className="flex w-full items-center rounded-md px-2 py-1.5 text-left text-xs transition-colors hover:bg-accent"
+                          onClick={() => onCompareTargetChange(v.id)}
+                        >
+                          <span className="min-w-0 flex-1 truncate">
+                            {v.name || `#${v.versionNumber}`}
+                          </span>
+                          <span className="w-8 shrink-0 text-right text-[10px] text-muted-foreground">
+                            {v.schemaSnapshot?.tables?.length ?? 0}t
+                          </span>
+                        </button>
+                      ))}
+                  </div>
+                </PopoverContent>
+              </Popover>
+            )
+          )}
 
           <div className="h-4 w-px bg-border" />
 

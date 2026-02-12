@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import type { ITable, IDiagramLayout, IDiagramVersion, ISearchResult, IViewSnapshot, TKeyType } from '~/shared/types/db';
+import type { ITable, IDiagramLayout, IDiagramSnapshot, IDiagramVersion, ISearchResult, IViewSnapshot, TKeyType } from '~/shared/types/db';
 import { useDiagrams, useDiagram, useUpdateDiagram, useCreateDiagram, useDeleteDiagram, useCloneDiagram, useDiagramLayout, useSaveDiagramLayout, useCreateDiagramVersion, useUpdateDiagramVersion, useDeleteDiagramVersion, useDiagramVersions, useReorderVersions, useReorderDiagrams } from '../model/useDiagrams';
 import { useDiagramStore } from '../model/diagramStore';
 import { schemaToNodes } from '../lib/schemaToNodes';
+import { compareVersionTables } from '../lib/compareVersions';
 import { applyDagreLayout } from '../lib/autoLayout';
 import { simulateCascade, getReferencedColumns } from '../lib/cascadeTraversal';
 import type { TSimulationType } from '../lib/cascadeTraversal';
@@ -15,6 +16,8 @@ import { SearchOverlay } from './SearchOverlay';
 import { FilterPanel } from './FilterPanel';
 import { ViewSnapshotManager } from './ViewSnapshotManager';
 import { DiagramListPanel } from './DiagramListPanel';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/shared/components/ui/dialog';
+import { Button } from '@/shared/components/ui/button';
 import { DiagramFormModal } from './DiagramFormModal';
 import { DdlEditorView } from '@/features/ddl-editor';
 import { schemaToDdl } from '@/features/ddl-editor/lib/schemaToDdl';
@@ -22,16 +25,20 @@ import { ExportMenu } from './ExportMenu';
 import { VersionFormModal } from './VersionFormModal';
 import { NodeContextMenu } from './NodeContextMenu';
 import { CascadeInfoPanel } from './CascadeInfoPanel';
+import { CompareInfoPanel } from './CompareInfoPanel';
 import { useNavigationGuard } from '../hooks/useNavigationGuard';
 
+let _tableIdCounter = 0;
 function createEmptyTable(): ITable {
+  const ts = Date.now();
+  const seq = _tableIdCounter++;
   return {
-    id: `tbl-${Date.now()}`,
+    id: `tbl-${ts}-${seq}`,
     name: 'new_table',
     comment: '',
     columns: [
       {
-        id: `col-${Date.now()}-0`,
+        id: `col-${ts}-${seq}-0`,
         name: 'id',
         dataType: 'BIGINT',
         keyTypes: ['PK'],
@@ -91,9 +98,7 @@ export function VirtualDiagramView() {
     resetLocalTables,
     setLayoutDirty,
     // Lock
-    isDiagramLocked,
     lockedNodeIds,
-    toggleDiagramLock,
     toggleNodeLock,
     // Undo/Redo
     undoStack,
@@ -110,6 +115,7 @@ export function VirtualDiagramView() {
     clearCascadeSimulation,
   } = useDiagramStore();
 
+  const [fitViewTrigger, setFitViewTrigger] = useState(0);
   const [isFilterPanelOpen, setIsFilterPanelOpen] = useState(false);
   const [isSnapshotPanelOpen, setIsSnapshotPanelOpen] = useState(false);
   const [isExportOpen, setIsExportOpen] = useState(false);
@@ -127,6 +133,9 @@ export function VirtualDiagramView() {
   const [versionModalMode, setVersionModalMode] = useState<'create' | 'edit'>('create');
   const [versionModalInitialName, setVersionModalInitialName] = useState('');
   const [editingVersionId, setEditingVersionId] = useState<string | null>(null);
+
+  // Delete confirmation modal state
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
 
   // Context menu state
   const [contextMenu, setContextMenu] = useState<{ position: { x: number; y: number }; tableId: string; tableName: string } | null>(null);
@@ -149,6 +158,17 @@ export function VirtualDiagramView() {
 
   const activeVersion = diagramVersions?.find((v) => v.id === activeVersionId) ?? null;
   const selectedTable = localTables.find((t) => t.id === selectedTableId) ?? null;
+
+  // Derive lock state from version data (persisted in DB)
+  const isDiagramLocked = activeVersion?.isLocked ?? false;
+  const lockedVersionIds = useMemo(
+    () => (diagramVersions ?? []).filter((v) => v.isLocked).map((v) => v.id),
+    [diagramVersions],
+  );
+  const toggleDiagramLock = useCallback(() => {
+    if (!activeVersionId || !selectedDiagramId) return;
+    updateVersion.mutate({ id: activeVersionId, diagramId: selectedDiagramId, isLocked: !isDiagramLocked });
+  }, [activeVersionId, selectedDiagramId, isDiagramLocked, updateVersion]);
 
   // Auto-load version when diagram first opens (NOT on version refetch after save)
   const prevDiagramIdRef = useRef<string | null>(null);
@@ -207,36 +227,37 @@ export function VirtualDiagramView() {
   }, [layout?.diagramId]);
 
   // --- Save handler ---
+  function buildCurrentSnapshot(): IDiagramSnapshot {
+    return {
+      ...(diagram ?? { id: '', name: '', tables: [], constraints: [] }),
+      tables: localTables,
+      layout: layout ? {
+        positions: layout.positions,
+        zoom: layout.zoom,
+        viewport: layout.viewport,
+        hiddenTableIds: useDiagramStore.getState().hiddenTableIds,
+        tableColors: useDiagramStore.getState().tableColors,
+      } : undefined,
+    };
+  }
+
   function handleSave() {
     if (!diagram || (!isDirty && !isLayoutDirty)) return;
 
     if (activeVersionId && selectedDiagramId) {
-      // Save to the active version with layout
       const ddl = schemaToDdl(localTables);
-      const currentLayout = layout;
-      const snapshot = {
-        ...diagram,
-        tables: localTables,
-        layout: currentLayout ? {
-          positions: currentLayout.positions,
-          zoom: currentLayout.zoom,
-          viewport: currentLayout.viewport,
-          hiddenTableIds: useDiagramStore.getState().hiddenTableIds,
-          tableColors: useDiagramStore.getState().tableColors,
-        } : undefined,
-      };
+      const snapshot = buildCurrentSnapshot();
       updateVersion.mutate(
         { id: activeVersionId, diagramId: selectedDiagramId, ddlContent: ddl, schemaSnapshot: snapshot },
         {
           onSuccess: () => {
             resetLocalTables(localTables);
-            // Sync diagram.tables for subtitle display in list panel
+            setLayoutDirty(false);
             updateDiagram.mutate({ id: diagram.id, tables: localTables });
           },
         },
       );
     } else {
-      // No version selected - save to diagram directly (fallback)
       updateDiagram.mutate(
         { id: diagram.id, tables: localTables },
         { onSuccess: () => resetLocalTables(localTables) },
@@ -259,9 +280,23 @@ export function VirtualDiagramView() {
     function handleKeyDown(e: KeyboardEvent) {
       const isMod = e.metaKey || e.ctrlKey;
 
-      // ESC: close cascade simulation first, then other overlays
+      // ESC: close compare mode first, then cascade simulation, then other overlays
+      if (e.key === 'Escape' && compareTargetVersionId) {
+        handleCompareTargetChange(null);
+        return;
+      }
       if (e.key === 'Escape' && cascadeSimulation) {
         clearCascadeSimulation();
+        return;
+      }
+
+      // Backspace/Delete: open delete confirmation for selected table
+      if ((e.key === 'Backspace' || e.key === 'Delete') && selectedTableId && !isDiagramLocked) {
+        // Don't trigger when typing in an input/textarea
+        const tag = (e.target as HTMLElement)?.tagName;
+        if (tag === 'INPUT' || tag === 'TEXTAREA' || (e.target as HTMLElement)?.isContentEditable) return;
+        e.preventDefault();
+        setDeleteConfirmOpen(true);
         return;
       }
 
@@ -296,7 +331,7 @@ export function VirtualDiagramView() {
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isDirty, isLayoutDirty, localTables, diagram?.id, cascadeSimulation]);
+  }, [isDirty, isLayoutDirty, localTables, diagram?.id, cascadeSimulation, compareTargetVersionId, selectedTableId, isDiagramLocked]);
 
   // Navigation guard
   useNavigationGuard({ isDirty: isDirty || isLayoutDirty });
@@ -326,6 +361,27 @@ export function VirtualDiagramView() {
     () => searchResults.filter((r) => r.type === 'table').map((r) => r.tableId),
     [searchResults],
   );
+
+  // Compare mode: compute diff between current tables and target version
+  const compareResult = useMemo(() => {
+    if (!compareTargetVersionId) return null;
+    const targetVer = diagramVersions?.find((v) => v.id === compareTargetVersionId);
+    if (!targetVer?.schemaSnapshot?.tables) return null;
+    return compareVersionTables(localTables, targetVer.schemaSnapshot.tables);
+  }, [compareTargetVersionId, diagramVersions, localTables]);
+
+  // --- Compare mode ---
+  function handleCompareTargetChange(id: string | null) {
+    setCompareTargetVersionId(id);
+    if (id) {
+      setRightPanelMode('compare');
+      clearCascadeSimulation();
+      setFitViewTrigger((v) => v + 1);
+    } else {
+      setRightPanelMode('detail');
+      setFitViewTrigger((v) => v + 1);
+    }
+  }
 
   // --- Diagram CRUD ---
   function handleDiagramSelect(id: string) {
@@ -405,10 +461,19 @@ export function VirtualDiagramView() {
   }
 
   // --- Table CRUD ---
+  function nextUniqueName(base: string): string {
+    const names = new Set(localTables.map((t) => t.name.toLowerCase()));
+    if (!names.has(base.toLowerCase())) return base;
+    let i = 2;
+    while (names.has(`${base}_${i}`.toLowerCase())) i++;
+    return `${base}_${i}`;
+  }
+
   function handleAddTable() {
     if (!diagram || isDiagramLocked) return;
     pushUndoState(localTables);
     const newTable = createEmptyTable();
+    newTable.name = nextUniqueName(newTable.name);
     addLocalTable(newTable);
   }
 
@@ -416,6 +481,7 @@ export function VirtualDiagramView() {
     if (!diagram || isDiagramLocked) return;
     pushUndoState(localTables);
     const newTable = createEmptyTable();
+    newTable.name = nextUniqueName(newTable.name);
     addLocalTable(newTable);
   }
 
@@ -453,14 +519,23 @@ export function VirtualDiagramView() {
 
   // --- Version ---
   function handleVersionSelect(version: IDiagramVersion) {
-    if (isDirty || isLayoutDirty) {
-      if (!window.confirm('You have unsaved changes. Discard and switch version?')) return;
+    if (version.id === activeVersionId) return;
+
+    // Auto-save current version's layout + tables before switching
+    if (activeVersionId && selectedDiagramId && layout) {
+      updateVersion.mutate({
+        id: activeVersionId,
+        diagramId: selectedDiagramId,
+        schemaSnapshot: buildCurrentSnapshot(),
+      });
     }
+
+    // Switch to the target version
     setActiveVersionId(version.id);
     if (version.schemaSnapshot?.tables) {
       resetLocalTables(version.schemaSnapshot.tables);
     }
-    // Restore layout from version snapshot
+    // Restore layout from target version's snapshot
     if (version.schemaSnapshot?.layout && selectedDiagramId) {
       const vLayout = version.schemaSnapshot.layout;
       saveLayout.mutate({
@@ -586,6 +661,14 @@ export function VirtualDiagramView() {
 
   function handleTableChange(updated: ITable) {
     if (isDiagramLocked) return;
+    // Prevent duplicate table names
+    const duplicate = localTables.find(
+      (t) => t.id !== updated.id && t.name.toLowerCase() === updated.name.toLowerCase(),
+    );
+    if (duplicate) {
+      alert(`A table named "${updated.name}" already exists.`);
+      return;
+    }
     pushUndoState(localTables);
     updateLocalTable(updated);
   }
@@ -595,6 +678,11 @@ export function VirtualDiagramView() {
     pushUndoState(localTables);
     deleteLocalTable(selectedTableId);
     setSelectedTableId(null);
+  }
+
+  function handleConfirmDelete() {
+    setDeleteConfirmOpen(false);
+    handleTableDelete();
   }
 
   function handleTableDeleteFromList(tableId: string) {
@@ -728,6 +816,9 @@ export function VirtualDiagramView() {
         onRenameVersion={openRenameVersionModal}
         onDeleteVersion={handleDeleteVersion}
         onReorderVersions={handleReorderVersions}
+        compareTargetVersionId={compareTargetVersionId}
+        onCompareTargetChange={handleCompareTargetChange}
+        lockedVersionIds={lockedVersionIds}
       />
 
       {/* Description bar (toggled by Info button) */}
@@ -757,6 +848,7 @@ export function VirtualDiagramView() {
               activeVersionId={activeVersionId}
               onVersionSelect={handleVersionSelect}
               onReorderVersions={handleReorderVersions}
+              lockedVersionIds={lockedVersionIds}
             />
           ) : diagram ? (
             <TableListPanel
@@ -860,6 +952,8 @@ export function VirtualDiagramView() {
                 onNodeDragStart={handleNodeDragStart}
                 onNodeContextMenu={handleNodeContextMenu}
                 cascadeSimulation={cascadeSimulation}
+                compareResult={compareResult}
+                fitViewTrigger={fitViewTrigger}
               />
             ) : (
               <div className="flex h-full items-center justify-center bg-muted/30">
@@ -891,7 +985,9 @@ export function VirtualDiagramView() {
                   return { ...parsed, id: existing.id, columns: mergedColumns };
                 });
                 // Keep hidden tables intact, only replace visible ones
-                const hiddenTables = localTables.filter((t) => hiddenTableIds.includes(t.id));
+                // Exclude hidden tables whose IDs were already merged (matched by name)
+                const mergedIds = new Set(merged.map((t) => t.id));
+                const hiddenTables = localTables.filter((t) => hiddenTableIds.includes(t.id) && !mergedIds.has(t.id));
                 setLocalTables([...merged, ...hiddenTables]);
                 setTimeout(() => setChangeSource(null), 100);
               }}
@@ -904,6 +1000,18 @@ export function VirtualDiagramView() {
             <CascadeInfoPanel
               simulation={cascadeSimulation}
               onClose={clearCascadeSimulation}
+            />
+          )}
+
+          {/* Compare info panel */}
+          {compareResult && compareTargetVersionId && (
+            <CompareInfoPanel
+              compareResult={compareResult}
+              targetVersionName={
+                diagramVersions?.find((v) => v.id === compareTargetVersionId)?.name
+                || `#${diagramVersions?.find((v) => v.id === compareTargetVersionId)?.versionNumber ?? '?'}`
+              }
+              onClose={() => handleCompareTargetChange(null)}
             />
           )}
         </div>
@@ -946,6 +1054,26 @@ export function VirtualDiagramView() {
         initialName={versionModalInitialName}
         onSubmit={handleVersionFormSubmit}
       />
+
+      {/* Delete Table Confirmation */}
+      <Dialog open={deleteConfirmOpen} onOpenChange={setDeleteConfirmOpen}>
+        <DialogContent showCloseButton={false} className="sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Delete Table</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to delete &quot;{selectedTable?.name}&quot;? You can undo this action.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" size="sm" onClick={() => setDeleteConfirmOpen(false)}>
+              Cancel
+            </Button>
+            <Button variant="destructive" size="sm" autoFocus onClick={handleConfirmDelete}>
+              Delete
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Node Context Menu */}
       {contextMenu && (

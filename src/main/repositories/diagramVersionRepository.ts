@@ -9,6 +9,7 @@ interface DiagramVersionRow {
   ddl_content: string;
   schema_snapshot: string;
   sort_order: number;
+  is_locked: number;
   created_at: string;
 }
 
@@ -21,6 +22,7 @@ function toVersion(row: DiagramVersionRow): IDiagramVersion {
     ddlContent: row.ddl_content,
     schemaSnapshot: JSON.parse(row.schema_snapshot),
     sortOrder: row.sort_order ?? 0,
+    isLocked: row.is_locked === 1,
     createdAt: row.created_at,
   };
 }
@@ -66,7 +68,7 @@ export const diagramVersionRepository = {
     return toVersion(row);
   },
 
-  update(id: string, data: { name?: string; ddlContent?: string; schemaSnapshot?: unknown }): IDiagramVersion {
+  update(id: string, data: { name?: string; ddlContent?: string; schemaSnapshot?: unknown; isLocked?: boolean }): IDiagramVersion {
     const db = getDb();
     const sets: string[] = [];
     const values: unknown[] = [];
@@ -74,6 +76,7 @@ export const diagramVersionRepository = {
     if (data.name !== undefined) { sets.push('name = ?'); values.push(data.name); }
     if (data.ddlContent !== undefined) { sets.push('ddl_content = ?'); values.push(data.ddlContent); }
     if (data.schemaSnapshot !== undefined) { sets.push('schema_snapshot = ?'); values.push(JSON.stringify(data.schemaSnapshot)); }
+    if (data.isLocked !== undefined) { sets.push('is_locked = ?'); values.push(data.isLocked ? 1 : 0); }
 
     if (sets.length > 0) {
       values.push(id);

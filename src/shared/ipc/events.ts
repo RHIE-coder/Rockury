@@ -131,7 +131,7 @@ export interface IEvents {
     response: { success: boolean; data: IDiagramVersion };
   };
   [CHANNELS.DIAGRAM_VERSION_UPDATE]: {
-    args: { id: string; name?: string; ddlContent?: string; schemaSnapshot?: unknown };
+    args: { id: string; name?: string; ddlContent?: string; schemaSnapshot?: unknown; isLocked?: boolean };
     response: { success: boolean; data: IDiagramVersion };
   };
   [CHANNELS.DIAGRAM_VERSION_DELETE]: {

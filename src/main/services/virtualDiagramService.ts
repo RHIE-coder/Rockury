@@ -53,7 +53,7 @@ export const virtualDiagramService = {
     });
   },
 
-  updateVersion(id: string, data: { name?: string; ddlContent?: string; schemaSnapshot?: unknown }): IDiagramVersion {
+  updateVersion(id: string, data: { name?: string; ddlContent?: string; schemaSnapshot?: unknown; isLocked?: boolean }): IDiagramVersion {
     return diagramVersionRepository.update(id, data);
   },
 

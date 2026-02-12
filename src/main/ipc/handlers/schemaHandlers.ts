@@ -111,9 +111,9 @@ export function registerSchemaHandlers() {
     }
   });
 
-  ipcMain.handle(CHANNELS.DIAGRAM_VERSION_UPDATE, async (_event, args: { id: string; name?: string; ddlContent?: string; schemaSnapshot?: unknown }) => {
+  ipcMain.handle(CHANNELS.DIAGRAM_VERSION_UPDATE, async (_event, args: { id: string; name?: string; ddlContent?: string; schemaSnapshot?: unknown; isLocked?: boolean }) => {
     try {
-      const data = virtualDiagramService.updateVersion(args.id, { name: args.name, ddlContent: args.ddlContent, schemaSnapshot: args.schemaSnapshot });
+      const data = virtualDiagramService.updateVersion(args.id, { name: args.name, ddlContent: args.ddlContent, schemaSnapshot: args.schemaSnapshot, isLocked: args.isLocked });
       return { success: true, data };
     } catch (error) {
       return { success: false, data: null, error: (error as Error).message };
