@@ -5,6 +5,8 @@ import type { ICascadeResult } from '../lib/cascadeTraversal';
 export type TDiagramTab = 'virtual' | 'real' | 'diff';
 export type TViewMode = 'canvas' | 'ddl';
 
+const ALL_EDGE_ACTIONS = { CASCADE: true, 'SET NULL': true, RESTRICT: true, 'NO ACTION': true };
+
 export const DEFAULT_FILTER: IDiagramFilter = {
   showColumns: true,
   showDataTypes: true,
@@ -12,7 +14,10 @@ export const DEFAULT_FILTER: IDiagramFilter = {
   showNullable: true,
   showComments: false,
   showConstraints: false,
+  showEdgePolicies: true,
   preset: 'full',
+  edgeOnDelete: { ...ALL_EDGE_ACTIONS },
+  edgeOnUpdate: { ...ALL_EDGE_ACTIONS },
 };
 
 export const FILTER_PRESETS: Record<string, Partial<IDiagramFilter>> = {
@@ -23,6 +28,9 @@ export const FILTER_PRESETS: Record<string, Partial<IDiagramFilter>> = {
     showNullable: false,
     showComments: false,
     showConstraints: false,
+    showEdgePolicies: false,
+    edgeOnDelete: { ...ALL_EDGE_ACTIONS },
+    edgeOnUpdate: { ...ALL_EDGE_ACTIONS },
   },
   full: {
     showColumns: true,
@@ -31,6 +39,9 @@ export const FILTER_PRESETS: Record<string, Partial<IDiagramFilter>> = {
     showNullable: true,
     showComments: true,
     showConstraints: true,
+    showEdgePolicies: true,
+    edgeOnDelete: { ...ALL_EDGE_ACTIONS },
+    edgeOnUpdate: { ...ALL_EDGE_ACTIONS },
   },
 };
 

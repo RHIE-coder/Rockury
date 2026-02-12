@@ -13,6 +13,17 @@ export interface ICascadeNode {
   propagates: boolean;
 }
 
+export interface IResolveStep {
+  order: number;
+  tableName: string;
+  tableId: string;
+  fkColumnName: string;
+  referencedTableName: string;
+  referencedTableId: string;
+  canSetNull: boolean;
+  depth: number;
+}
+
 export interface ICascadeResult {
   sourceTableId: string;
   sourceTableName: string;
@@ -24,6 +35,7 @@ export interface ICascadeResult {
   affectedTableIds: Set<string>;
   blockedTableIds: Set<string>;
   affectedEdgeIds: Set<string>;
+  resolveSteps: IResolveStep[];
 }
 
 interface FkEntry {
@@ -84,6 +96,7 @@ export function simulateCascade(
       affectedTableIds: new Set(),
       blockedTableIds: new Set(),
       affectedEdgeIds: new Set(),
+      resolveSteps: [],
     };
   }
 
@@ -184,6 +197,25 @@ export function simulateCascade(
     }
   }
 
+  // Compute resolve steps: blocked nodes sorted by depth descending (deepest first)
+  const resolveSteps: IResolveStep[] = [...blockedNodes]
+    .sort((a, b) => b.depth - a.depth)
+    .map((node, idx) => {
+      const refTable = tableById.get(node.tableId);
+      const fkCol = refTable?.columns.find((c) => c.name === node.fkColumnName);
+      const parentTable = tableById.get(node.parentTableId);
+      return {
+        order: idx + 1,
+        tableName: node.tableName,
+        tableId: node.tableId,
+        fkColumnName: node.fkColumnName,
+        referencedTableName: parentTable?.name ?? '',
+        referencedTableId: node.parentTableId,
+        canSetNull: fkCol?.nullable ?? false,
+        depth: node.depth,
+      };
+    });
+
   return {
     sourceTableId,
     sourceTableName: sourceTable.name,
@@ -195,5 +227,6 @@ export function simulateCascade(
     affectedTableIds,
     blockedTableIds,
     affectedEdgeIds,
+    resolveSteps,
   };
 }

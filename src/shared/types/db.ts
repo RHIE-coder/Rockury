@@ -157,7 +157,11 @@ export interface IDiagramFilter {
   showNullable: boolean;
   showComments: boolean;
   showConstraints: boolean;
+  showEdgePolicies: boolean;
   preset: TFilterPreset;
+  // Edge constraint filters (show edges matching these actions)
+  edgeOnDelete: Record<string, boolean>;
+  edgeOnUpdate: Record<string, boolean>;
 }
 
 // ─── Search Result ───

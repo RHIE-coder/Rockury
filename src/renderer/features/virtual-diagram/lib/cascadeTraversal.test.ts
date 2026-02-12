@@ -334,6 +334,107 @@ describe('simulateCascade', () => {
   });
 });
 
+describe('resolveSteps', () => {
+  it('returns single resolve step for single RESTRICT blocked node', () => {
+    const tables: ITable[] = [
+      makeTable('t1', 'users', [makePkColumn('c1', 'id')]),
+      makeTable('t2', 'orders', [
+        makePkColumn('c2', 'id'),
+        makeFkColumn('c3', 'user_id', 'users', 'id', 'RESTRICT'),
+      ]),
+    ];
+
+    const result = simulateCascade(tables, 't1', 'DELETE');
+
+    expect(result.resolveSteps).toHaveLength(1);
+    expect(result.resolveSteps[0]).toMatchObject({
+      order: 1,
+      tableName: 'orders',
+      tableId: 't2',
+      fkColumnName: 'user_id',
+      referencedTableName: 'users',
+      referencedTableId: 't1',
+      depth: 1,
+    });
+  });
+
+  it('orders multi-depth blocked nodes by depth descending', () => {
+    // users → comments (CASCADE) → comment_likes (RESTRICT, depth 2)
+    // users → orders (RESTRICT, depth 1)
+    const tables: ITable[] = [
+      makeTable('t1', 'users', [makePkColumn('c1', 'id')]),
+      makeTable('t2', 'comments', [
+        makePkColumn('c2', 'id'),
+        makeFkColumn('c3', 'user_id', 'users', 'id', 'CASCADE'),
+      ]),
+      makeTable('t3', 'comment_likes', [
+        makePkColumn('c4', 'id'),
+        makeFkColumn('c5', 'comment_id', 'comments', 'id', 'RESTRICT'),
+      ]),
+      makeTable('t4', 'orders', [
+        makePkColumn('c6', 'id'),
+        makeFkColumn('c7', 'user_id', 'users', 'id', 'RESTRICT'),
+      ]),
+    ];
+
+    const result = simulateCascade(tables, 't1', 'DELETE');
+
+    expect(result.resolveSteps).toHaveLength(2);
+    // Deepest first: comment_likes (depth 2) before orders (depth 1)
+    expect(result.resolveSteps[0].tableName).toBe('comment_likes');
+    expect(result.resolveSteps[0].order).toBe(1);
+    expect(result.resolveSteps[0].depth).toBe(2);
+    expect(result.resolveSteps[1].tableName).toBe('orders');
+    expect(result.resolveSteps[1].order).toBe(2);
+    expect(result.resolveSteps[1].depth).toBe(1);
+  });
+
+  it('returns empty resolveSteps when no blocked nodes', () => {
+    const tables: ITable[] = [
+      makeTable('t1', 'users', [makePkColumn('c1', 'id')]),
+      makeTable('t2', 'posts', [
+        makePkColumn('c2', 'id'),
+        makeFkColumn('c3', 'user_id', 'users', 'id', 'CASCADE'),
+      ]),
+    ];
+
+    const result = simulateCascade(tables, 't1', 'DELETE');
+
+    expect(result.resolveSteps).toHaveLength(0);
+  });
+
+  it('sets canSetNull true when FK column is nullable', () => {
+    const tables: ITable[] = [
+      makeTable('t1', 'users', [makePkColumn('c1', 'id')]),
+      makeTable('t2', 'orders', [
+        makePkColumn('c2', 'id'),
+        makeFkColumn('c3', 'user_id', 'users', 'id', 'RESTRICT'), // nullable: true (default in makeFkColumn)
+      ]),
+    ];
+
+    const result = simulateCascade(tables, 't1', 'DELETE');
+
+    expect(result.resolveSteps[0].canSetNull).toBe(true);
+  });
+
+  it('sets canSetNull false when FK column is not nullable', () => {
+    const tables: ITable[] = [
+      makeTable('t1', 'users', [makePkColumn('c1', 'id')]),
+      makeTable('t2', 'orders', [
+        makePkColumn('c2', 'id'),
+        {
+          ...makeFkColumn('c3', 'user_id', 'users', 'id', 'RESTRICT'),
+          nullable: false,
+        },
+      ]),
+    ];
+
+    const result = simulateCascade(tables, 't1', 'DELETE');
+
+    expect(result.resolveSteps[0].canSetNull).toBe(false);
+  });
+});
+
 describe('getReferencedColumns', () => {
   it('returns columns referenced by other tables', () => {
     const tables: ITable[] = [

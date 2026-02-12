@@ -156,7 +156,14 @@ export function schemaToNodes(
       if (column.reference) {
         const targetTableId = tableNameToId.get(column.reference.table);
         if (targetTableId) {
+          const onDelete = column.reference.onDelete ?? 'NO ACTION';
+          const onUpdate = column.reference.onUpdate ?? 'NO ACTION';
+
+          // Edge constraint filter: skip edges whose actions are unchecked
+          if (!filter.edgeOnDelete?.[onDelete] || !filter.edgeOnUpdate?.[onUpdate]) continue;
+
           const edgeId = `${table.id}-${column.id}-${targetTableId}`;
+          const isUnique = column.keyTypes.includes('UK') || column.keyTypes.includes('PK');
           edges.push({
             id: edgeId,
             source: table.id,
@@ -167,9 +174,13 @@ export function schemaToNodes(
             animated: !cascadeSimulation,
             data: {
               nullable: column.nullable,
+              isUnique,
               onDelete: column.reference.onDelete,
               onUpdate: column.reference.onUpdate,
+              showPolicies: filter.showEdgePolicies ?? true,
               simulationRole: getEdgeSimulationRole(edgeId),
+              sourceTableName: table.name,
+              targetTableName: column.reference.table,
             },
           });
         }

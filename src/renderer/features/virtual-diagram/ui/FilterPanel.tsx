@@ -10,14 +10,17 @@ interface FilterPanelProps {
   onClose: () => void;
 }
 
-const FILTER_OPTIONS: { key: keyof Omit<IDiagramFilter, 'preset'>; label: string }[] = [
+const FILTER_OPTIONS: { key: keyof Omit<IDiagramFilter, 'preset' | 'edgeOnDelete' | 'edgeOnUpdate'>; label: string }[] = [
   { key: 'showColumns', label: 'Columns' },
   { key: 'showDataTypes', label: 'Data Types' },
   { key: 'showKeyIcons', label: 'Key Icons' },
   { key: 'showNullable', label: 'Nullable' },
   { key: 'showComments', label: 'Comments' },
   { key: 'showConstraints', label: 'Constraints' },
+  { key: 'showEdgePolicies', label: 'Edge Policies (D/U)' },
 ];
+
+const EDGE_ACTIONS = ['CASCADE', 'SET NULL', 'RESTRICT', 'NO ACTION'] as const;
 
 const PRESETS: { key: TFilterPreset; label: string }[] = [
   { key: 'compact', label: 'Compact' },
@@ -56,7 +59,7 @@ export function FilterPanel({ filter, onFilterChange, onPresetChange, onClose }:
       </div>
 
       {/* Individual toggles */}
-      <div className="p-2">
+      <div className="border-b border-border p-2">
         <p className="mb-1.5 text-[10px] font-medium uppercase text-muted-foreground">Display</p>
         <div className="space-y-1">
           {FILTER_OPTIONS.map((option) => (
@@ -73,6 +76,59 @@ export function FilterPanel({ filter, onFilterChange, onPresetChange, onClose }:
               {option.label}
             </label>
           ))}
+        </div>
+      </div>
+
+      {/* Edge constraint filters */}
+      <div className="p-2">
+        <p className="mb-1.5 text-[10px] font-medium uppercase text-muted-foreground">Edge Constraints</p>
+        <div className="space-y-2">
+          <div>
+            <p className="mb-1 text-[10px] text-muted-foreground">ON DELETE</p>
+            <div className="space-y-1">
+              {EDGE_ACTIONS.map((action) => (
+                <label
+                  key={`del-${action}`}
+                  className="flex cursor-pointer items-center gap-2 rounded-sm px-1 py-0.5 text-xs hover:bg-accent"
+                >
+                  <input
+                    type="checkbox"
+                    checked={filter.edgeOnDelete?.[action] ?? true}
+                    onChange={(e) =>
+                      onFilterChange({
+                        edgeOnDelete: { ...filter.edgeOnDelete, [action]: e.target.checked },
+                      })
+                    }
+                    className="size-3.5 rounded border-border"
+                  />
+                  {action}
+                </label>
+              ))}
+            </div>
+          </div>
+          <div>
+            <p className="mb-1 text-[10px] text-muted-foreground">ON UPDATE</p>
+            <div className="space-y-1">
+              {EDGE_ACTIONS.map((action) => (
+                <label
+                  key={`upd-${action}`}
+                  className="flex cursor-pointer items-center gap-2 rounded-sm px-1 py-0.5 text-xs hover:bg-accent"
+                >
+                  <input
+                    type="checkbox"
+                    checked={filter.edgeOnUpdate?.[action] ?? true}
+                    onChange={(e) =>
+                      onFilterChange({
+                        edgeOnUpdate: { ...filter.edgeOnUpdate, [action]: e.target.checked },
+                      })
+                    }
+                    className="size-3.5 rounded border-border"
+                  />
+                  {action}
+                </label>
+              ))}
+            </div>
+          </div>
         </div>
       </div>
     </div>

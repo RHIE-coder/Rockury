@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { createPortal } from 'react-dom';
-import { FolderOpen, Table2, Save, Lock, LockOpen, Undo2, Redo2, Info, ChevronDown, Plus, Pencil, Trash2, Check, X, GripVertical } from 'lucide-react';
+import { FolderOpen, Table2, Save, Lock, LockOpen, Undo2, Redo2, Info, HelpCircle, ChevronDown, Plus, Pencil, Trash2, Check, X, GripVertical } from 'lucide-react';
 import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors, type DragEndEvent, DragOverlay } from '@dnd-kit/core';
 import { SortableContext, verticalListSortingStrategy, useSortable, arrayMove } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
@@ -425,6 +425,102 @@ export function DiagramToolbar({
           </div>
         </>
       )}
+
+      {/* Spacer to push help to the right */}
+      <div className="flex-1" />
+
+      {/* Crow's Foot notation help */}
+      <Popover>
+        <PopoverTrigger asChild>
+          <Button
+            variant="ghost"
+            size="xs"
+            className="text-muted-foreground/60"
+            title="Crow's Foot notation guide"
+          >
+            <HelpCircle className="size-3.5" />
+          </Button>
+        </PopoverTrigger>
+        <PopoverContent className="w-80 p-3" align="end">
+          <div className="space-y-3">
+            <div className="text-xs font-semibold">Crow's Foot (IE) Notation Guide</div>
+            <div className="space-y-2">
+              {/* 1:1 */}
+              <div className="flex items-start gap-2">
+                <div className="flex w-20 shrink-0 items-center justify-center gap-1 pt-0.5">
+                  <svg width="40" height="16" viewBox="0 0 40 16">
+                    <line x1="10" y1="8" x2="30" y2="8" stroke="currentColor" strokeWidth="1.5" strokeDasharray="4 2" />
+                    <line x1="8" y1="3" x2="8" y2="13" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+                    <line x1="5" y1="3" x2="5" y2="13" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+                    <line x1="32" y1="3" x2="32" y2="13" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+                    <line x1="35" y1="3" x2="35" y2="13" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+                  </svg>
+                </div>
+                <div>
+                  <div className="text-[11px] font-medium">1 : 1</div>
+                  <div className="text-[10px] text-muted-foreground">One-to-One (mandatory). FK is NOT NULL + UNIQUE.</div>
+                </div>
+              </div>
+              {/* 1:0..1 */}
+              <div className="flex items-start gap-2">
+                <div className="flex w-20 shrink-0 items-center justify-center gap-1 pt-0.5">
+                  <svg width="40" height="16" viewBox="0 0 40 16">
+                    <line x1="10" y1="8" x2="30" y2="8" stroke="currentColor" strokeWidth="1.5" strokeDasharray="4 2" />
+                    <circle cx="6" cy="8" r="3" fill="var(--background, #fff)" stroke="currentColor" strokeWidth="1.5" />
+                    <line x1="11" y1="3" x2="11" y2="13" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+                    <line x1="32" y1="3" x2="32" y2="13" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+                    <line x1="35" y1="3" x2="35" y2="13" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+                  </svg>
+                </div>
+                <div>
+                  <div className="text-[11px] font-medium">1 : 0..1</div>
+                  <div className="text-[10px] text-muted-foreground">One-to-Zero-or-One (optional). FK is NULLABLE + UNIQUE.</div>
+                </div>
+              </div>
+              {/* 1:N */}
+              <div className="flex items-start gap-2">
+                <div className="flex w-20 shrink-0 items-center justify-center gap-1 pt-0.5">
+                  <svg width="40" height="16" viewBox="0 0 40 16">
+                    <line x1="10" y1="8" x2="30" y2="8" stroke="currentColor" strokeWidth="1.5" strokeDasharray="4 2" />
+                    <line x1="8" y1="8" x2="2" y2="2" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+                    <line x1="8" y1="8" x2="2" y2="8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+                    <line x1="8" y1="8" x2="2" y2="14" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+                    <line x1="10" y1="2" x2="10" y2="14" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+                    <line x1="32" y1="3" x2="32" y2="13" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+                    <line x1="35" y1="3" x2="35" y2="13" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+                  </svg>
+                </div>
+                <div>
+                  <div className="text-[11px] font-medium">1 : 1..N</div>
+                  <div className="text-[10px] text-muted-foreground">One-to-Many (mandatory). FK is NOT NULL, no UNIQUE.</div>
+                </div>
+              </div>
+              {/* 1:0..N */}
+              <div className="flex items-start gap-2">
+                <div className="flex w-20 shrink-0 items-center justify-center gap-1 pt-0.5">
+                  <svg width="40" height="16" viewBox="0 0 40 16">
+                    <line x1="13" y1="8" x2="30" y2="8" stroke="currentColor" strokeWidth="1.5" strokeDasharray="4 2" />
+                    <line x1="11" y1="8" x2="5" y2="2" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+                    <line x1="11" y1="8" x2="5" y2="8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+                    <line x1="11" y1="8" x2="5" y2="14" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+                    <circle cx="2" cy="8" r="2.5" fill="var(--background, #fff)" stroke="currentColor" strokeWidth="1.5" />
+                    <line x1="32" y1="3" x2="32" y2="13" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+                    <line x1="35" y1="3" x2="35" y2="13" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+                  </svg>
+                </div>
+                <div>
+                  <div className="text-[11px] font-medium">1 : 0..N</div>
+                  <div className="text-[10px] text-muted-foreground">One-to-Many (optional). FK is NULLABLE, no UNIQUE.</div>
+                </div>
+              </div>
+            </div>
+            <div className="border-t border-border pt-2 text-[10px] text-muted-foreground">
+              <div><strong>||</strong> = Exactly one &nbsp; <strong>O|</strong> = Zero or one</div>
+              <div><strong>|&lt;</strong> = One or many &nbsp; <strong>O&lt;</strong> = Zero or many</div>
+            </div>
+          </div>
+        </PopoverContent>
+      </Popover>
     </div>
   );
 }

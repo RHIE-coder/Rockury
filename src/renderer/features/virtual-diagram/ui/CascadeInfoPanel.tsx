@@ -1,5 +1,5 @@
-import { X, AlertTriangle, Info } from 'lucide-react';
-import type { ICascadeResult, ICascadeNode } from '../lib/cascadeTraversal';
+import { X, AlertTriangle, Info, ListOrdered } from 'lucide-react';
+import type { ICascadeResult, ICascadeNode, IResolveStep } from '../lib/cascadeTraversal';
 
 interface CascadeInfoPanelProps {
   simulation: ICascadeResult;
@@ -39,8 +39,42 @@ function groupByDepth(nodes: ICascadeNode[]): Map<number, ICascadeNode[]> {
   return map;
 }
 
+function ResolveStepsSection({ steps, simulationType, sourceTableName }: { steps: IResolveStep[]; simulationType: string; sourceTableName: string }) {
+  if (steps.length === 0) return null;
+
+  function getAdvice(step: IResolveStep): string {
+    if (step.canSetNull) return 'SET NULL or DELETE rows';
+    return simulationType === 'DELETE' ? 'DELETE rows first' : 'UPDATE FK or DELETE rows first';
+  }
+
+  return (
+    <div className="border-b px-3 py-2">
+      <div className="mb-1.5 flex items-center gap-1.5 text-xs font-medium text-blue-600 dark:text-blue-400">
+        <ListOrdered className="size-3.5" />
+        Prerequisite Steps
+      </div>
+      <div className="space-y-1.5">
+        {steps.map((step) => (
+          <div key={`${step.tableId}-${step.fkColumnName}`} className="flex items-start gap-1.5 text-[11px]">
+            <span className="mt-px shrink-0 font-bold text-blue-600 dark:text-blue-400">{step.order}.</span>
+            <div className="min-w-0">
+              <span className="font-medium">{step.tableName}</span>
+              <span className="text-muted-foreground">.{step.fkColumnName}</span>
+              <span className="text-muted-foreground"> → {step.referencedTableName}</span>
+              <p className="text-[10px] text-muted-foreground">{getAdvice(step)}</p>
+            </div>
+          </div>
+        ))}
+      </div>
+      <p className="mt-1.5 text-[10px] text-muted-foreground italic">
+        After all steps, retry {simulationType} on {sourceTableName}
+      </p>
+    </div>
+  );
+}
+
 export function CascadeInfoPanel({ simulation, onClose }: CascadeInfoPanelProps) {
-  const { simulationType, sourceTableName, sourceColumnName, affectedNodes, blockedNodes, isBlocked } = simulation;
+  const { simulationType, sourceTableName, sourceColumnName, affectedNodes, blockedNodes, isBlocked, resolveSteps } = simulation;
   const totalAffected = affectedNodes.length;
   const totalBlocked = blockedNodes.length;
   const allNodes = [...affectedNodes, ...blockedNodes];
@@ -77,6 +111,11 @@ export function CascadeInfoPanel({ simulation, onClose }: CascadeInfoPanelProps)
             Operation blocked by RESTRICT/NO ACTION constraint on {totalBlocked} table{totalBlocked > 1 ? 's' : ''}.
           </p>
         </div>
+      )}
+
+      {/* Resolve steps */}
+      {isBlocked && (
+        <ResolveStepsSection steps={resolveSteps} simulationType={simulationType} sourceTableName={sourceTableName} />
       )}
 
       {/* Body */}
