@@ -1,12 +1,14 @@
 import { useState, useEffect } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { GitBranch, ArrowRightLeft, Play, AlertTriangle } from 'lucide-react';
+import {
+  GitBranch, ArrowRightLeft, Play, AlertTriangle,
+  Plus, Minus, Pencil, ChevronRight,
+} from 'lucide-react';
 import { Button } from '@/shared/components/ui/button';
 import { Select } from '@/shared/components/ui/select';
-import { Badge } from '@/shared/components/ui/badge';
 import { useConnections } from '@/features/db-connection';
 import { useDiagrams, useDiagramStore } from '@/features/virtual-diagram';
-import type { IDiffResult, ITableDiff } from '../model/types';
+import type { IDiffResult, ITableDiff, IColumnDiff } from '../model/types';
 import type { TDiffMode } from '~/shared/types/db';
 import { diffApi } from '../api/diffApi';
 import { useCreateMigration, useApplyMigration } from '../model/useMigrations';
@@ -14,35 +16,93 @@ import { DiffSummary } from './DiffSummary';
 import { MigrationDdlView } from './MigrationDdlView';
 import { MigrationPanel } from './MigrationPanel';
 
-const ACTION_COLORS: Record<string, string> = {
-  added: 'bg-green-100 border-green-300 dark:bg-green-950 dark:border-green-800',
-  removed: 'bg-red-100 border-red-300 dark:bg-red-950 dark:border-red-800',
-  modified: 'bg-yellow-100 border-yellow-300 dark:bg-yellow-950 dark:border-yellow-800',
+const ACTION_BORDER: Record<string, string> = {
+  added: 'border-l-green-500',
+  removed: 'border-l-red-500',
+  modified: 'border-l-yellow-500',
 };
 
-function TableDiffItem({ tableDiff }: { tableDiff: ITableDiff }) {
+const ACTION_ICON = {
+  added: Plus,
+  removed: Minus,
+  modified: Pencil,
+} as const;
+
+const ACTION_ICON_STYLE: Record<string, string> = {
+  added: 'text-green-500 bg-green-500/10',
+  removed: 'text-red-500 bg-red-500/10',
+  modified: 'text-yellow-500 bg-yellow-500/10',
+};
+
+const ACTION_LABEL: Record<string, string> = {
+  added: 'Added',
+  removed: 'Removed',
+  modified: 'Modified',
+};
+
+const PREVIEW_LIMIT = 3;
+
+function ColumnDiffRow({ col }: { col: IColumnDiff }) {
+  const Icon = ACTION_ICON[col.action] ?? Pencil;
   return (
-    <div className={`rounded-md border p-3 ${ACTION_COLORS[tableDiff.action] ?? 'border-border'}`}>
+    <div className="flex items-center gap-2 py-0.5">
+      <span className={`flex size-4 shrink-0 items-center justify-center rounded ${ACTION_ICON_STYLE[col.action] ?? ''}`}>
+        <Icon className="size-2.5" />
+      </span>
+      <span className={`min-w-0 truncate text-xs ${col.action === 'removed' ? 'line-through opacity-60' : ''}`}>
+        {col.columnName}
+      </span>
+      {col.changes && col.changes.length > 0 && (
+        <span className="shrink-0 text-[10px] text-muted-foreground">
+          {col.changes.join(', ')}
+        </span>
+      )}
+    </div>
+  );
+}
+
+function TableDiffItem({ tableDiff }: { tableDiff: ITableDiff }) {
+  const [expanded, setExpanded] = useState(false);
+  const Icon = ACTION_ICON[tableDiff.action] ?? Pencil;
+  const colCount = tableDiff.columnDiffs.length;
+  const previewCols = tableDiff.columnDiffs.slice(0, PREVIEW_LIMIT);
+  const hiddenCount = colCount - PREVIEW_LIMIT;
+  const showExpander = colCount > PREVIEW_LIMIT;
+
+  return (
+    <div className={`rounded-md border border-l-2 border-border bg-card p-3 ${ACTION_BORDER[tableDiff.action] ?? ''}`}>
+      {/* Header */}
       <div className="flex items-center gap-2">
-        <span className="text-sm font-semibold">{tableDiff.tableName}</span>
-        <Badge variant="outline" className="text-xs">
-          {tableDiff.action}
-        </Badge>
+        <span className={`flex size-5 shrink-0 items-center justify-center rounded ${ACTION_ICON_STYLE[tableDiff.action] ?? ''}`}>
+          <Icon className="size-3" />
+        </span>
+        <span className="min-w-0 flex-1 truncate text-sm font-semibold">{tableDiff.tableName}</span>
+        <span className={`text-[10px] font-medium ${ACTION_ICON_STYLE[tableDiff.action]?.split(' ')[0] ?? 'text-muted-foreground'}`}>
+          {ACTION_LABEL[tableDiff.action]}
+        </span>
+        {colCount > 0 && (
+          <span className="text-[10px] text-muted-foreground">
+            {colCount} col{colCount !== 1 ? 's' : ''}
+          </span>
+        )}
       </div>
-      {tableDiff.columnDiffs.length > 0 && (
-        <ul className="mt-2 space-y-1">
-          {tableDiff.columnDiffs.map((col) => (
-            <li key={col.columnName} className="flex items-center gap-2 text-xs">
-              <Badge variant="outline" className="text-xs">
-                {col.action}
-              </Badge>
-              <span>{col.columnName}</span>
-              {col.changes && col.changes.length > 0 && (
-                <span className="text-muted-foreground">({col.changes.join(', ')})</span>
-              )}
-            </li>
+
+      {/* Column diffs */}
+      {colCount > 0 && (
+        <div className="mt-2 pl-7">
+          {(expanded ? tableDiff.columnDiffs : previewCols).map((col) => (
+            <ColumnDiffRow key={col.columnName} col={col} />
           ))}
-        </ul>
+          {showExpander && (
+            <button
+              onClick={() => setExpanded(!expanded)}
+              className="mt-1 flex items-center gap-1 text-[10px] text-muted-foreground hover:text-foreground"
+            >
+              <ChevronRight className={`size-3 transition-transform ${expanded ? 'rotate-90' : ''}`} />
+              {expanded ? 'Show less' : `${hiddenCount} more column${hiddenCount !== 1 ? 's' : ''}...`}
+            </button>
+          )}
+        </div>
       )}
     </div>
   );
