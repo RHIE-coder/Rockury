@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
-import { RefreshCw, Search, SlidersHorizontal, PanelLeft, PanelRight, ArrowDownToLine, Code, History } from 'lucide-react';
+import { RefreshCw, Search, SlidersHorizontal, PanelLeft, PanelRight, ArrowDownToLine, Code, History, Camera } from 'lucide-react';
 import { useMutation } from '@tanstack/react-query';
 import { Button } from '@/shared/components/ui/button';
 import { Select } from '@/shared/components/ui/select';
@@ -14,6 +14,7 @@ import { FilterPanel } from '@/features/virtual-diagram/ui/FilterPanel';
 import { DdlEditorView } from '@/features/ddl-editor';
 import { realDiagramApi } from '../api/realDiagramApi';
 import { ChangelogPanel } from './ChangelogPanel';
+import { SnapshotListPanel } from '@/features/schema-snapshot';
 
 export function RealDiagramView() {
   const { data: connections } = useConnections();
@@ -47,6 +48,7 @@ export function RealDiagramView() {
     setStoreConnectionId(id || null);
   }
   // Ephemeral UI state remains local
+  const [isSnapshotsOpen, setIsSnapshotsOpen] = useState(false);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<ISearchResult[]>([]);
@@ -249,6 +251,14 @@ export function RealDiagramView() {
               {createDiagram.isPending ? 'Importing...' : 'Import as Virtual'}
             </Button>
             <Button
+              variant={isSnapshotsOpen ? 'secondary' : 'ghost'}
+              size="xs"
+              onClick={() => setIsSnapshotsOpen(!isSnapshotsOpen)}
+              title="Schema Snapshots"
+            >
+              <Camera className="size-3.5" />
+            </Button>
+            <Button
               variant={isChangelogOpen ? 'secondary' : 'ghost'}
               size="xs"
               onClick={() => setIsChangelogOpen(!isChangelogOpen)}
@@ -394,6 +404,13 @@ export function RealDiagramView() {
             onDelete={() => {}} // read-only
             onClose={() => setSelectedTableId(null)}
           />
+        )}
+
+        {/* Snapshots Panel */}
+        {isSnapshotsOpen && selectedConnectionId && (
+          <div className="w-72 shrink-0 overflow-y-auto border-l border-border p-3">
+            <SnapshotListPanel connectionId={selectedConnectionId} />
+          </div>
         )}
 
         {/* Changelog Panel */}

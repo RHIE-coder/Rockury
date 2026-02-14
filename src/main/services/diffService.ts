@@ -222,6 +222,38 @@ function compareTables(
 }
 
 export const diffService = {
+  compareTableArrays(
+    sourceTables: ITable[],
+    targetTables: ITable[],
+    options?: { sourceName?: string; targetName?: string; sourceVersionId?: string; targetVersionId?: string },
+  ): IDiffResult {
+    const tableDiffs = compareTables(sourceTables, targetTables);
+    const migrationDdl = generateMigrationDdl(tableDiffs);
+    const rollbackDdl = generateRollbackDdl(tableDiffs);
+
+    return {
+      virtualDiagramId: '',
+      realDiagramId: '',
+      tableDiffs,
+      hasDifferences: tableDiffs.length > 0,
+      migrationDdl,
+      rollbackDdl,
+      comparedAt: new Date().toISOString(),
+      sourceName: options?.sourceName,
+      targetName: options?.targetName,
+      sourceVersionId: options?.sourceVersionId,
+      targetVersionId: options?.targetVersionId,
+    };
+  },
+
+  generateMigrationDdlFromDiffs(tableDiffs: ITableDiff[]): string {
+    return generateMigrationDdl(tableDiffs);
+  },
+
+  generateRollbackDdlFromDiffs(tableDiffs: ITableDiff[]): string {
+    return generateRollbackDdl(tableDiffs);
+  },
+
   async applyRealToVirtual(
     virtualDiagramId: string,
     connectionId: string,

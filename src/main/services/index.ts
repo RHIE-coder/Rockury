@@ -10,3 +10,5 @@ export { documentService } from './documentService';
 export { validationService } from './validationService';
 export { mockingService } from './mockingService';
 export { viewSnapshotService } from './viewSnapshotService';
+export { schemaSnapshotService } from './schemaSnapshotService';
+export { migrationPackService } from './migrationPackService';

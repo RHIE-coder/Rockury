@@ -1,6 +1,6 @@
 import { ipcMain } from 'electron';
 import { CHANNELS } from '~/shared/ipc/channels';
-import { schemaService, virtualDiagramService, diffService } from '#/services';
+import { schemaService, virtualDiagramService, diffService, schemaSnapshotService } from '#/services';
 import { diagramRepository, changelogRepository } from '#/repositories';
 import type { ITable, ISchemaChange, IColumnChange, TDbType, TDiagramType, IDiagramLayout } from '~/shared/types/db';
 
@@ -254,6 +254,70 @@ export function registerSchemaHandlers() {
   ipcMain.handle(CHANNELS.SCHEMA_APPLY_REAL_TO_VIRTUAL, async (_event, args: { virtualDiagramId: string; connectionId: string }) => {
     try {
       const data = await diffService.applyRealToVirtual(args.virtualDiagramId, args.connectionId);
+      return { success: true, data };
+    } catch (error) {
+      return { success: false, data: null, error: (error as Error).message };
+    }
+  });
+
+  // ─── Schema Snapshots ───
+  ipcMain.handle(CHANNELS.SCHEMA_SNAPSHOT_LIST, async (_event, args: { connectionId: string }) => {
+    try {
+      const data = schemaSnapshotService.list(args.connectionId);
+      return { success: true, data };
+    } catch (error) {
+      return { success: false, data: null, error: (error as Error).message };
+    }
+  });
+
+  ipcMain.handle(CHANNELS.SCHEMA_SNAPSHOT_CREATE, async (_event, args: { connectionId: string; name?: string }) => {
+    try {
+      const data = await schemaSnapshotService.create(args.connectionId, args.name);
+      return { success: true, data };
+    } catch (error) {
+      return { success: false, data: null, error: (error as Error).message };
+    }
+  });
+
+  ipcMain.handle(CHANNELS.SCHEMA_SNAPSHOT_GET, async (_event, args: { id: string }) => {
+    try {
+      const data = schemaSnapshotService.getById(args.id);
+      return { success: true, data };
+    } catch (error) {
+      return { success: false, data: null, error: (error as Error).message };
+    }
+  });
+
+  ipcMain.handle(CHANNELS.SCHEMA_SNAPSHOT_DELETE, async (_event, args: { id: string }) => {
+    try {
+      schemaSnapshotService.deleteById(args.id);
+      return { success: true };
+    } catch (error) {
+      return { success: false, error: (error as Error).message };
+    }
+  });
+
+  ipcMain.handle(CHANNELS.SCHEMA_SNAPSHOT_RENAME, async (_event, args: { id: string; name: string }) => {
+    try {
+      const data = schemaSnapshotService.rename(args.id, args.name);
+      return { success: true, data };
+    } catch (error) {
+      return { success: false, data: null, error: (error as Error).message };
+    }
+  });
+
+  ipcMain.handle(CHANNELS.SCHEMA_SNAPSHOT_VALIDATE, async (_event, args: { snapshotId: string }) => {
+    try {
+      const data = await schemaSnapshotService.validate(args.snapshotId);
+      return { success: true, data };
+    } catch (error) {
+      return { success: false, data: null, error: (error as Error).message };
+    }
+  });
+
+  ipcMain.handle(CHANNELS.SCHEMA_VALIDATE_AGAINST_VERSION, async (_event, args: { connectionId: string; versionId: string }) => {
+    try {
+      const data = await schemaSnapshotService.validateAgainstVersion(args.connectionId, args.versionId);
       return { success: true, data };
     } catch (error) {
       return { success: false, data: null, error: (error as Error).message };

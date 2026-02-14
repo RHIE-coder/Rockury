@@ -228,6 +228,54 @@ CREATE TABLE IF NOT EXISTS documents (
 );
 `;
 
+export const SQL_CREATE_SCHEMA_SNAPSHOTS = `
+CREATE TABLE IF NOT EXISTS schema_snapshots (
+  id TEXT PRIMARY KEY,
+  connection_id TEXT NOT NULL,
+  name TEXT NOT NULL,
+  tables_json TEXT NOT NULL,
+  metadata_json TEXT NOT NULL,
+  checksum TEXT NOT NULL,
+  validated_at TEXT,
+  is_valid INTEGER DEFAULT 0,
+  created_at TEXT DEFAULT (datetime('now')),
+  FOREIGN KEY (connection_id) REFERENCES connections(id) ON DELETE CASCADE
+);
+`;
+
+export const SQL_CREATE_SCHEMA_SNAPSHOTS_INDEX = `
+CREATE INDEX IF NOT EXISTS idx_snapshots_connection ON schema_snapshots(connection_id);
+`;
+
+export const SQL_CREATE_MIGRATION_PACKS = `
+CREATE TABLE IF NOT EXISTS migration_packs (
+  id TEXT PRIMARY KEY,
+  connection_id TEXT NOT NULL,
+  diagram_id TEXT NOT NULL,
+  source_version_id TEXT,
+  target_version_id TEXT NOT NULL,
+  pre_snapshot_id TEXT,
+  diff_json TEXT NOT NULL,
+  update_ddl TEXT NOT NULL,
+  seed_dml TEXT NOT NULL DEFAULT '',
+  rollback_ddl TEXT NOT NULL,
+  status TEXT NOT NULL DEFAULT 'draft'
+    CHECK(status IN ('draft','reviewed','executing','applied','failed','rolled_back')),
+  execution_log_json TEXT,
+  applied_at TEXT,
+  rolled_back_at TEXT,
+  post_snapshot_id TEXT,
+  created_at TEXT DEFAULT (datetime('now')),
+  FOREIGN KEY (connection_id) REFERENCES connections(id) ON DELETE CASCADE,
+  FOREIGN KEY (diagram_id) REFERENCES diagrams(id) ON DELETE CASCADE
+);
+`;
+
+export const SQL_CREATE_MIGRATION_PACKS_INDEXES = `
+CREATE INDEX IF NOT EXISTS idx_migration_packs_diagram ON migration_packs(diagram_id);
+CREATE INDEX IF NOT EXISTS idx_migration_packs_connection ON migration_packs(connection_id);
+`;
+
 const ALL_MIGRATIONS = [
   SQL_CREATE_PACKAGES,
   SQL_CREATE_PACKAGE_RESOURCES,
@@ -243,6 +291,10 @@ const ALL_MIGRATIONS = [
   SQL_CREATE_QUERY_HISTORY,
   SQL_CREATE_DOCUMENTS,
   SQL_CREATE_SCHEMA_CHANGELOGS,
+  SQL_CREATE_SCHEMA_SNAPSHOTS,
+  SQL_CREATE_SCHEMA_SNAPSHOTS_INDEX,
+  SQL_CREATE_MIGRATION_PACKS,
+  SQL_CREATE_MIGRATION_PACKS_INDEXES,
 ];
 
 export function runMigrations(db: Database.Database): void {

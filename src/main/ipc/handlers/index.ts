@@ -8,6 +8,7 @@ import { registerValidationHandlers } from './validationHandlers';
 import { registerMockingHandlers } from './mockingHandlers';
 import { registerMigrationHandlers } from './migrationHandlers';
 import { registerViewSnapshotHandlers } from './viewSnapshotHandlers';
+import { registerMigrationPackHandlers } from './migrationPackHandlers';
 
 export function registerAllHandlers() {
   registerSystemInfoHandlers();
@@ -20,4 +21,5 @@ export function registerAllHandlers() {
   registerValidationHandlers();
   registerMockingHandlers();
   registerViewSnapshotHandlers();
+  registerMigrationPackHandlers();
 }

@@ -10,6 +10,8 @@ import type {
   IValidationReport,
   IMockResult,
   ISchemaChangelog,
+  ISchemaSnapshot, IValidationResult,
+  IMigrationPack,
 } from '~/shared/types/db';
 
 export interface IEvents {
@@ -319,5 +321,72 @@ export interface IEvents {
   [CHANNELS.MOCK_EXPORT]: {
     args: { mockResult: IMockResult; format: 'sql' | 'csv' | 'json' };
     response: { success: boolean; data: { content: string } };
+  };
+
+  // Schema Snapshot
+  [CHANNELS.SCHEMA_SNAPSHOT_LIST]: {
+    args: { connectionId: string };
+    response: { success: boolean; data: ISchemaSnapshot[] };
+  };
+  [CHANNELS.SCHEMA_SNAPSHOT_CREATE]: {
+    args: { connectionId: string; name?: string };
+    response: { success: boolean; data: ISchemaSnapshot };
+  };
+  [CHANNELS.SCHEMA_SNAPSHOT_GET]: {
+    args: { id: string };
+    response: { success: boolean; data: ISchemaSnapshot };
+  };
+  [CHANNELS.SCHEMA_SNAPSHOT_DELETE]: {
+    args: { id: string };
+    response: { success: boolean };
+  };
+  [CHANNELS.SCHEMA_SNAPSHOT_RENAME]: {
+    args: { id: string; name: string };
+    response: { success: boolean; data: ISchemaSnapshot };
+  };
+  [CHANNELS.SCHEMA_SNAPSHOT_VALIDATE]: {
+    args: { snapshotId: string };
+    response: { success: boolean; data: IValidationResult };
+  };
+
+  // Migration Pack
+  [CHANNELS.MIGRATION_PACK_LIST]: {
+    args: { diagramId: string };
+    response: { success: boolean; data: IMigrationPack[] };
+  };
+  [CHANNELS.MIGRATION_PACK_CREATE]: {
+    args: {
+      connectionId: string;
+      diagramId: string;
+      sourceVersionId: string | null;
+      targetVersionId: string;
+    };
+    response: { success: boolean; data: IMigrationPack };
+  };
+  [CHANNELS.MIGRATION_PACK_GET]: {
+    args: { id: string };
+    response: { success: boolean; data: IMigrationPack };
+  };
+  [CHANNELS.MIGRATION_PACK_UPDATE_DML]: {
+    args: { id: string; seedDml: string };
+    response: { success: boolean; data: IMigrationPack };
+  };
+  [CHANNELS.MIGRATION_PACK_EXECUTE]: {
+    args: { id: string };
+    response: { success: boolean; data: IMigrationPack };
+  };
+  [CHANNELS.MIGRATION_PACK_ROLLBACK]: {
+    args: { id: string };
+    response: { success: boolean; data: IMigrationPack };
+  };
+  [CHANNELS.MIGRATION_PACK_DELETE]: {
+    args: { id: string };
+    response: { success: boolean };
+  };
+
+  // Composite
+  [CHANNELS.SCHEMA_VALIDATE_AGAINST_VERSION]: {
+    args: { connectionId: string; versionId: string };
+    response: { success: boolean; data: IValidationResult };
   };
 }

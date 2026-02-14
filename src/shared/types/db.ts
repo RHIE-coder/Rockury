@@ -241,6 +241,8 @@ export interface IDiffResult {
   mode?: TDiffMode;
   sourceName?: string;
   targetName?: string;
+  sourceVersionId?: string;
+  targetVersionId?: string;
 }
 
 // ─── Schema Changelog ───
@@ -326,6 +328,72 @@ export interface IValidationReport {
   items: IValidationItem[];
   summary: { errors: number; warnings: number; infos: number };
   validatedAt: string;
+}
+
+// ─── Schema Snapshot ───
+export interface ISchemaSnapshot {
+  id: string;
+  connectionId: string;
+  name: string;
+  tables: ITable[];
+  metadata: {
+    dbType: TDbType;
+    serverVersion?: string;
+    tableCount: number;
+    database: string;
+  };
+  checksum: string;
+  validatedAt?: string;
+  isValid?: boolean;
+  createdAt: string;
+}
+
+export interface IValidationResult {
+  snapshotId: string;
+  connectionId: string;
+  isValid: boolean;
+  matchedTables: number;
+  totalTables: number;
+  diffs: ITableDiff[];
+  checkedAt: string;
+}
+
+// ─── Migration Pack ───
+export type TMigrationPackStatus =
+  | 'draft'
+  | 'reviewed'
+  | 'executing'
+  | 'applied'
+  | 'failed'
+  | 'rolled_back';
+
+export interface IMigrationPack {
+  id: string;
+  connectionId: string;
+  diagramId: string;
+  sourceVersionId: string | null;
+  targetVersionId: string;
+  preSnapshotId?: string;
+  diff: IDiffResult;
+  updateDdl: string;
+  seedDml: string;
+  rollbackDdl: string;
+  status: TMigrationPackStatus;
+  executionLog?: IMigrationLog[];
+  appliedAt?: string;
+  rolledBackAt?: string;
+  postSnapshotId?: string;
+  createdAt: string;
+}
+
+export interface IMigrationLog {
+  statementIndex: number;
+  sql: string;
+  phase: 'ddl' | 'dml' | 'rollback';
+  status: 'success' | 'failed' | 'skipped';
+  durationMs: number;
+  error?: string;
+  executedAt: string;
 }
 
 // ─── Mocking ───

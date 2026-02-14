@@ -8,3 +8,5 @@ export { migrationRepository } from './migrationRepository';
 export { documentRepository } from './documentRepository';
 export { viewSnapshotRepository } from './viewSnapshotRepository';
 export { changelogRepository } from './changelogRepository';
+export { schemaSnapshotRepository } from './schemaSnapshotRepository';
+export { migrationPackRepository } from './migrationPackRepository';
