@@ -13,6 +13,7 @@ interface MysqlColumnRow {
   COLUMN_TYPE: string;
   COLUMN_KEY: string;
   COLUMN_COMMENT: string;
+  EXTRA: string;
 }
 
 interface MysqlConstraintRow {
@@ -24,6 +25,8 @@ interface MysqlConstraintRow {
   REFERENCED_COLUMN_NAME: string | null;
   UPDATE_RULE: string | null;
   DELETE_RULE: string | null;
+  CONSTRAINT_ORDINAL: number;
+  REFERENCED_ORDINAL: number;
 }
 
 interface PgColumnRow {
@@ -34,6 +37,7 @@ interface PgColumnRow {
   is_nullable: string;
   data_type: string;
   udt_name: string;
+  is_identity: string;
 }
 
 interface PgConstraintRow {
@@ -88,7 +92,7 @@ async function fetchMysqlSchema(connectionId: string): Promise<ITable[]> {
     // Fetch columns
     const [columnRows] = await conn.query(
       `SELECT c.TABLE_NAME, c.COLUMN_NAME, c.ORDINAL_POSITION, c.COLUMN_DEFAULT,
-              c.IS_NULLABLE, c.DATA_TYPE, c.COLUMN_TYPE, c.COLUMN_KEY, c.COLUMN_COMMENT
+              c.IS_NULLABLE, c.DATA_TYPE, c.COLUMN_TYPE, c.COLUMN_KEY, c.COLUMN_COMMENT, c.EXTRA
        FROM information_schema.COLUMNS c
        WHERE c.TABLE_SCHEMA = ?
        ORDER BY c.TABLE_NAME, c.ORDINAL_POSITION`,
@@ -99,14 +103,16 @@ async function fetchMysqlSchema(connectionId: string): Promise<ITable[]> {
     const [constraintRows] = await conn.query(
       `SELECT tc.TABLE_NAME, tc.CONSTRAINT_NAME, tc.CONSTRAINT_TYPE,
               kcu.COLUMN_NAME, kcu.REFERENCED_TABLE_NAME, kcu.REFERENCED_COLUMN_NAME,
-              rc.UPDATE_RULE, rc.DELETE_RULE
+              rc.UPDATE_RULE, rc.DELETE_RULE,
+              kcu.ORDINAL_POSITION AS CONSTRAINT_ORDINAL,
+              COALESCE(kcu.POSITION_IN_UNIQUE_CONSTRAINT, kcu.ORDINAL_POSITION) AS REFERENCED_ORDINAL
        FROM information_schema.TABLE_CONSTRAINTS tc
        JOIN information_schema.KEY_COLUMN_USAGE kcu
          ON tc.CONSTRAINT_NAME = kcu.CONSTRAINT_NAME AND tc.TABLE_SCHEMA = kcu.TABLE_SCHEMA AND tc.TABLE_NAME = kcu.TABLE_NAME
        LEFT JOIN information_schema.REFERENTIAL_CONSTRAINTS rc
          ON tc.CONSTRAINT_NAME = rc.CONSTRAINT_NAME AND tc.TABLE_SCHEMA = rc.CONSTRAINT_SCHEMA
        WHERE tc.TABLE_SCHEMA = ?
-       ORDER BY tc.TABLE_NAME, tc.CONSTRAINT_NAME`,
+       ORDER BY tc.TABLE_NAME, tc.CONSTRAINT_NAME, CONSTRAINT_ORDINAL`,
       [config.database],
     );
 
@@ -153,7 +159,7 @@ function buildTablesFromMysql(
         if (!keyTypes.includes('FK')) keyTypes.push('FK');
         reference = {
           table: c.REFERENCED_TABLE_NAME!,
-          column: c.REFERENCED_COLUMN_NAME!,
+          column: c.REFERENCED_COLUMN_NAME ?? c.COLUMN_NAME,
           onDelete: resolveRefAction(c.DELETE_RULE),
           onUpdate: resolveRefAction(c.UPDATE_RULE),
         };
@@ -167,6 +173,7 @@ function buildTablesFromMysql(
       name: row.COLUMN_NAME,
       dataType: row.COLUMN_TYPE,
       keyTypes,
+      isAutoIncrement: row.EXTRA?.toLowerCase().includes('auto_increment'),
       defaultValue: row.COLUMN_DEFAULT,
       nullable: row.IS_NULLABLE === 'YES',
       comment: row.COLUMN_COMMENT ?? '',
@@ -192,17 +199,24 @@ function buildTablesFromMysql(
     if (!tableConstraints) continue;
 
     for (const [constraintName, rows] of tableConstraints) {
-      const first = rows[0];
+      const rowsByConstraintOrder = [...rows].sort(
+        (a, b) => (a.CONSTRAINT_ORDINAL ?? 0) - (b.CONSTRAINT_ORDINAL ?? 0),
+      );
+      const first = rowsByConstraintOrder[0];
       const constraint: IConstraint = {
         type: resolveKeyType(first.CONSTRAINT_TYPE) ?? 'IDX',
         name: constraintName,
-        columns: rows.map(r => r.COLUMN_NAME),
+        columns: rowsByConstraintOrder.map(r => r.COLUMN_NAME),
       };
 
       if (first.CONSTRAINT_TYPE === 'FOREIGN KEY' && first.REFERENCED_TABLE_NAME) {
         constraint.reference = {
           table: first.REFERENCED_TABLE_NAME,
-          column: first.REFERENCED_COLUMN_NAME!,
+          // Keep referenced column order aligned with source FK column order.
+          column: rowsByConstraintOrder
+            .map((r) => r.REFERENCED_COLUMN_NAME ?? r.COLUMN_NAME)
+            .filter((name): name is string => Boolean(name))
+            .join(', '),
           onDelete: resolveRefAction(first.DELETE_RULE),
           onUpdate: resolveRefAction(first.UPDATE_RULE),
         };
@@ -243,7 +257,7 @@ async function fetchPgSchema(connectionId: string): Promise<ITable[]> {
     // Fetch columns
     const columnResult = await client.query<PgColumnRow>(
       `SELECT c.table_name, c.column_name, c.ordinal_position, c.column_default,
-              c.is_nullable, c.data_type, c.udt_name
+              c.is_nullable, c.data_type, c.udt_name, c.is_identity
        FROM information_schema.columns c
        WHERE c.table_schema = 'public'
        ORDER BY c.table_name, c.ordinal_position`,
@@ -350,6 +364,7 @@ function buildTablesFromPg(
       name: row.column_name,
       dataType: row.udt_name,
       keyTypes,
+      isAutoIncrement: row.is_identity === 'YES' || /^nextval\(/i.test(row.column_default ?? ''),
       defaultValue: row.column_default,
       nullable: row.is_nullable === 'YES',
       comment,

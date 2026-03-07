@@ -147,6 +147,24 @@ export function registerSchemaHandlers() {
     }
   });
 
+  ipcMain.handle(CHANNELS.DIAGRAM_VERSION_MOVE, async (_event, args: { versionId: string; targetDiagramId: string }) => {
+    try {
+      const data = virtualDiagramService.moveVersionToDiagram(args.versionId, args.targetDiagramId);
+      return { success: true, data };
+    } catch (error) {
+      return { success: false, data: null, error: (error as Error).message };
+    }
+  });
+
+  ipcMain.handle(CHANNELS.DIAGRAM_VERSION_COPY, async (_event, args: { versionId: string; targetDiagramId: string }) => {
+    try {
+      const data = virtualDiagramService.copyVersionToDiagram(args.versionId, args.targetDiagramId);
+      return { success: true, data };
+    } catch (error) {
+      return { success: false, data: null, error: (error as Error).message };
+    }
+  });
+
   ipcMain.handle(CHANNELS.DIAGRAMS_REORDER, async (_event, args: { orderedDiagramIds: string[] }) => {
     try {
       diagramRepository.reorder(args.orderedDiagramIds);
