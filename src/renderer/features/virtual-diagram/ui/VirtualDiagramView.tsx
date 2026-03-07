@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { ITable, IDiagramLayout, IDiagramSnapshot, IDiagramVersion, ISearchResult, IViewSnapshot, TKeyType } from '~/shared/types/db';
-import { useDiagrams, useDiagram, useUpdateDiagram, useCreateDiagram, useDeleteDiagram, useCloneDiagram, useDiagramLayout, useSaveDiagramLayout, useCreateDiagramVersion, useUpdateDiagramVersion, useDeleteDiagramVersion, useDiagramVersions, useReorderVersions, useReorderDiagrams } from '../model/useDiagrams';
+import { useDiagrams, useDiagram, useUpdateDiagram, useCreateDiagram, useDeleteDiagram, useCloneDiagram, useDiagramLayout, useSaveDiagramLayout, useCreateDiagramVersion, useUpdateDiagramVersion, useDeleteDiagramVersion, useDiagramVersions, useReorderVersions, useReorderDiagrams, useMoveVersion, useCopyVersion } from '../model/useDiagrams';
 import { useDiagramStore } from '../model/diagramStore';
 import { schemaToNodes } from '../lib/schemaToNodes';
 import { compareVersionTables } from '../lib/compareVersions';
@@ -27,6 +27,7 @@ import { NodeContextMenu } from './NodeContextMenu';
 import { CascadeInfoPanel } from './CascadeInfoPanel';
 import { CompareInfoPanel } from './CompareInfoPanel';
 import { useNavigationGuard } from '../hooks/useNavigationGuard';
+import { toast, ToastContainer } from '@/shared/components/ui/toast';
 
 let _tableIdCounter = 0;
 function createEmptyTable(): ITable {
@@ -140,6 +141,15 @@ export function VirtualDiagramView() {
   // Context menu state
   const [contextMenu, setContextMenu] = useState<{ position: { x: number; y: number }; tableId: string; tableName: string } | null>(null);
 
+  // Move version confirmation modal state
+  const [pendingMove, setPendingMove] = useState<{
+    versionId: string;
+    versionName: string;
+    targetDiagramId: string;
+    targetDiagramName: string;
+    isLastVersion: boolean;
+  } | null>(null);
+
   const { data: diagram } = useDiagram(selectedDiagramId ?? '');
   const { data: diagramVersions } = useDiagramVersions(selectedDiagramId ?? '');
   // Removed: allDiagrams was used for diagram-based compare, now version-based
@@ -155,6 +165,8 @@ export function VirtualDiagramView() {
   const deleteVersion = useDeleteDiagramVersion();
   const reorderVersions = useReorderVersions();
   const reorderDiagrams = useReorderDiagrams();
+  const moveVersion = useMoveVersion();
+  const copyVersion = useCopyVersion();
 
   const activeVersion = diagramVersions?.find((v) => v.id === activeVersionId) ?? null;
   const selectedTable = localTables.find((t) => t.id === selectedTableId) ?? null;
@@ -567,7 +579,17 @@ export function VirtualDiagramView() {
   }
 
   function handleVersionFormSubmit(name: string) {
+    const existingNames = (diagramVersions ?? []).map((v) => v.name.toLowerCase());
+
     if (versionModalMode === 'create' && diagram) {
+      // Auto-suffix on create if duplicate
+      let finalName = name;
+      if (existingNames.includes(name.toLowerCase())) {
+        let i = 1;
+        while (existingNames.includes(`${name} (${i})`.toLowerCase())) i++;
+        finalName = `${name} (${i})`;
+      }
+
       const ddl = schemaToDdl(localTables);
       const currentLayout = layout;
       const snapshot = {
@@ -582,7 +604,7 @@ export function VirtualDiagramView() {
         } : undefined,
       };
       createVersion.mutate(
-        { diagramId: diagram.id, name, ddlContent: ddl, schemaSnapshot: snapshot },
+        { diagramId: diagram.id, name: finalName, ddlContent: ddl, schemaSnapshot: snapshot },
         {
           onSuccess: (result) => {
             if (result.success) {
@@ -593,6 +615,14 @@ export function VirtualDiagramView() {
         },
       );
     } else if (versionModalMode === 'edit' && editingVersionId && selectedDiagramId) {
+      // Reject rename if duplicate (excluding the version being edited)
+      const isDuplicate = (diagramVersions ?? []).some(
+        (v) => v.id !== editingVersionId && v.name.toLowerCase() === name.toLowerCase(),
+      );
+      if (isDuplicate) {
+        alert(`A version named "${name}" already exists in this diagram.`);
+        return;
+      }
       updateVersion.mutate({ id: editingVersionId, diagramId: selectedDiagramId, name });
     }
   }
@@ -615,6 +645,93 @@ export function VirtualDiagramView() {
               if (diagram) resetLocalTables(diagram.tables);
             }
           }
+        },
+      },
+    );
+  }
+
+  function handleMoveVersionRequest(versionId: string, targetDiagramId: string) {
+    const version = (diagramVersions ?? []).find((v) => v.id === versionId);
+    const targetDiagram = (diagrams ?? []).find((d) => d.id === targetDiagramId);
+    if (!version || !targetDiagram) return;
+
+    const isLastVersion = (diagramVersions ?? []).length === 1;
+    setPendingMove({
+      versionId,
+      versionName: version.name || `#${version.versionNumber}`,
+      targetDiagramId,
+      targetDiagramName: targetDiagram.name,
+      isLastVersion,
+    });
+  }
+
+  function handleConfirmMoveVersion() {
+    if (!pendingMove || !selectedDiagramId) return;
+    const { versionId, versionName, targetDiagramName, targetDiagramId } = pendingMove;
+    moveVersion.mutate(
+      { versionId, sourceDiagramId: selectedDiagramId, targetDiagramId },
+      {
+        onSuccess: (result) => {
+          if (!result.success) {
+            toast.error('Failed to move version');
+            setPendingMove(null);
+            return;
+          }
+          // If the moved version was active, switch to next available
+          if (activeVersionId === versionId) {
+            const remaining = (diagramVersions ?? []).filter((v) => v.id !== versionId);
+            const next = remaining[0] ?? null;
+            if (next) {
+              setActiveVersionId(next.id);
+              if (next.schemaSnapshot?.tables) resetLocalTables(next.schemaSnapshot.tables);
+            } else {
+              setActiveVersionId(null);
+            }
+          }
+          toast.success(`Moved "${versionName}" to "${targetDiagramName}"`);
+          setPendingMove(null);
+        },
+        onError: (err) => {
+          console.error('Move version error:', err);
+          toast.error('Failed to move version');
+          setPendingMove(null);
+        },
+      },
+    );
+  }
+
+  function handleCopyVersionToDiagram(versionId: string, targetDiagramId: string) {
+    const version = (diagramVersions ?? []).find((v) => v.id === versionId);
+    const targetDiagram = (diagrams ?? []).find((d) => d.id === targetDiagramId);
+    copyVersion.mutate(
+      { versionId, targetDiagramId },
+      {
+        onSuccess: () => {
+          const vName = version?.name || `#${version?.versionNumber ?? '?'}`;
+          const dName = targetDiagram?.name ?? '';
+          toast.success(`Copied "${vName}" to "${dName}"`);
+        },
+        onError: (err) => {
+          console.error('Copy version error:', err);
+          toast.error('Failed to copy version');
+        },
+      },
+    );
+  }
+
+  function handleDuplicateVersion(versionId: string) {
+    if (!selectedDiagramId) return;
+    const version = (diagramVersions ?? []).find((v) => v.id === versionId);
+    copyVersion.mutate(
+      { versionId, targetDiagramId: selectedDiagramId },
+      {
+        onSuccess: () => {
+          const vName = version?.name || `#${version?.versionNumber ?? '?'}`;
+          toast.success(`Duplicated "${vName}"`);
+        },
+        onError: (err) => {
+          console.error('Duplicate version error:', err);
+          toast.error('Failed to duplicate version');
         },
       },
     );
@@ -849,6 +966,9 @@ export function VirtualDiagramView() {
               onVersionSelect={handleVersionSelect}
               onReorderVersions={handleReorderVersions}
               lockedVersionIds={lockedVersionIds}
+              onMoveVersion={handleMoveVersionRequest}
+              onCopyVersion={handleCopyVersionToDiagram}
+              onDuplicateVersion={handleDuplicateVersion}
             />
           ) : diagram ? (
             <TableListPanel
@@ -867,7 +987,7 @@ export function VirtualDiagramView() {
         )}
 
         {/* Center: Canvas or DDL */}
-        <div className="relative flex-1">
+        <div className="relative w-0 min-w-0 flex-1">
           {/* Canvas Floating Toolbar */}
           {viewMode === 'canvas' && diagram && (
             <CanvasToolbar
@@ -1075,6 +1195,31 @@ export function VirtualDiagramView() {
         </DialogContent>
       </Dialog>
 
+      {/* Move Version Confirmation */}
+      <Dialog open={!!pendingMove} onOpenChange={(open) => { if (!open) setPendingMove(null); }}>
+        <DialogContent showCloseButton={false} className="sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Move Version</DialogTitle>
+            <DialogDescription>
+              Move &quot;{pendingMove?.versionName}&quot; to &quot;{pendingMove?.targetDiagramName}&quot;?
+              {pendingMove?.isLastVersion && (
+                <span className="mt-1 block text-amber-600">
+                  This is the last version. A blank v0.0.0 will be created in the source diagram.
+                </span>
+              )}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" size="sm" onClick={() => setPendingMove(null)}>
+              Cancel
+            </Button>
+            <Button size="sm" autoFocus onClick={handleConfirmMoveVersion}>
+              Move
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       {/* Node Context Menu */}
       {contextMenu && (
         <NodeContextMenu
@@ -1085,6 +1230,8 @@ export function VirtualDiagramView() {
           onClose={() => setContextMenu(null)}
         />
       )}
+
+      <ToastContainer />
     </div>
   );
 }

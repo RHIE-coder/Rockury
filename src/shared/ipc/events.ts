@@ -148,6 +148,14 @@ export interface IEvents {
     args: { diagramId: string; orderedVersionIds: string[] };
     response: { success: boolean };
   };
+  [CHANNELS.DIAGRAM_VERSION_MOVE]: {
+    args: { versionId: string; targetDiagramId: string };
+    response: { success: boolean; data: { moved: IDiagramVersion; wasLastVersion: boolean; newBlankVersion?: IDiagramVersion } };
+  };
+  [CHANNELS.DIAGRAM_VERSION_COPY]: {
+    args: { versionId: string; targetDiagramId: string };
+    response: { success: boolean; data: IDiagramVersion };
+  };
 
   [CHANNELS.DIAGRAMS_REORDER]: {
     args: { orderedDiagramIds: string[] };

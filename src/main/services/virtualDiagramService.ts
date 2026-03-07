@@ -97,6 +97,37 @@ export const virtualDiagramService = {
     return cloned;
   },
 
+  moveVersionToDiagram(versionId: string, targetDiagramId: string): { moved: IDiagramVersion; wasLastVersion: boolean; newBlankVersion?: IDiagramVersion } {
+    const version = diagramVersionRepository.getById(versionId);
+    if (!version) throw new Error(`Version not found: ${versionId}`);
+
+    const targetDiagram = diagramRepository.getById(targetDiagramId);
+    if (!targetDiagram) throw new Error(`Target diagram not found: ${targetDiagramId}`);
+
+    const sourceVersions = diagramVersionRepository.list(version.diagramId);
+    const wasLastVersion = sourceVersions.length === 1;
+
+    const moved = diagramVersionRepository.moveToDiagram(versionId, targetDiagramId);
+
+    let newBlankVersion: IDiagramVersion | undefined;
+    if (wasLastVersion) {
+      newBlankVersion = diagramVersionRepository.create({
+        diagramId: version.diagramId,
+        name: 'v0.0.0',
+        ddlContent: '',
+        schemaSnapshot: { tables: [] },
+      });
+    }
+
+    return { moved, wasLastVersion, newBlankVersion };
+  },
+
+  copyVersionToDiagram(versionId: string, targetDiagramId: string): IDiagramVersion {
+    const targetDiagram = diagramRepository.getById(targetDiagramId);
+    if (!targetDiagram) throw new Error(`Target diagram not found: ${targetDiagramId}`);
+    return diagramVersionRepository.copyToDiagram(versionId, targetDiagramId);
+  },
+
   restoreVersion(versionId: string): IDiagram {
     const version = diagramVersionRepository.getById(versionId);
     if (!version) throw new Error(`Diagram version not found: ${versionId}`);

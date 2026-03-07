@@ -190,6 +190,31 @@ export function useReorderDiagrams() {
   });
 }
 
+export function useMoveVersion() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (args: { versionId: string; sourceDiagramId: string; targetDiagramId: string }) =>
+      diagramApi.moveVersion(args.versionId, args.targetDiagramId),
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: diagramKeys.versions(variables.sourceDiagramId) });
+      queryClient.invalidateQueries({ queryKey: diagramKeys.versions(variables.targetDiagramId) });
+    },
+  });
+}
+
+export function useCopyVersion() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (args: { versionId: string; targetDiagramId: string }) =>
+      diagramApi.copyVersion(args.versionId, args.targetDiagramId),
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: diagramKeys.versions(variables.targetDiagramId) });
+    },
+  });
+}
+
 export function useRestoreDiagramVersion() {
   const queryClient = useQueryClient();
 

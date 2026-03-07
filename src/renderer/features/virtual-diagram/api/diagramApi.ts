@@ -30,4 +30,8 @@ export const diagramApi = {
     api.DIAGRAM_VERSIONS_REORDER({ diagramId, orderedVersionIds }),
   reorderDiagrams: (orderedDiagramIds: string[]) =>
     api.DIAGRAMS_REORDER({ orderedDiagramIds }),
+  moveVersion: (versionId: string, targetDiagramId: string) =>
+    api.DIAGRAM_VERSION_MOVE({ versionId, targetDiagramId }),
+  copyVersion: (versionId: string, targetDiagramId: string) =>
+    api.DIAGRAM_VERSION_COPY({ versionId, targetDiagramId }),
 };
