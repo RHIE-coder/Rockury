@@ -9,7 +9,8 @@ import { DbPackagePage } from '@/pages/db-package';
 import { DbConnectionPage } from '@/pages/db-connection';
 import { StudioDiagramPage, ConsoleDiagramPage } from '@/pages/db-diagram';
 import { StudioDdlPage } from '@/pages/db-ddl';
-import { DbQueryPage } from '@/pages/db-query';
+import { ExplorerPage } from '@/pages/db-explorer';
+import { QueryCollectionPage } from '@/pages/db-query-collection';
 import { DbDocumentingPage } from '@/pages/db-documenting';
 import { DbValidationPage } from '@/pages/db-validation';
 import { DbMockingPage } from '@/pages/db-mocking';
@@ -46,10 +47,10 @@ export function AppRouter() {
             <Route path="connection" element={<DbConnectionPage />} />
             <Route path="diagram" element={<ConsoleDiagramPage />} />
             <Route path="data" element={<PlaceholderPage service="Data Browser" />} />
-            <Route path="sql" element={<DbQueryPage />} />
-            <Route path="explorer" element={<PlaceholderPage service="Explorer" />} />
-            <Route path="query-collection" element={<PlaceholderPage service="Query Collection" />} />
-            <Route path="seed" element={<PlaceholderPage service="Seed Runner" />} />
+            <Route path="sql" element={<PlaceholderPage service="SQL Definition Viewer" />} />
+            <Route path="explorer" element={<ExplorerPage />} />
+            <Route path="query-collection" element={<QueryCollectionPage />} />
+            <Route path="seed" element={<PlaceholderPage service="Seed Capture" />} />
             <Route path="validation-run" element={<PlaceholderPage service="Validation Run" />} />
           </Route>
         </Route>
