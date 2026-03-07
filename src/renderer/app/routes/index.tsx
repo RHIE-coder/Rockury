@@ -2,6 +2,9 @@ import { Routes, Route, Navigate } from 'react-router';
 import { ROUTES } from '@/shared/config/constants';
 import { AppLayout } from '../layouts/AppLayout';
 import { DbLayout } from '../layouts/DbLayout';
+import { SchemaStudioLayout } from '../layouts/SchemaStudioLayout';
+import { LiveConsoleLayout } from '../layouts/LiveConsoleLayout';
+import { DbOverviewPage } from '@/pages/db-overview';
 import { DbPackagePage } from '@/pages/db-package';
 import { DbConnectionPage } from '@/pages/db-connection';
 import { DbDiagramPage } from '@/pages/db-diagram';
@@ -16,19 +19,38 @@ export function AppRouter() {
   return (
     <Routes>
       <Route element={<AppLayout />}>
-        {/* Root redirect to DB Package */}
-        <Route index element={<Navigate to={ROUTES.DB.PACKAGE} replace />} />
+        {/* Root redirect to DB Overview */}
+        <Route index element={<Navigate to={ROUTES.DB.OVERVIEW} replace />} />
 
         {/* DB Service */}
         <Route path="db" element={<DbLayout />}>
-          <Route index element={<Navigate to={ROUTES.DB.PACKAGE} replace />} />
+          <Route index element={<Navigate to={ROUTES.DB.OVERVIEW} replace />} />
+          <Route path="overview" element={<DbOverviewPage />} />
           <Route path="package" element={<DbPackagePage />} />
-          <Route path="connection" element={<DbConnectionPage />} />
-          <Route path="diagram" element={<DbDiagramPage />} />
-          <Route path="query" element={<DbQueryPage />} />
-          <Route path="documenting" element={<DbDocumentingPage />} />
-          <Route path="validation" element={<DbValidationPage />} />
-          <Route path="mocking" element={<DbMockingPage />} />
+
+          {/* Schema Studio */}
+          <Route path="studio" element={<SchemaStudioLayout />}>
+            <Route index element={<Navigate to={ROUTES.DB.SCHEMA_STUDIO.DIAGRAM} replace />} />
+            <Route path="diagram" element={<DbDiagramPage />} />
+            <Route path="ddl" element={<PlaceholderPage service="DDL Editor" />} />
+            <Route path="seed" element={<PlaceholderPage service="Seed" />} />
+            <Route path="mocking" element={<DbMockingPage />} />
+            <Route path="documenting" element={<DbDocumentingPage />} />
+            <Route path="validation" element={<DbValidationPage />} />
+          </Route>
+
+          {/* Live Console */}
+          <Route path="console" element={<LiveConsoleLayout />}>
+            <Route index element={<Navigate to={ROUTES.DB.LIVE_CONSOLE.CONNECTION} replace />} />
+            <Route path="connection" element={<DbConnectionPage />} />
+            <Route path="diagram" element={<PlaceholderPage service="Live Diagram" />} />
+            <Route path="data" element={<PlaceholderPage service="Data Browser" />} />
+            <Route path="sql" element={<DbQueryPage />} />
+            <Route path="explorer" element={<PlaceholderPage service="Explorer" />} />
+            <Route path="query-collection" element={<PlaceholderPage service="Query Collection" />} />
+            <Route path="seed" element={<PlaceholderPage service="Seed Runner" />} />
+            <Route path="validation-run" element={<PlaceholderPage service="Validation Run" />} />
+          </Route>
         </Route>
 
         {/* Placeholder Services */}

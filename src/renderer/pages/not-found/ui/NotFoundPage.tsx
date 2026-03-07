@@ -10,7 +10,7 @@ export function NotFoundPage() {
       <h1 className="text-xl font-semibold">Page Not Found</h1>
       <p className="text-sm text-muted-foreground">요청하신 페이지를 찾을 수 없습니다.</p>
       <Button asChild variant="outline">
-        <Link to={ROUTES.DB.PACKAGE}>홈으로 이동</Link>
+        <Link to={ROUTES.DB.OVERVIEW}>홈으로 이동</Link>
       </Button>
     </div>
   );
