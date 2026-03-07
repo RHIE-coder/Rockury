@@ -1,7 +1,11 @@
 import { Plug } from 'lucide-react';
 import { ConnectionList } from '@/features/db-connection';
+import { useConnectionStore } from '@/features/db-connection/model/connectionStore';
+import { DriftStatusPanel } from '@/features/drift-detection';
 
 export function DbConnectionPage() {
+  const { selectedConnectionId } = useConnectionStore();
+
   return (
     <div className="space-y-4">
       <div className="flex items-center gap-2">
@@ -12,6 +16,10 @@ export function DbConnectionPage() {
         MySQL, MariaDB, PostgreSQL 연결을 관리합니다.
       </p>
       <ConnectionList />
+
+      {selectedConnectionId && (
+        <DriftStatusPanel connectionId={selectedConnectionId} />
+      )}
     </div>
   );
 }
