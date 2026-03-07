@@ -10,7 +10,7 @@ export function PackageList() {
   const createPackage = useCreatePackage();
   const updatePackage = useUpdatePackage();
   const deletePackage = useDeletePackage();
-  const { isFormOpen, editingPackageId, openForm, closeForm } = usePackageStore();
+  const { activePackageId, setActivePackageId, isFormOpen, editingPackageId, openForm, closeForm } = usePackageStore();
 
   const editingPackage = editingPackageId
     ? packages?.find((p) => p.id === editingPackageId) ?? null
@@ -27,50 +27,51 @@ export function PackageList() {
   function handleDelete(id: string) {
     if (window.confirm('Are you sure you want to delete this package?')) {
       deletePackage.mutate(id);
+      if (activePackageId === id) setActivePackageId(null);
     }
   }
 
-  if (isLoading) {
-    return <p className="text-sm text-muted-foreground">Loading packages...</p>;
-  }
-
-  if (error) {
-    return <p className="text-sm text-destructive">Failed to load packages.</p>;
-  }
-
   return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <h2 className="text-lg font-semibold">Packages</h2>
-        <Button size="sm" onClick={() => openForm()}>
-          <Plus className="size-4" />
-          New Package
+    <div className="flex h-full flex-col">
+      <div className="flex items-center justify-between border-b border-border px-3 py-2">
+        <span className="text-xs font-semibold">Packages</span>
+        <Button variant="ghost" size="icon" className="size-6" onClick={() => openForm()}>
+          <Plus className="size-3.5" />
         </Button>
       </div>
 
       {isFormOpen && (
-        <PackageForm
-          initialData={editingPackage}
-          onSave={handleSave}
-          onCancel={closeForm}
-          isLoading={createPackage.isPending || updatePackage.isPending}
-        />
+        <div className="border-b border-border p-3">
+          <PackageForm
+            initialData={editingPackage}
+            onSave={handleSave}
+            onCancel={closeForm}
+            isLoading={createPackage.isPending || updatePackage.isPending}
+          />
+        </div>
       )}
 
-      {packages && packages.length > 0 ? (
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          {packages.map((pkg) => (
-            <PackageCard
-              key={pkg.id}
-              pkg={pkg}
-              onEdit={(id) => openForm(id)}
-              onDelete={handleDelete}
-            />
-          ))}
-        </div>
-      ) : (
-        <p className="text-sm text-muted-foreground">No packages yet. Create one to get started.</p>
-      )}
+      <div className="flex-1 overflow-y-auto">
+        {isLoading && (
+          <p className="p-3 text-xs text-muted-foreground">Loading...</p>
+        )}
+        {error && (
+          <p className="p-3 text-xs text-destructive">Failed to load packages.</p>
+        )}
+        {packages && packages.length === 0 && (
+          <p className="p-3 text-xs text-muted-foreground">No packages yet.</p>
+        )}
+        {packages?.map((pkg) => (
+          <PackageCard
+            key={pkg.id}
+            pkg={pkg}
+            isActive={pkg.id === activePackageId}
+            onSelect={() => setActivePackageId(pkg.id)}
+            onEdit={(id) => openForm(id)}
+            onDelete={handleDelete}
+          />
+        ))}
+      </div>
     </div>
   );
 }

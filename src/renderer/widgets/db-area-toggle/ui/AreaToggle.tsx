@@ -12,7 +12,7 @@ const areas: IDbAreaItem[] = [
 
 export function AreaToggle() {
   return (
-    <nav className="flex items-center gap-1 border-b px-3 py-1.5">
+    <nav className="flex items-center gap-1 border-b border-border px-4 py-1.5">
       {areas.map((area) => (
         <AreaToggleButton key={area.id} item={area} />
       ))}

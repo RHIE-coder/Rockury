@@ -86,7 +86,7 @@ export function DdlEditorView({
   const extensions = useMemo(() => [sql(), search()], []);
 
   return (
-    <div className="flex h-full w-full min-w-0 flex-col overflow-hidden border-l border-border bg-background ddl-editor-shell">
+    <div className="flex h-full w-full min-w-0 flex-col overflow-hidden bg-background ddl-editor-shell">
       {/* Toolbar - shrink-0 prevents flex compression on scroll */}
       <div className="flex min-w-0 shrink-0 items-center gap-2 border-b border-border p-2">
         <h3 className="shrink-0 text-sm font-semibold">{readOnly ? 'DDL View' : 'DDL Editor'}</h3>

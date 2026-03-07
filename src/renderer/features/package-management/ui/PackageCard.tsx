@@ -1,32 +1,48 @@
-import { Pencil, Trash2 } from 'lucide-react';
-import { Card, CardHeader, CardTitle, CardDescription, CardFooter } from '@/shared/components/ui/card';
+import { Pencil, Trash2, Package } from 'lucide-react';
 import { Button } from '@/shared/components/ui/button';
 import type { IPackage } from '@/entities/package';
 
 interface PackageCardProps {
   pkg: IPackage;
+  isActive: boolean;
+  onSelect: () => void;
   onEdit: (id: string) => void;
   onDelete: (id: string) => void;
 }
 
-export function PackageCard({ pkg, onEdit, onDelete }: PackageCardProps) {
+export function PackageCard({ pkg, isActive, onSelect, onEdit, onDelete }: PackageCardProps) {
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="text-base">{pkg.name}</CardTitle>
-        <CardDescription>{pkg.description || 'No description'}</CardDescription>
-      </CardHeader>
-      <CardFooter className="gap-2">
-        <Button variant="ghost" size="icon-xs" onClick={() => onEdit(pkg.id)}>
-          <Pencil className="size-3.5" />
+    <div
+      className={`group flex cursor-pointer items-center gap-3 border-b border-border/50 px-3 py-2.5 transition-colors hover:bg-accent ${
+        isActive ? 'bg-accent' : ''
+      }`}
+      onClick={onSelect}
+    >
+      <Package className="size-4 shrink-0 text-muted-foreground" />
+      <div className="min-w-0 flex-1">
+        <div className="truncate text-xs font-medium">{pkg.name}</div>
+        <div className="truncate text-[10px] text-muted-foreground">
+          {pkg.description || 'No description'}
+        </div>
+      </div>
+      <div className="flex shrink-0 gap-0.5 opacity-0 group-hover:opacity-100">
+        <Button
+          variant="ghost"
+          size="icon"
+          className="size-5"
+          onClick={(e) => { e.stopPropagation(); onEdit(pkg.id); }}
+        >
+          <Pencil className="size-3" />
         </Button>
-        <Button variant="ghost" size="icon-xs" onClick={() => onDelete(pkg.id)}>
-          <Trash2 className="size-3.5 text-destructive" />
+        <Button
+          variant="ghost"
+          size="icon"
+          className="size-5"
+          onClick={(e) => { e.stopPropagation(); onDelete(pkg.id); }}
+        >
+          <Trash2 className="size-3 text-destructive" />
         </Button>
-        <span className="ml-auto text-xs text-muted-foreground">
-          {new Date(pkg.updatedAt).toLocaleDateString()}
-        </span>
-      </CardFooter>
-    </Card>
+      </div>
+    </div>
   );
 }
