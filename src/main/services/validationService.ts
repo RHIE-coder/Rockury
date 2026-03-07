@@ -184,13 +184,16 @@ export const validationService = {
     // FK integrity checks within virtual diagram
     validateForeignKeyIntegrity(diagram.tables, items);
 
-    const errors = items.filter(i => i.severity === 'error').length;
-    const warnings = items.filter(i => i.severity === 'warning').length;
+    const errorItems = items.filter(i => i.severity === 'error');
+    const warningItems = items.filter(i => i.severity === 'warning');
     const infos = items.filter(i => i.severity === 'info').length;
 
     return {
       items,
-      summary: { errors, warnings, infos },
+      errors: errorItems,
+      warnings: warningItems,
+      isValid: errorItems.length === 0,
+      summary: { errors: errorItems.length, warnings: warningItems.length, infos },
       validatedAt: new Date().toISOString(),
     };
   },

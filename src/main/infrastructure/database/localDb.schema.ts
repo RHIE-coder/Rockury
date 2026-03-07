@@ -288,6 +288,17 @@ CREATE TABLE IF NOT EXISTS seeds (
 );
 `;
 
+export const SQL_CREATE_VALIDATION_SUITES = `
+CREATE TABLE IF NOT EXISTS validation_suites (
+  id TEXT PRIMARY KEY,
+  name TEXT NOT NULL,
+  description TEXT NOT NULL DEFAULT '',
+  rules TEXT NOT NULL DEFAULT '[]',
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+`;
+
 const ALL_MIGRATIONS = [
   SQL_CREATE_PACKAGES,
   SQL_CREATE_PACKAGE_RESOURCES,
@@ -308,6 +319,7 @@ const ALL_MIGRATIONS = [
   SQL_CREATE_MIGRATION_PACKS,
   SQL_CREATE_MIGRATION_PACKS_INDEXES,
   SQL_CREATE_SEEDS,
+  SQL_CREATE_VALIDATION_SUITES,
 ];
 
 export function runMigrations(db: Database.Database): void {

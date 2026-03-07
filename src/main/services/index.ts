@@ -14,3 +14,7 @@ export { schemaSnapshotService } from './schemaSnapshotService';
 export { migrationPackService } from './migrationPackService';
 export { driftDetectionService } from './driftDetectionService';
 export { seedService } from './seedService';
+export { schemaObjectsService } from './schemaObjectsService';
+export { querySafetyService } from './querySafetyService';
+export { validationSuiteService } from './validationSuiteService';
+export { forwardService } from './forwardService';

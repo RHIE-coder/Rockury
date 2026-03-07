@@ -48,4 +48,38 @@ export function registerSeedHandlers() {
       return { success: false, data: null, error: (error as Error).message };
     }
   });
+
+  ipcMain.handle(CHANNELS.SEED_CAPTURE_WITH_FK, async (_event, args: {
+    connectionId: string;
+    tableName: string;
+    whereClause?: string;
+    limit?: number;
+    saveMode?: 'append' | 'overwrite' | 'new';
+    targetSeedId?: string;
+    newSeedName?: string;
+  }) => {
+    try {
+      const data = await seedService.captureWithFkOrdering(
+        args.connectionId,
+        args.tableName,
+        args.whereClause,
+        args.limit,
+        args.saveMode,
+        args.targetSeedId,
+        args.newSeedName,
+      );
+      return { success: true, data };
+    } catch (error) {
+      return { success: false, data: null, error: (error as Error).message };
+    }
+  });
+
+  ipcMain.handle(CHANNELS.SEED_APPLY, async (_event, args: { seedId: string; connectionId: string }) => {
+    try {
+      const data = await seedService.applyToConnection(args.seedId, args.connectionId);
+      return { success: true, data };
+    } catch (error) {
+      return { success: false, data: null, error: (error as Error).message };
+    }
+  });
 }

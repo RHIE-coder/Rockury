@@ -4,16 +4,18 @@ import type {
   IPackage, IPackageResource, TResourceType,
   IConnection, IConnectionFormData, IConnectionTestResult,
   IDiagram, IDiagramLayout, IDiagramVersion, IDiagramFilter, TDiagramType,
-  ITable, TDbType, IDiffResult, IMigration, TMigrationDirection, IViewSnapshot,
+  ITable, TDbType, TSchemaObjectType, IDiffResult, IMigration, TMigrationDirection, IViewSnapshot,
   IQuery, IQueryResult, IQueryHistory,
   IDocument, TExportFormat,
   IValidationReport,
+  IValidationSuite, IValidationRunResult,
   IMockResult,
   ISchemaChangelog,
-  ISchemaSnapshot, IValidationResult,
-  IMigrationPack,
+  ISchemaSnapshot, ISchemaObjects, IValidationResult,
+  IMigrationPack, IMigrationLog,
   ISeedFile,
   IDriftCheckResult,
+  TQuerySafetyLevel,
 } from '~/shared/types/db';
 
 export interface IEvents {
@@ -227,6 +229,22 @@ export interface IEvents {
     response: { success: boolean; data: { diagram: IDiagram; changelog?: ISchemaChangelog } };
   };
 
+  // Schema Objects Introspection
+  [CHANNELS.SCHEMA_OBJECTS_FETCH]: {
+    args: { connectionId: string; objectTypes?: TSchemaObjectType[] };
+    response: { success: boolean; data: Partial<ISchemaObjects> };
+  };
+  [CHANNELS.SCHEMA_OBJECT_DDL]: {
+    args: { connectionId: string; objectType: TSchemaObjectType; objectName: string };
+    response: { success: boolean; data: { ddl: string } };
+  };
+
+  // Query Safety
+  [CHANNELS.QUERY_CLASSIFY_SAFETY]: {
+    args: { sql: string };
+    response: { success: boolean; data: { level: TQuerySafetyLevel; reason: string } };
+  };
+
   // Changelog
   [CHANNELS.CHANGELOG_LIST]: {
     args: { connectionId: string };
@@ -321,6 +339,32 @@ export interface IEvents {
   [CHANNELS.VALIDATION_RUN]: {
     args: { virtualDiagramId: string; connectionId: string };
     response: { success: boolean; data: IValidationReport };
+  };
+
+  // Validation Suite
+  [CHANNELS.VALIDATION_SUITE_LIST]: {
+    args: void;
+    response: { success: boolean; data: IValidationSuite[] };
+  };
+  [CHANNELS.VALIDATION_SUITE_GET]: {
+    args: { id: string };
+    response: { success: boolean; data: IValidationSuite };
+  };
+  [CHANNELS.VALIDATION_SUITE_CREATE]: {
+    args: { name: string; description: string };
+    response: { success: boolean; data: IValidationSuite };
+  };
+  [CHANNELS.VALIDATION_SUITE_UPDATE]: {
+    args: { id: string; name?: string; description?: string; rules?: IValidationSuite['rules'] };
+    response: { success: boolean; data: IValidationSuite };
+  };
+  [CHANNELS.VALIDATION_SUITE_DELETE]: {
+    args: { id: string };
+    response: { success: boolean };
+  };
+  [CHANNELS.VALIDATION_SUITE_RUN]: {
+    args: { suiteId: string; connectionId: string };
+    response: { success: boolean; data: IValidationRunResult };
   };
 
   // Mocking
@@ -424,6 +468,62 @@ export interface IEvents {
   [CHANNELS.SEED_CAPTURE]: {
     args: { connectionId: string; tableName: string; whereClause?: string; limit?: number };
     response: { success: boolean; data: { dml: string; rowCount: number } };
+  };
+  [CHANNELS.SEED_CAPTURE_WITH_FK]: {
+    args: {
+      connectionId: string;
+      tableName: string;
+      whereClause?: string;
+      limit?: number;
+      saveMode: 'append' | 'overwrite' | 'new';
+      targetSeedId?: string;
+      newSeedName?: string;
+    };
+    response: { success: boolean; data: { dml: string; rowCount: number; fkOrderedTables: string[]; seedId: string } };
+  };
+  [CHANNELS.SEED_APPLY]: {
+    args: { seedId: string; connectionId: string };
+    response: { success: boolean; data: { appliedRows: number } };
+  };
+
+  // Forward (Concurrent Control)
+  [CHANNELS.FORWARD_PRE_CHECK]: {
+    args: { connectionId: string; diagramId: string; targetVersionId: string };
+    response: {
+      success: boolean;
+      data: {
+        preSnapshotId: string;
+        checksum: string;
+        diff: IDiffResult;
+        migrationStatements: string[];
+      };
+    };
+  };
+  [CHANNELS.FORWARD_EXECUTE_STEP]: {
+    args: {
+      connectionId: string;
+      migrationPackId: string;
+      statementIndex: number;
+      expectedChecksum: string;
+    };
+    response: {
+      success: boolean;
+      data: {
+        log: IMigrationLog;
+        currentChecksum: string;
+        checksumMatch: boolean;
+      };
+    };
+  };
+  [CHANNELS.FORWARD_ROLLBACK]: {
+    args: { migrationPackId: string };
+    response: { success: boolean; data: IMigrationPack };
+  };
+
+  // Mocking Apply
+  [CHANNELS.MOCK_APPLY]: {
+    args: { connectionId: string; mockResult: IMockResult };
+    response: { success: boolean; data: { appliedRows: number } };
   };
 
   // Composite

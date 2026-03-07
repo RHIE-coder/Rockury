@@ -11,6 +11,9 @@ import { registerViewSnapshotHandlers } from './viewSnapshotHandlers';
 import { registerMigrationPackHandlers } from './migrationPackHandlers';
 import { registerDriftDetectionHandlers } from './driftDetectionHandlers';
 import { registerSeedHandlers } from './seedHandlers';
+import { registerSchemaObjectsHandlers } from './schemaObjectsHandlers';
+import { registerValidationSuiteHandlers } from './validationSuiteHandlers';
+import { registerForwardHandlers } from './forwardHandlers';
 
 export function registerAllHandlers() {
   registerSystemInfoHandlers();
@@ -26,4 +29,7 @@ export function registerAllHandlers() {
   registerMigrationPackHandlers();
   registerDriftDetectionHandlers();
   registerSeedHandlers();
+  registerSchemaObjectsHandlers();
+  registerValidationSuiteHandlers();
+  registerForwardHandlers();
 }

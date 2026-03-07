@@ -1,8 +1,23 @@
-import { useMemo } from 'react';
-import { LayoutDashboard, Database, GitBranch, FileCode, Sprout, ShieldCheck, FileText, Package } from 'lucide-react';
+import { useState, useMemo } from 'react';
+import {
+  LayoutDashboard,
+  Database,
+  GitBranch,
+  FileCode,
+  Sprout,
+  ShieldCheck,
+  Package,
+  Network,
+  List,
+} from 'lucide-react';
+import { ReactFlowProvider } from '@xyflow/react';
 import { useConnections } from '@/features/db-connection';
 import { useDiagrams } from '@/features/virtual-diagram';
 import { useSeeds } from '@/features/seed';
+import { OverviewGraph } from './OverviewGraph';
+import { OverviewList } from './OverviewList';
+
+type ViewMode = 'graph' | 'list';
 
 interface StatCardProps {
   icon: React.ReactNode;
@@ -27,6 +42,8 @@ function StatCard({ icon, label, count, description }: StatCardProps) {
 }
 
 export function DbOverviewPage() {
+  const [viewMode, setViewMode] = useState<ViewMode>('graph');
+
   const { data: connections } = useConnections();
   const { data: diagrams } = useDiagrams();
   const { data: seeds } = useSeeds();
@@ -43,8 +60,13 @@ export function DbOverviewPage() {
     };
   }, [connections, diagrams, seeds]);
 
+  const safeConnections = connections ?? [];
+  const safeDiagrams = diagrams ?? [];
+  const safeSeeds = seeds ?? [];
+
   return (
     <div className="flex h-full flex-col overflow-auto">
+      {/* Header */}
       <div className="flex items-center gap-2 border-b border-border px-6 py-4">
         <LayoutDashboard className="size-5" />
         <h1 className="text-xl font-semibold">Overview</h1>
@@ -79,34 +101,50 @@ export function DbOverviewPage() {
           />
         </div>
 
-        {/* Resource Map */}
-        <div className="rounded-lg border border-border">
-          <div className="border-b border-border px-4 py-3">
-            <h2 className="text-sm font-semibold">Resource Map</h2>
-            <p className="text-xs text-muted-foreground">Diagrams and their table counts</p>
+        {/* View Toggle + Resource View */}
+        <div>
+          <div className="mb-3 flex items-center gap-1">
+            <button
+              type="button"
+              onClick={() => setViewMode('graph')}
+              className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
+                viewMode === 'graph'
+                  ? 'bg-accent text-foreground'
+                  : 'text-muted-foreground hover:bg-accent/50 hover:text-foreground'
+              }`}
+            >
+              <Network className="size-3.5" />
+              Graph
+            </button>
+            <button
+              type="button"
+              onClick={() => setViewMode('list')}
+              className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
+                viewMode === 'list'
+                  ? 'bg-accent text-foreground'
+                  : 'text-muted-foreground hover:bg-accent/50 hover:text-foreground'
+              }`}
+            >
+              <List className="size-3.5" />
+              List
+            </button>
           </div>
-          <div className="p-4">
-            {diagrams?.filter((d) => d.type === 'virtual').length === 0 ? (
-              <p className="text-xs text-muted-foreground">No diagrams yet. Create one in Schema Studio.</p>
-            ) : (
-              <div className="grid grid-cols-2 gap-3 lg:grid-cols-3">
-                {diagrams
-                  ?.filter((d) => d.type === 'virtual')
-                  .map((d) => (
-                    <div key={d.id} className="flex items-center gap-3 rounded border border-border/50 p-3">
-                      <GitBranch className="size-4 text-muted-foreground" />
-                      <div className="min-w-0 flex-1">
-                        <div className="truncate text-xs font-medium">{d.name}</div>
-                        <div className="text-[10px] text-muted-foreground">
-                          {d.tables?.length ?? 0} tables
-                          {d.version && ` · v${d.version}`}
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-              </div>
-            )}
-          </div>
+
+          {viewMode === 'graph' ? (
+            <ReactFlowProvider>
+              <OverviewGraph
+                connections={safeConnections}
+                diagrams={safeDiagrams}
+                seeds={safeSeeds}
+              />
+            </ReactFlowProvider>
+          ) : (
+            <OverviewList
+              connections={safeConnections}
+              diagrams={safeDiagrams}
+              seeds={safeSeeds}
+            />
+          )}
         </div>
 
         {/* Quick Actions */}

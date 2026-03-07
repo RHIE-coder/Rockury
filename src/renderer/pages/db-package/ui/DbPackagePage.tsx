@@ -1,7 +1,11 @@
-import { Package, ArrowRight, ArrowLeft, ShieldCheck, Sprout, Shuffle } from 'lucide-react';
+import { useState, useMemo } from 'react';
+import { Package, ChevronDown } from 'lucide-react';
 import { PackageList } from '@/features/package-management';
 import { usePackageStore } from '@/features/package-management';
-import { Button } from '@/shared/components/ui/button';
+import { useConnections } from '@/features/db-connection';
+import { useDiagrams, useDiagramVersions } from '@/features/virtual-diagram';
+import { useSeeds } from '@/features/seed';
+import { PackageActions } from './PackageActions';
 
 export function DbPackagePage() {
   const { activePackageId } = usePackageStore();
@@ -29,58 +33,128 @@ export function DbPackagePage() {
 }
 
 function PackageDashboard() {
+  const [connectionId, setConnectionId] = useState('');
+  const [diagramId, setDiagramId] = useState('');
+  const [versionId, setVersionId] = useState('');
+  const [seedId, setSeedId] = useState('');
+
+  const { data: connections } = useConnections();
+  const { data: diagrams } = useDiagrams();
+  const { data: versions } = useDiagramVersions(diagramId);
+  const { data: seeds } = useSeeds();
+
+  const virtualDiagrams = useMemo(
+    () => (diagrams ?? []).filter((d) => d.type === 'virtual'),
+    [diagrams],
+  );
+
   return (
     <div className="space-y-6">
       <div>
-        <h2 className="text-lg font-semibold">Orchestrator Actions</h2>
+        <h2 className="text-lg font-semibold text-foreground">Orchestrator Actions</h2>
         <p className="text-sm text-muted-foreground">
           Cross-domain actions connecting Schema Studio and Live Console
         </p>
       </div>
 
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-3">
-        <ActionCard
-          icon={<ArrowRight className="size-4" />}
-          label="Forward"
-          description="Apply design to Real DB"
+      {/* Selectors */}
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+        <Selector
+          label="Connection"
+          value={connectionId}
+          onChange={setConnectionId}
+          options={(connections ?? []).map((c) => ({ value: c.id, label: c.name }))}
+          placeholder="Select connection"
         />
-        <ActionCard
-          icon={<ArrowLeft className="size-4" />}
-          label="Reverse"
-          description="Import Real DB to design"
+        <Selector
+          label="Diagram"
+          value={diagramId}
+          onChange={(v) => {
+            setDiagramId(v);
+            setVersionId('');
+          }}
+          options={virtualDiagrams.map((d) => ({ value: d.id, label: d.name }))}
+          placeholder="Select diagram"
         />
-        <ActionCard
-          icon={<ShieldCheck className="size-4" />}
-          label="Validation Run"
-          description="Execute validation suite"
+        <Selector
+          label="Version"
+          value={versionId}
+          onChange={setVersionId}
+          options={(versions ?? []).map((v) => ({ value: v.id, label: v.name }))}
+          placeholder="Select version"
+          disabled={!diagramId}
         />
-        <ActionCard
-          icon={<Sprout className="size-4" />}
-          label="Seed Apply"
-          description="Apply seed data to DB"
-        />
-        <ActionCard
-          icon={<Shuffle className="size-4" />}
-          label="Mocking Run"
-          description="Generate mock data"
+        <Selector
+          label="Seed"
+          value={seedId}
+          onChange={setSeedId}
+          options={(seeds ?? []).map((s) => ({ value: s.id, label: s.name }))}
+          placeholder="Select seed (optional)"
         />
       </div>
+
+      {/* Status Bar */}
+      {connectionId && diagramId && (
+        <div className="flex items-center gap-2 rounded-lg bg-muted/30 px-4 py-2">
+          <div className="size-2 rounded-full bg-green-500" />
+          <span className="text-xs text-muted-foreground">
+            Ready to run actions
+          </span>
+          {!versionId && (
+            <span className="text-xs text-amber-500">
+              (Select a version for Forward action)
+            </span>
+          )}
+        </div>
+      )}
+
+      {/* Actions */}
+      <PackageActions
+        connectionId={connectionId}
+        diagramId={diagramId}
+        versionId={versionId}
+        seedId={seedId}
+      />
     </div>
   );
 }
 
-function ActionCard({ icon, label, description }: { icon: React.ReactNode; label: string; description: string }) {
+function Selector({
+  label,
+  value,
+  onChange,
+  options,
+  placeholder,
+  disabled,
+}: {
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+  options: { value: string; label: string }[];
+  placeholder: string;
+  disabled?: boolean;
+}) {
   return (
-    <Button
-      variant="outline"
-      className="flex h-auto flex-col items-start gap-1 p-4"
-      disabled
-    >
-      <div className="flex items-center gap-2">
-        {icon}
-        <span className="font-medium">{label}</span>
+    <div className="space-y-1">
+      <label className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+        {label}
+      </label>
+      <div className="relative">
+        <select
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          disabled={disabled}
+          className="w-full appearance-none rounded-md border border-border bg-background px-3 py-2 pr-8 text-sm text-foreground outline-none transition-colors hover:border-ring focus:border-ring focus:ring-1 focus:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          <option value="">{placeholder}</option>
+          {options.map((opt) => (
+            <option key={opt.value} value={opt.value}>
+              {opt.label}
+            </option>
+          ))}
+        </select>
+        <ChevronDown className="pointer-events-none absolute right-2 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
       </div>
-      <span className="text-xs text-muted-foreground">{description}</span>
-    </Button>
+    </div>
   );
 }

@@ -5,6 +5,128 @@ export type TDbType = 'mysql' | 'mariadb' | 'postgresql';
 export type TKeyType = 'PK' | 'FK' | 'UK' | 'IDX';
 export type TConstraintType = 'PK' | 'FK' | 'UK' | 'IDX' | 'CHECK' | 'NOT_NULL';
 
+// ─── Schema Object Types ───
+export type TSchemaObjectType =
+  | 'table' | 'view' | 'materialized_view'
+  | 'function' | 'procedure' | 'trigger' | 'event'
+  | 'type' | 'sequence' | 'index';
+
+export interface ISchemaObjectCategory {
+  id: string;
+  label: string;
+  types: TSchemaObjectType[];
+}
+
+export const SCHEMA_OBJECT_CATEGORIES: ISchemaObjectCategory[] = [
+  { id: 'core', label: 'Core', types: ['table', 'view', 'materialized_view', 'index'] },
+  { id: 'routines', label: 'Routines', types: ['procedure', 'function', 'trigger', 'event'] },
+  { id: 'definitions', label: 'Definitions', types: ['type', 'sequence'] },
+];
+
+export interface ISchemaView {
+  name: string;
+  definition: string;
+  isMaterialized: boolean;
+  columns: IColumn[];
+  comment?: string;
+}
+
+export interface IRoutine {
+  name: string;
+  type: 'function' | 'procedure';
+  definition: string;
+  language?: string;
+  returnType?: string;
+  parameters: { name: string; dataType: string; mode: 'IN' | 'OUT' | 'INOUT' }[];
+  comment?: string;
+}
+
+export interface ITrigger {
+  name: string;
+  tableName: string;
+  timing: 'BEFORE' | 'AFTER' | 'INSTEAD OF';
+  event: 'INSERT' | 'UPDATE' | 'DELETE';
+  definition: string;
+  comment?: string;
+}
+
+export interface IDbEvent {
+  name: string;
+  schedule: string;
+  definition: string;
+  status: 'ENABLED' | 'DISABLED';
+  comment?: string;
+}
+
+export interface ICustomType {
+  name: string;
+  type: 'enum' | 'composite' | 'domain';
+  values?: string[];
+  attributes?: { name: string; dataType: string }[];
+  definition: string;
+}
+
+export interface ISequence {
+  name: string;
+  dataType: string;
+  startValue: number;
+  increment: number;
+  minValue?: number;
+  maxValue?: number;
+  currentValue?: number;
+  isCyclic: boolean;
+}
+
+export interface ISchemaIndex {
+  name: string;
+  tableName: string;
+  columns: string[];
+  isUnique: boolean;
+  type?: string;
+  definition: string;
+}
+
+export interface ISchemaObjects {
+  tables: ITable[];
+  views: ISchemaView[];
+  functions: IRoutine[];
+  procedures: IRoutine[];
+  triggers: ITrigger[];
+  events: IDbEvent[];
+  types: ICustomType[];
+  sequences: ISequence[];
+  indexes: ISchemaIndex[];
+}
+
+// ─── Dialect ───
+export interface IDialectInfo {
+  dbType: TDbType;
+  supportedObjects: TSchemaObjectType[];
+  name: string;
+}
+
+export const DIALECT_INFO: Record<TDbType, IDialectInfo> = {
+  mysql: {
+    dbType: 'mysql',
+    name: 'MySQL',
+    supportedObjects: ['table', 'view', 'index', 'function', 'procedure', 'trigger', 'event'],
+  },
+  mariadb: {
+    dbType: 'mariadb',
+    name: 'MariaDB',
+    supportedObjects: ['table', 'view', 'index', 'function', 'procedure', 'trigger', 'event'],
+  },
+  postgresql: {
+    dbType: 'postgresql',
+    name: 'PostgreSQL',
+    supportedObjects: ['table', 'view', 'materialized_view', 'index', 'function', 'procedure', 'trigger', 'type', 'sequence'],
+  },
+};
+
+// ─── Query Safety ───
+export type TQuerySafetyLevel = 'safe' | 'caution' | 'destructive';
+export type TConnectionPermissionMode = 'read_only' | 'cautious' | 'full_access';
+
 // ─── Package ───
 export interface IPackage {
   id: string;
@@ -35,6 +157,8 @@ export interface IConnection {
   username: string;
   sslEnabled: boolean;
   sslConfig?: Record<string, unknown>;
+  ignorePatterns: string[];
+  permissionMode: TConnectionPermissionMode;
   createdAt: string;
   updatedAt: string;
 }
@@ -49,6 +173,8 @@ export interface IConnectionFormData {
   password: string;
   sslEnabled: boolean;
   sslConfig?: Record<string, unknown>;
+  ignorePatterns?: string[];
+  permissionMode?: TConnectionPermissionMode;
 }
 
 export type TConnectionStatus = 'connected' | 'disconnected' | 'error' | 'testing';
@@ -326,6 +452,9 @@ export interface IValidationItem {
 
 export interface IValidationReport {
   items: IValidationItem[];
+  errors: IValidationItem[];
+  warnings: IValidationItem[];
+  isValid: boolean;
   summary: { errors: number; warnings: number; infos: number };
   validatedAt: string;
 }
@@ -336,6 +465,7 @@ export interface ISchemaSnapshot {
   connectionId: string;
   name: string;
   tables: ITable[];
+  schemaObjects?: Partial<ISchemaObjects>;
   metadata: {
     dbType: TDbType;
     serverVersion?: string;
@@ -343,6 +473,7 @@ export interface ISchemaSnapshot {
     database: string;
   };
   checksum: string;
+  status: TSnapshotStatus;
   validatedAt?: string;
   isValid?: boolean;
   createdAt: string;
