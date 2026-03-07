@@ -8,6 +8,7 @@ import { DbOverviewPage } from '@/pages/db-overview';
 import { DbPackagePage } from '@/pages/db-package';
 import { DbConnectionPage } from '@/pages/db-connection';
 import { StudioDiagramPage, ConsoleDiagramPage } from '@/pages/db-diagram';
+import { StudioDdlPage } from '@/pages/db-ddl';
 import { DbQueryPage } from '@/pages/db-query';
 import { DbDocumentingPage } from '@/pages/db-documenting';
 import { DbValidationPage } from '@/pages/db-validation';
@@ -32,7 +33,7 @@ export function AppRouter() {
           <Route path="studio" element={<SchemaStudioLayout />}>
             <Route index element={<Navigate to={ROUTES.DB.SCHEMA_STUDIO.DIAGRAM} replace />} />
             <Route path="diagram" element={<StudioDiagramPage />} />
-            <Route path="ddl" element={<PlaceholderPage service="DDL Editor" />} />
+            <Route path="ddl" element={<StudioDdlPage />} />
             <Route path="seed" element={<PlaceholderPage service="Seed" />} />
             <Route path="mocking" element={<DbMockingPage />} />
             <Route path="documenting" element={<DbDocumentingPage />} />
