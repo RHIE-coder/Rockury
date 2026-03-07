@@ -1,11 +1,11 @@
 import { Outlet } from 'react-router';
-import { DbTopNav } from '@/widgets/db-top-nav';
+import { AreaToggle } from '@/widgets/db-area-toggle';
 
 export function DbLayout() {
   return (
     <div className="flex flex-col h-full">
-      <DbTopNav />
-      <div className="flex-1 overflow-auto p-6">
+      <AreaToggle />
+      <div className="flex-1 overflow-hidden">
         <Outlet />
       </div>
     </div>
