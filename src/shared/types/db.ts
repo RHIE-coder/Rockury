@@ -396,7 +396,29 @@ export interface IMigrationLog {
   executedAt: string;
 }
 
+// ─── Seed ───
+export interface ISeedFile {
+  id: string;
+  name: string;
+  description: string;
+  dmlContent: string;
+  targetTables: string[];
+  createdAt: string;
+  updatedAt: string;
+}
+
 // ─── Mocking ───
+export type TMockingEnvironment = 'local' | 'dev' | 'qa' | 'production';
+
+export interface IMockingProfile {
+  id: string;
+  name: string;
+  environment: TMockingEnvironment;
+  strategy: Record<string, { rowCount: number; generatorType: string }>;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface IMockTableData {
   tableName: string;
   columns: string[];
@@ -406,4 +428,79 @@ export interface IMockTableData {
 export interface IMockResult {
   tables: IMockTableData[];
   generatedAt: string;
+}
+
+// ─── Validation Suite ───
+export type TValidationCheckType = 'schema' | 'data' | 'query' | 'fk';
+
+export interface IValidationCheck {
+  id: string;
+  ruleId: string;
+  type: TValidationCheckType;
+  expression: string;
+  expectedResult?: string;
+}
+
+export interface IValidationRule {
+  id: string;
+  suiteId: string;
+  name: string;
+  description: string;
+  checks: IValidationCheck[];
+}
+
+export interface IValidationSuite {
+  id: string;
+  name: string;
+  description: string;
+  rules: IValidationRule[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+export type TValidationRunStatus = 'running' | 'passed' | 'failed' | 'error';
+
+export interface IValidationRunResult {
+  id: string;
+  suiteId: string;
+  connectionId: string;
+  status: TValidationRunStatus;
+  results: { ruleId: string; checkId: string; passed: boolean; actual?: string; error?: string }[];
+  startedAt: string;
+  completedAt?: string;
+}
+
+// ─── Drift Detection ───
+export type TDriftStatus = 'fresh' | 'stale' | 'drifted' | 'archived';
+
+export interface IDriftEvent {
+  id: string;
+  connectionId: string;
+  status: TDriftStatus;
+  changes: ISchemaChange[];
+  correspondingDdl: string;
+  previousSnapshotId?: string;
+  newSnapshotId?: string;
+  detectedAt: string;
+}
+
+// ─── Snapshot (extended) ───
+export type TSnapshotStatus = 'fresh' | 'stale' | 'drifted' | 'archived';
+
+export interface ISnapshot {
+  id: string;
+  connectionId: string;
+  name: string;
+  tables: ITable[];
+  seedData?: ISeedFile[];
+  ignoredPatterns: string[];
+  status: TSnapshotStatus;
+  checksum: string;
+  metadata: {
+    dbType: TDbType;
+    serverVersion?: string;
+    tableCount: number;
+    database: string;
+  };
+  createdAt: string;
 }

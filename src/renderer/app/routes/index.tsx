@@ -9,11 +9,16 @@ import { DbPackagePage } from '@/pages/db-package';
 import { DbConnectionPage } from '@/pages/db-connection';
 import { StudioDiagramPage, ConsoleDiagramPage } from '@/pages/db-diagram';
 import { StudioDdlPage } from '@/pages/db-ddl';
-import { ExplorerPage } from '@/pages/db-explorer';
-import { QueryCollectionPage } from '@/pages/db-query-collection';
+import { StudioSeedPage } from '@/pages/db-seed';
+import { DbMockingPage } from '@/pages/db-mocking';
 import { DbDocumentingPage } from '@/pages/db-documenting';
 import { DbValidationPage } from '@/pages/db-validation';
-import { DbMockingPage } from '@/pages/db-mocking';
+import { DataBrowserPage } from '@/pages/db-data';
+import { SqlViewerPage } from '@/pages/db-sql-viewer';
+import { ExplorerPage } from '@/pages/db-explorer';
+import { QueryCollectionPage } from '@/pages/db-query-collection';
+import { SeedCapturePage } from '@/pages/db-seed-capture';
+import { ValidationRunPage } from '@/pages/db-validation-run';
 import { PlaceholderPage } from '@/pages/placeholder';
 import { NotFoundPage } from '@/pages/not-found';
 
@@ -35,7 +40,7 @@ export function AppRouter() {
             <Route index element={<Navigate to={ROUTES.DB.SCHEMA_STUDIO.DIAGRAM} replace />} />
             <Route path="diagram" element={<StudioDiagramPage />} />
             <Route path="ddl" element={<StudioDdlPage />} />
-            <Route path="seed" element={<PlaceholderPage service="Seed" />} />
+            <Route path="seed" element={<StudioSeedPage />} />
             <Route path="mocking" element={<DbMockingPage />} />
             <Route path="documenting" element={<DbDocumentingPage />} />
             <Route path="validation" element={<DbValidationPage />} />
@@ -46,12 +51,12 @@ export function AppRouter() {
             <Route index element={<Navigate to={ROUTES.DB.LIVE_CONSOLE.CONNECTION} replace />} />
             <Route path="connection" element={<DbConnectionPage />} />
             <Route path="diagram" element={<ConsoleDiagramPage />} />
-            <Route path="data" element={<PlaceholderPage service="Data Browser" />} />
-            <Route path="sql" element={<PlaceholderPage service="SQL Definition Viewer" />} />
+            <Route path="data" element={<DataBrowserPage />} />
+            <Route path="sql" element={<SqlViewerPage />} />
             <Route path="explorer" element={<ExplorerPage />} />
             <Route path="query-collection" element={<QueryCollectionPage />} />
-            <Route path="seed" element={<PlaceholderPage service="Seed Capture" />} />
-            <Route path="validation-run" element={<PlaceholderPage service="Validation Run" />} />
+            <Route path="seed" element={<SeedCapturePage />} />
+            <Route path="validation-run" element={<ValidationRunPage />} />
           </Route>
         </Route>
 
