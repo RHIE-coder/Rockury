@@ -15,6 +15,7 @@ import { DdlEditorView } from '@/features/ddl-editor';
 import { realDiagramApi } from '../api/realDiagramApi';
 import { ChangelogPanel } from './ChangelogPanel';
 import { SnapshotListPanel } from '@/features/schema-snapshot';
+import { sanitizeImportedTables } from '../lib/sanitizeImportedTables';
 
 export function RealDiagramView() {
   const { data: connections } = useConnections();
@@ -44,6 +45,7 @@ export function RealDiagramView() {
   } = useDiagramStore();
 
   const selectedConnectionId = storeConnectionId ?? '';
+  const selectedConnection = connections?.find((c) => c.id === selectedConnectionId);
   function setSelectedConnectionId(id: string) {
     setStoreConnectionId(id || null);
   }
@@ -66,7 +68,7 @@ export function RealDiagramView() {
     mutationFn: (connectionId: string) => realDiagramApi.syncReal(connectionId),
     onSuccess: (result) => {
       if (result.success) {
-        const newTables = result.data.diagram.tables;
+        const newTables = sanitizeImportedTables(result.data.diagram.tables);
         const newDiagramId = result.data.diagram.id;
 
         // Remap saved positions from old table IDs to new table IDs by table name
@@ -118,7 +120,7 @@ export function RealDiagramView() {
 
     realDiagramApi.fetchReal(selectedConnectionId).then((result) => {
       if (result.success && result.data && result.data.tables?.length > 0) {
-        setTables(result.data.tables);
+        setTables(sanitizeImportedTables(result.data.tables));
         setRealDiagramId(result.data.id);
       } else {
         setTables([]);
@@ -159,9 +161,11 @@ export function RealDiagramView() {
 
   function handleImportAsVirtual() {
     if (tables.length === 0) return;
+    const importTables = sanitizeImportedTables(tables);
+    if (importTables.length === 0) return;
     const connName = connections?.find((c) => c.id === selectedConnectionId)?.name ?? 'Imported';
     createDiagram.mutate(
-      { name: `${connName} (imported)`, type: 'virtual', version: '0.0.0', tables },
+      { name: `${connName} (imported)`, type: 'virtual', version: '0.0.0', tables: importTables },
       {
         onSuccess: (result) => {
           if (result.success) {
@@ -171,7 +175,7 @@ export function RealDiagramView() {
               diagramId: newDiagram.id,
               name: 'v0.0.0',
               ddlContent: '',
-              schemaSnapshot: { ...newDiagram, tables },
+              schemaSnapshot: { ...newDiagram, tables: importTables },
             });
             // Switch to virtual tab
             useDiagramStore.getState().setActiveTab('virtual');
@@ -342,7 +346,7 @@ export function RealDiagramView() {
         )}
 
         {/* Center: Canvas */}
-        <div className="relative flex-1">
+        <div className="relative w-0 min-w-0 flex-1">
           {/* Filter Panel (floating) */}
           {isFilterPanelOpen && (
             <div className="absolute right-2 top-2 z-50">
@@ -372,6 +376,7 @@ export function RealDiagramView() {
             <DdlEditorView
               tables={tables}
               readOnly
+              initialDbType={selectedConnection?.dbType ?? 'mysql'}
               focusTableName={selectedTableId ? tables.find((t) => t.id === selectedTableId)?.name ?? null : null}
             />
           ) : realDiagram ? (

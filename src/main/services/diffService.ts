@@ -53,12 +53,6 @@ function compareColumns(
     if ((vCol.defaultValue ?? '') !== (rCol.defaultValue ?? '')) {
       changes.push(`defaultValue: ${rCol.defaultValue ?? 'NULL'} -> ${vCol.defaultValue ?? 'NULL'}`);
     }
-    const vKeys = (vCol.keyTypes ?? []).join(',') || 'none';
-    const rKeys = (rCol.keyTypes ?? []).join(',') || 'none';
-    if (vKeys !== rKeys) {
-      changes.push(`keyTypes: ${rKeys} -> ${vKeys}`);
-    }
-
     if (changes.length > 0) {
       diffs.push({
         columnName: vCol.name,
@@ -96,28 +90,87 @@ function compareConstraints(
   return diffs;
 }
 
+function q(name: string): string {
+  return `\`${name}\``;
+}
+
+function colDef(col: Partial<IColumn> & { name: string }): string {
+  const parts: string[] = [q(col.name), col.dataType ?? 'VARCHAR(255)'];
+  if (!col.nullable) parts.push('NOT NULL');
+  if (col.isAutoIncrement) parts.push('AUTO_INCREMENT');
+  if (col.defaultValue !== null && col.defaultValue !== undefined) parts.push(`DEFAULT ${col.defaultValue}`);
+  if (col.comment) parts.push(`COMMENT '${col.comment.replace(/'/g, "''")}'`);
+  return parts.join(' ');
+}
+
+function generateCreateTableDdl(td: ITableDiff, source: 'virtualValue' | 'realValue'): string {
+  const cols = td.columnDiffs
+    .filter((cd) => cd[source])
+    .map((cd) => `  ${colDef({ name: cd.columnName, ...cd[source] })}`);
+
+  // PK
+  const pkCols = td.columnDiffs
+    .filter((cd) => cd[source]?.keyTypes?.includes('PK'))
+    .map((cd) => q(cd.columnName));
+  if (pkCols.length > 0) cols.push(`  PRIMARY KEY (${pkCols.join(', ')})`);
+
+  // Constraints from diffs
+  const constraints = td.constraintDiffs
+    .filter((cd) => cd[source])
+    .map((cd) => cd[source]!);
+
+  for (const c of constraints) {
+    if (c.type === 'UK') {
+      cols.push(`  CONSTRAINT ${q(c.name)} UNIQUE (${c.columns.map(q).join(', ')})`);
+    } else if (c.type === 'FK' && c.reference) {
+      const refCols = c.reference.column.split(',').map((s) => q(s.trim()));
+      let fk = `  CONSTRAINT ${q(c.name)} FOREIGN KEY (${c.columns.map(q).join(', ')}) REFERENCES ${q(c.reference.table)} (${refCols.join(', ')})`;
+      if (c.reference.onDelete) fk += ` ON DELETE ${c.reference.onDelete}`;
+      if (c.reference.onUpdate) fk += ` ON UPDATE ${c.reference.onUpdate}`;
+      cols.push(fk);
+    }
+  }
+
+  // FK from column-level references (fallback for constraints not in constraintDiffs)
+  const coveredFkCols = new Set(
+    constraints.filter((c) => c.type === 'FK').flatMap((c) => c.columns.map((n) => n.toLowerCase())),
+  );
+  for (const cd of td.columnDiffs) {
+    const col = cd[source];
+    if (!col?.keyTypes?.includes('FK') || !col.reference) continue;
+    if (coveredFkCols.has(cd.columnName.toLowerCase())) continue;
+    const fkName = `fk_${td.tableName}_${cd.columnName}`;
+    let fk = `  CONSTRAINT ${q(fkName)} FOREIGN KEY (${q(cd.columnName)}) REFERENCES ${q(col.reference.table)} (${q(col.reference.column)})`;
+    if (col.reference.onDelete) fk += ` ON DELETE ${col.reference.onDelete}`;
+    if (col.reference.onUpdate) fk += ` ON UPDATE ${col.reference.onUpdate}`;
+    cols.push(fk);
+  }
+
+  return `CREATE TABLE ${q(td.tableName)} (\n${cols.join(',\n')}\n);`;
+}
+
 function generateMigrationDdl(tableDiffs: ITableDiff[]): string {
   const lines: string[] = [];
 
   for (const td of tableDiffs) {
     if (td.action === 'added') {
-      lines.push(`-- TODO: CREATE TABLE ${td.tableName}`);
+      lines.push(generateCreateTableDdl(td, 'virtualValue'));
     } else if (td.action === 'removed') {
-      lines.push(`DROP TABLE IF EXISTS ${td.tableName};`);
+      lines.push(`DROP TABLE IF EXISTS ${q(td.tableName)};`);
     } else if (td.action === 'modified') {
       for (const cd of td.columnDiffs) {
         if (cd.action === 'added' && cd.virtualValue) {
-          lines.push(`ALTER TABLE ${td.tableName} ADD COLUMN ${cd.columnName} ${cd.virtualValue.dataType}${cd.virtualValue.nullable ? '' : ' NOT NULL'}${cd.virtualValue.defaultValue ? ` DEFAULT ${cd.virtualValue.defaultValue}` : ''};`);
+          lines.push(`ALTER TABLE ${q(td.tableName)} ADD COLUMN ${colDef({ name: cd.columnName, ...cd.virtualValue })};`);
         } else if (cd.action === 'removed') {
-          lines.push(`ALTER TABLE ${td.tableName} DROP COLUMN ${cd.columnName};`);
+          lines.push(`ALTER TABLE ${q(td.tableName)} DROP COLUMN ${q(cd.columnName)};`);
         } else if (cd.action === 'modified' && cd.virtualValue) {
-          lines.push(`ALTER TABLE ${td.tableName} MODIFY COLUMN ${cd.columnName} ${cd.virtualValue.dataType}${cd.virtualValue.nullable ? '' : ' NOT NULL'}${cd.virtualValue.defaultValue ? ` DEFAULT ${cd.virtualValue.defaultValue}` : ''};`);
+          lines.push(`ALTER TABLE ${q(td.tableName)} MODIFY COLUMN ${colDef({ name: cd.columnName, ...cd.virtualValue })};`);
         }
       }
     }
   }
 
-  return lines.join('\n');
+  return lines.join('\n\n');
 }
 
 function generateRollbackDdl(tableDiffs: ITableDiff[]): string {
@@ -126,27 +179,27 @@ function generateRollbackDdl(tableDiffs: ITableDiff[]): string {
   for (const td of tableDiffs) {
     if (td.action === 'added') {
       // Forward added a table → rollback drops it
-      lines.push(`DROP TABLE IF EXISTS ${td.tableName};`);
+      lines.push(`DROP TABLE IF EXISTS ${q(td.tableName)};`);
     } else if (td.action === 'removed') {
-      // Forward dropped a table → rollback recreates it (placeholder)
-      lines.push(`-- TODO: CREATE TABLE ${td.tableName}`);
+      // Forward dropped a table → rollback recreates it
+      lines.push(generateCreateTableDdl(td, 'realValue'));
     } else if (td.action === 'modified') {
       for (const cd of td.columnDiffs) {
         if (cd.action === 'added') {
           // Forward added a column → rollback drops it
-          lines.push(`ALTER TABLE ${td.tableName} DROP COLUMN ${cd.columnName};`);
+          lines.push(`ALTER TABLE ${q(td.tableName)} DROP COLUMN ${q(cd.columnName)};`);
         } else if (cd.action === 'removed' && cd.realValue) {
           // Forward dropped a column → rollback re-adds it
-          lines.push(`ALTER TABLE ${td.tableName} ADD COLUMN ${cd.columnName} ${cd.realValue.dataType}${cd.realValue.nullable ? '' : ' NOT NULL'}${cd.realValue.defaultValue ? ` DEFAULT ${cd.realValue.defaultValue}` : ''};`);
+          lines.push(`ALTER TABLE ${q(td.tableName)} ADD COLUMN ${colDef({ name: cd.columnName, ...cd.realValue })};`);
         } else if (cd.action === 'modified' && cd.realValue) {
           // Forward modified a column → rollback reverts to real value
-          lines.push(`ALTER TABLE ${td.tableName} MODIFY COLUMN ${cd.columnName} ${cd.realValue.dataType}${cd.realValue.nullable ? '' : ' NOT NULL'}${cd.realValue.defaultValue ? ` DEFAULT ${cd.realValue.defaultValue}` : ''};`);
+          lines.push(`ALTER TABLE ${q(td.tableName)} MODIFY COLUMN ${colDef({ name: cd.columnName, ...cd.realValue })};`);
         }
       }
     }
   }
 
-  return lines.join('\n');
+  return lines.join('\n\n');
 }
 
 function compareTables(
