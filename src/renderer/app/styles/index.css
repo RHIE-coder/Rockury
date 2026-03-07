@@ -106,3 +106,18 @@ body {
     rgba(220, 38, 38, 0.08) 8px
   );
 }
+
+/* Toast slide-up animation */
+@keyframes toast-in {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.animate-toast-in {
+  animation: toast-in 0.2s ease-out;
+}
+
+/* Prevent CodeMirror long lines from expanding parent flex width in DDL mode */
+.ddl-editor-shell .cm-editor,
+.ddl-editor-shell .cm-scroller {
+  max-width: 100%;
+}

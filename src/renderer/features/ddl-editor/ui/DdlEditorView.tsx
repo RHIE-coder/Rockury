@@ -16,6 +16,7 @@ interface DdlEditorViewProps {
   onParsed?: (tables: ITable[]) => void;
   onClose?: () => void;
   readOnly?: boolean;
+  initialDbType?: TDbType;
   /** Table name to scroll to in the DDL editor */
   focusTableName?: string | null;
 }
@@ -25,11 +26,16 @@ export function DdlEditorView({
   onParsed,
   onClose,
   readOnly = false,
+  initialDbType = 'mysql',
   focusTableName = null,
 }: DdlEditorViewProps) {
   const [ddlContent, setDdlContent] = useState('');
-  const [dbType, setDbType] = useState<TDbType>('mysql');
+  const [dbType, setDbType] = useState<TDbType>(initialDbType);
   const editorRef = useRef<ReactCodeMirrorRef>(null);
+
+  useEffect(() => {
+    setDbType(initialDbType);
+  }, [initialDbType]);
 
   // Auto-generate DDL in readOnly mode when tables change
   useEffect(() => {
@@ -80,12 +86,12 @@ export function DdlEditorView({
   const extensions = useMemo(() => [sql(), search()], []);
 
   return (
-    <div className="flex h-full flex-col border-l border-border bg-background">
+    <div className="flex h-full w-full min-w-0 flex-col overflow-hidden border-l border-border bg-background ddl-editor-shell">
       {/* Toolbar - shrink-0 prevents flex compression on scroll */}
-      <div className="flex shrink-0 items-center gap-2 border-b border-border p-2">
-        <h3 className="text-sm font-semibold">{readOnly ? 'DDL View' : 'DDL Editor'}</h3>
+      <div className="flex min-w-0 shrink-0 items-center gap-2 border-b border-border p-2">
+        <h3 className="shrink-0 text-sm font-semibold">{readOnly ? 'DDL View' : 'DDL Editor'}</h3>
         <Select
-          className="h-7 w-32 text-xs"
+          className="h-7 w-32 shrink-0 text-xs"
           value={dbType}
           onChange={(e) => setDbType(e.target.value as TDbType)}
         >
@@ -93,7 +99,7 @@ export function DdlEditorView({
           <option value="mariadb">MariaDB</option>
           <option value="postgresql">PostgreSQL</option>
         </Select>
-        <div className="ml-auto flex gap-1">
+        <div className="ml-auto flex shrink-0 gap-1">
           <Button
             variant="ghost"
             size="xs"
@@ -132,7 +138,7 @@ export function DdlEditorView({
         </div>
       </div>
 
-      <div className="min-h-0 flex-1">
+      <div className="min-h-0 min-w-0 w-full flex-1 overflow-hidden">
         <CodeMirror
           ref={editorRef}
           value={ddlContent}
@@ -141,7 +147,8 @@ export function DdlEditorView({
           onChange={readOnly ? undefined : (value) => setDdlContent(value)}
           readOnly={readOnly}
           editable={!readOnly}
-          className="h-full"
+          className="h-full w-full"
+          style={{ width: '100%' }}
           theme="dark"
         />
       </div>
