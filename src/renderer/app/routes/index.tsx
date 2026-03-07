@@ -7,7 +7,7 @@ import { LiveConsoleLayout } from '../layouts/LiveConsoleLayout';
 import { DbOverviewPage } from '@/pages/db-overview';
 import { DbPackagePage } from '@/pages/db-package';
 import { DbConnectionPage } from '@/pages/db-connection';
-import { DbDiagramPage } from '@/pages/db-diagram';
+import { StudioDiagramPage, ConsoleDiagramPage } from '@/pages/db-diagram';
 import { DbQueryPage } from '@/pages/db-query';
 import { DbDocumentingPage } from '@/pages/db-documenting';
 import { DbValidationPage } from '@/pages/db-validation';
@@ -31,7 +31,7 @@ export function AppRouter() {
           {/* Schema Studio */}
           <Route path="studio" element={<SchemaStudioLayout />}>
             <Route index element={<Navigate to={ROUTES.DB.SCHEMA_STUDIO.DIAGRAM} replace />} />
-            <Route path="diagram" element={<DbDiagramPage />} />
+            <Route path="diagram" element={<StudioDiagramPage />} />
             <Route path="ddl" element={<PlaceholderPage service="DDL Editor" />} />
             <Route path="seed" element={<PlaceholderPage service="Seed" />} />
             <Route path="mocking" element={<DbMockingPage />} />
@@ -43,7 +43,7 @@ export function AppRouter() {
           <Route path="console" element={<LiveConsoleLayout />}>
             <Route index element={<Navigate to={ROUTES.DB.LIVE_CONSOLE.CONNECTION} replace />} />
             <Route path="connection" element={<DbConnectionPage />} />
-            <Route path="diagram" element={<PlaceholderPage service="Live Diagram" />} />
+            <Route path="diagram" element={<ConsoleDiagramPage />} />
             <Route path="data" element={<PlaceholderPage service="Data Browser" />} />
             <Route path="sql" element={<DbQueryPage />} />
             <Route path="explorer" element={<PlaceholderPage service="Explorer" />} />

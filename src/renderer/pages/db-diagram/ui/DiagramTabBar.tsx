@@ -2,8 +2,7 @@ import { useDiagramStore } from '@/features/virtual-diagram';
 import type { TDiagramTab } from '@/features/virtual-diagram';
 
 const TABS: { key: TDiagramTab; label: string }[] = [
-  { key: 'virtual', label: 'Virtual' },
-  { key: 'real', label: 'Real' },
+  { key: 'virtual', label: 'Design' },
   { key: 'diff', label: 'Diff' },
 ];
 
