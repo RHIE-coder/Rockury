@@ -12,6 +12,8 @@ import type {
   ISchemaChangelog,
   ISchemaSnapshot, IValidationResult,
   IMigrationPack,
+  ISeedFile,
+  IDriftCheckResult,
 } from '~/shared/types/db';
 
 export interface IEvents {
@@ -390,6 +392,38 @@ export interface IEvents {
   [CHANNELS.MIGRATION_PACK_DELETE]: {
     args: { id: string };
     response: { success: boolean };
+  };
+
+  // Drift Detection
+  [CHANNELS.DRIFT_LIGHTWEIGHT_CHECK]: {
+    args: { connectionId: string };
+    response: { success: boolean; data: IDriftCheckResult };
+  };
+  [CHANNELS.DRIFT_FULL_CHECK]: {
+    args: { connectionId: string };
+    response: { success: boolean; data: IDriftCheckResult };
+  };
+
+  // Seed
+  [CHANNELS.SEED_LIST]: {
+    args: void;
+    response: { success: boolean; data: ISeedFile[] };
+  };
+  [CHANNELS.SEED_CREATE]: {
+    args: { name: string; description: string; dmlContent: string; targetTables: string[] };
+    response: { success: boolean; data: ISeedFile };
+  };
+  [CHANNELS.SEED_UPDATE]: {
+    args: { id: string; name?: string; description?: string; dmlContent?: string; targetTables?: string[] };
+    response: { success: boolean; data: ISeedFile };
+  };
+  [CHANNELS.SEED_DELETE]: {
+    args: { id: string };
+    response: { success: boolean };
+  };
+  [CHANNELS.SEED_CAPTURE]: {
+    args: { connectionId: string; tableName: string; whereClause?: string; limit?: number };
+    response: { success: boolean; data: { dml: string; rowCount: number } };
   };
 
   // Composite

@@ -504,3 +504,15 @@ export interface ISnapshot {
   };
   createdAt: string;
 }
+
+// ─── Drift Check Result ───
+export interface IDriftCheckResult {
+  connectionId: string;
+  hasDrift: boolean;
+  checkType: 'lightweight' | 'full';
+  lightweightHash?: string;
+  previousHash?: string;
+  changes: ISchemaChange[];
+  correspondingDdl: string;
+  checkedAt: string;
+}

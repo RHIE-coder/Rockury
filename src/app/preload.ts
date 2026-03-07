@@ -173,6 +173,58 @@ const API: TElectronAPI = {
     ipcRenderer.invoke(CHANNELS.MOCK_GENERATE, args),
   [CHANNELS.MOCK_EXPORT]: (args) =>
     ipcRenderer.invoke(CHANNELS.MOCK_EXPORT, args),
+
+  // Schema Snapshot
+  [CHANNELS.SCHEMA_SNAPSHOT_LIST]: (args) =>
+    ipcRenderer.invoke(CHANNELS.SCHEMA_SNAPSHOT_LIST, args),
+  [CHANNELS.SCHEMA_SNAPSHOT_CREATE]: (args) =>
+    ipcRenderer.invoke(CHANNELS.SCHEMA_SNAPSHOT_CREATE, args),
+  [CHANNELS.SCHEMA_SNAPSHOT_GET]: (args) =>
+    ipcRenderer.invoke(CHANNELS.SCHEMA_SNAPSHOT_GET, args),
+  [CHANNELS.SCHEMA_SNAPSHOT_DELETE]: (args) =>
+    ipcRenderer.invoke(CHANNELS.SCHEMA_SNAPSHOT_DELETE, args),
+  [CHANNELS.SCHEMA_SNAPSHOT_RENAME]: (args) =>
+    ipcRenderer.invoke(CHANNELS.SCHEMA_SNAPSHOT_RENAME, args),
+  [CHANNELS.SCHEMA_SNAPSHOT_VALIDATE]: (args) =>
+    ipcRenderer.invoke(CHANNELS.SCHEMA_SNAPSHOT_VALIDATE, args),
+
+  // Migration Pack
+  [CHANNELS.MIGRATION_PACK_LIST]: (args) =>
+    ipcRenderer.invoke(CHANNELS.MIGRATION_PACK_LIST, args),
+  [CHANNELS.MIGRATION_PACK_CREATE]: (args) =>
+    ipcRenderer.invoke(CHANNELS.MIGRATION_PACK_CREATE, args),
+  [CHANNELS.MIGRATION_PACK_GET]: (args) =>
+    ipcRenderer.invoke(CHANNELS.MIGRATION_PACK_GET, args),
+  [CHANNELS.MIGRATION_PACK_UPDATE_DML]: (args) =>
+    ipcRenderer.invoke(CHANNELS.MIGRATION_PACK_UPDATE_DML, args),
+  [CHANNELS.MIGRATION_PACK_EXECUTE]: (args) =>
+    ipcRenderer.invoke(CHANNELS.MIGRATION_PACK_EXECUTE, args),
+  [CHANNELS.MIGRATION_PACK_ROLLBACK]: (args) =>
+    ipcRenderer.invoke(CHANNELS.MIGRATION_PACK_ROLLBACK, args),
+  [CHANNELS.MIGRATION_PACK_DELETE]: (args) =>
+    ipcRenderer.invoke(CHANNELS.MIGRATION_PACK_DELETE, args),
+
+  // Drift Detection
+  [CHANNELS.DRIFT_LIGHTWEIGHT_CHECK]: (args) =>
+    ipcRenderer.invoke(CHANNELS.DRIFT_LIGHTWEIGHT_CHECK, args),
+  [CHANNELS.DRIFT_FULL_CHECK]: (args) =>
+    ipcRenderer.invoke(CHANNELS.DRIFT_FULL_CHECK, args),
+
+  // Seed
+  [CHANNELS.SEED_LIST]: () =>
+    ipcRenderer.invoke(CHANNELS.SEED_LIST),
+  [CHANNELS.SEED_CREATE]: (args) =>
+    ipcRenderer.invoke(CHANNELS.SEED_CREATE, args),
+  [CHANNELS.SEED_UPDATE]: (args) =>
+    ipcRenderer.invoke(CHANNELS.SEED_UPDATE, args),
+  [CHANNELS.SEED_DELETE]: (args) =>
+    ipcRenderer.invoke(CHANNELS.SEED_DELETE, args),
+  [CHANNELS.SEED_CAPTURE]: (args) =>
+    ipcRenderer.invoke(CHANNELS.SEED_CAPTURE, args),
+
+  // Composite
+  [CHANNELS.SCHEMA_VALIDATE_AGAINST_VERSION]: (args) =>
+    ipcRenderer.invoke(CHANNELS.SCHEMA_VALIDATE_AGAINST_VERSION, args),
 };
 
 contextBridge.exposeInMainWorld('electronAPI', API);

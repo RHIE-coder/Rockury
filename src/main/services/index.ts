@@ -12,3 +12,5 @@ export { mockingService } from './mockingService';
 export { viewSnapshotService } from './viewSnapshotService';
 export { schemaSnapshotService } from './schemaSnapshotService';
 export { migrationPackService } from './migrationPackService';
+export { driftDetectionService } from './driftDetectionService';
+export { seedService } from './seedService';

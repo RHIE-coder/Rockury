@@ -276,6 +276,18 @@ CREATE INDEX IF NOT EXISTS idx_migration_packs_diagram ON migration_packs(diagra
 CREATE INDEX IF NOT EXISTS idx_migration_packs_connection ON migration_packs(connection_id);
 `;
 
+export const SQL_CREATE_SEEDS = `
+CREATE TABLE IF NOT EXISTS seeds (
+  id TEXT PRIMARY KEY,
+  name TEXT NOT NULL,
+  description TEXT NOT NULL DEFAULT '',
+  dml_content TEXT NOT NULL DEFAULT '',
+  target_tables TEXT NOT NULL DEFAULT '[]',
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+`;
+
 const ALL_MIGRATIONS = [
   SQL_CREATE_PACKAGES,
   SQL_CREATE_PACKAGE_RESOURCES,
@@ -295,6 +307,7 @@ const ALL_MIGRATIONS = [
   SQL_CREATE_SCHEMA_SNAPSHOTS_INDEX,
   SQL_CREATE_MIGRATION_PACKS,
   SQL_CREATE_MIGRATION_PACKS_INDEXES,
+  SQL_CREATE_SEEDS,
 ];
 
 export function runMigrations(db: Database.Database): void {

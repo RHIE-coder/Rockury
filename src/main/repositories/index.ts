@@ -10,3 +10,4 @@ export { viewSnapshotRepository } from './viewSnapshotRepository';
 export { changelogRepository } from './changelogRepository';
 export { schemaSnapshotRepository } from './schemaSnapshotRepository';
 export { migrationPackRepository } from './migrationPackRepository';
+export { seedRepository } from './seedRepository';
