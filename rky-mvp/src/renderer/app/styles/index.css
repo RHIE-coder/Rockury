@@ -1,4 +1,34 @@
 @import 'tailwindcss';
+@import '@xyflow/react/dist/style.css';
+
+/* CSS 파일 기준 src/ 디렉토리 전체를 스캔 대상에 포함 */
+@source "../../../../src";
+
+@theme {
+  --color-background: hsl(var(--background));
+  --color-foreground: hsl(var(--foreground));
+  --color-muted: hsl(var(--muted));
+  --color-muted-foreground: hsl(var(--muted-foreground));
+  --color-card: hsl(var(--card));
+  --color-card-foreground: hsl(var(--card-foreground));
+  --color-popover: hsl(var(--popover));
+  --color-popover-foreground: hsl(var(--popover-foreground));
+  --color-border: hsl(var(--border));
+  --color-input: hsl(var(--input));
+  --color-primary: hsl(var(--primary));
+  --color-primary-foreground: hsl(var(--primary-foreground));
+  --color-secondary: hsl(var(--secondary));
+  --color-secondary-foreground: hsl(var(--secondary-foreground));
+  --color-accent: hsl(var(--accent));
+  --color-accent-foreground: hsl(var(--accent-foreground));
+  --color-destructive: hsl(var(--destructive));
+  --color-destructive-foreground: hsl(var(--destructive-foreground));
+  --color-ring: hsl(var(--ring));
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+}
 
 :root {
   --background: 0 0% 100%;
@@ -55,14 +85,39 @@ body {
   font-family: system-ui, -apple-system, sans-serif;
 }
 
-.bg-background {
-  background-color: hsl(var(--background));
+/* Cascade simulation pulse animation */
+@keyframes cascade-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 var(--cascade-pulse-color, rgba(249, 115, 22, 0.4)); }
+  50% { box-shadow: 0 0 0 8px transparent; }
 }
 
-.text-foreground {
-  color: hsl(var(--foreground));
+.cascade-pulse {
+  animation: cascade-pulse 1.5s ease-in-out infinite;
+  animation-delay: var(--cascade-pulse-delay, 0ms);
 }
 
-.text-muted-foreground {
-  color: hsl(var(--muted-foreground));
+/* Cascade blocked: diagonal stripes background */
+.cascade-blocked-bg {
+  background-image: repeating-linear-gradient(
+    -45deg,
+    transparent,
+    transparent 4px,
+    rgba(220, 38, 38, 0.08) 4px,
+    rgba(220, 38, 38, 0.08) 8px
+  );
+}
+
+/* Toast slide-up animation */
+@keyframes toast-in {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.animate-toast-in {
+  animation: toast-in 0.2s ease-out;
+}
+
+/* Prevent CodeMirror long lines from expanding parent flex width in DDL mode */
+.ddl-editor-shell .cm-editor,
+.ddl-editor-shell .cm-scroller {
+  max-width: 100%;
 }

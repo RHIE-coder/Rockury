@@ -1,5 +1,6 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
+import tailwindcss from '@tailwindcss/vite'
 import { alias, rendererOutputPath } from './vite.common.config';
 import { resolve } from 'path';
 
@@ -8,6 +9,7 @@ const appName = "main-window"
 export default defineConfig({
   plugins: [
     react(),
+    tailwindcss(),
   ],
   resolve: {
     alias,
