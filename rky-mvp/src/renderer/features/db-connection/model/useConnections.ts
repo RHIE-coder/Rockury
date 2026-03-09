@@ -71,3 +71,32 @@ export function useTestConnection() {
     mutationFn: (args: IConnectionFormData) => connectionApi.test(args),
   });
 }
+
+export function useTestConnectionById() {
+  return useMutation({
+    mutationFn: (id: string) => connectionApi.testById(id),
+  });
+}
+
+export function useReorderConnections() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (orderedIds: string[]) => connectionApi.reorder(orderedIds),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: connectionKeys.lists() });
+    },
+  });
+}
+
+export function useConnectionPassword(id: string | null) {
+  return useQuery({
+    queryKey: [...connectionKeys.all, 'password', id],
+    queryFn: async () => {
+      const result = await connectionApi.getPassword(id!);
+      if (!result.success) throw new Error('Failed to fetch password');
+      return result.data;
+    },
+    enabled: !!id,
+  });
+}

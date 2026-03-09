@@ -88,6 +88,22 @@ export interface IEvents {
     args: IConnectionFormData;
     response: { success: boolean; data: IConnectionTestResult };
   };
+  [CHANNELS.CONNECTION_GET_PASSWORD]: {
+    args: { id: string };
+    response: { success: boolean; data: string };
+  };
+  [CHANNELS.CONNECTION_REORDER]: {
+    args: { orderedIds: string[] };
+    response: { success: boolean };
+  };
+  [CHANNELS.CONNECTION_TEST_BY_ID]: {
+    args: { id: string };
+    response: { success: boolean; data: IConnectionTestResult };
+  };
+  [CHANNELS.CONNECTION_SET_IGNORED]: {
+    args: { id: string; ignored: boolean };
+    response: { success: boolean; data: IConnection };
+  };
 
   // Diagram
   [CHANNELS.DIAGRAM_LIST]: {

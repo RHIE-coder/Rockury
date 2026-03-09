@@ -1,5 +1,5 @@
 // ─── DB Type ───
-export type TDbType = 'mysql' | 'mariadb' | 'postgresql';
+export type TDbType = 'mysql' | 'mariadb' | 'postgresql' | 'sqlite';
 
 // ─── Key / Constraint Types ───
 export type TKeyType = 'PK' | 'FK' | 'UK' | 'IDX';
@@ -121,6 +121,11 @@ export const DIALECT_INFO: Record<TDbType, IDialectInfo> = {
     name: 'PostgreSQL',
     supportedObjects: ['table', 'view', 'materialized_view', 'index', 'function', 'procedure', 'trigger', 'type', 'sequence'],
   },
+  sqlite: {
+    dbType: 'sqlite',
+    name: 'SQLite',
+    supportedObjects: ['table', 'view', 'index', 'trigger'],
+  },
 };
 
 // ─── Query Safety ───
@@ -157,6 +162,7 @@ export interface IConnection {
   username: string;
   sslEnabled: boolean;
   sslConfig?: Record<string, unknown>;
+  ignored: boolean;
   ignorePatterns: string[];
   permissionMode: TConnectionPermissionMode;
   createdAt: string;
@@ -177,7 +183,7 @@ export interface IConnectionFormData {
   permissionMode?: TConnectionPermissionMode;
 }
 
-export type TConnectionStatus = 'connected' | 'disconnected' | 'error' | 'testing';
+export type TConnectionStatus = 'connected' | 'disconnected' | 'error' | 'testing' | 'ignored';
 
 export interface IConnectionTestResult {
   success: boolean;

@@ -345,6 +345,8 @@ export function runMigrations(db: Database.Database): void {
       SQL_ADD_DIAGRAM_VERSIONS_SORT_ORDER,
       SQL_ADD_DIAGRAMS_SORT_ORDER,
       SQL_ADD_DIAGRAM_VERSIONS_IS_LOCKED,
+      `ALTER TABLE connections ADD COLUMN sort_order INTEGER NOT NULL DEFAULT 0;`,
+      `ALTER TABLE connections ADD COLUMN ignored INTEGER NOT NULL DEFAULT 0;`,
     ];
     for (const sql of alterMigrations) {
       try {

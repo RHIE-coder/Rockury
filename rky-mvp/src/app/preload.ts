@@ -41,6 +41,14 @@ const API: TElectronAPI = {
     ipcRenderer.invoke(CHANNELS.CONNECTION_DELETE, args),
   [CHANNELS.CONNECTION_TEST]: (args) =>
     ipcRenderer.invoke(CHANNELS.CONNECTION_TEST, args),
+  [CHANNELS.CONNECTION_GET_PASSWORD]: (args) =>
+    ipcRenderer.invoke(CHANNELS.CONNECTION_GET_PASSWORD, args),
+  [CHANNELS.CONNECTION_REORDER]: (args) =>
+    ipcRenderer.invoke(CHANNELS.CONNECTION_REORDER, args),
+  [CHANNELS.CONNECTION_TEST_BY_ID]: (args) =>
+    ipcRenderer.invoke(CHANNELS.CONNECTION_TEST_BY_ID, args),
+  [CHANNELS.CONNECTION_SET_IGNORED]: (args) =>
+    ipcRenderer.invoke(CHANNELS.CONNECTION_SET_IGNORED, args),
 
   // Diagram
   [CHANNELS.DIAGRAM_LIST]: (args) =>

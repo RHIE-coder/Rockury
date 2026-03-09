@@ -12,6 +12,8 @@ interface ConnectionRow {
   encrypted_password: string;
   ssl_enabled: number;
   ssl_config: string | null;
+  sort_order: number;
+  ignored: number;
   created_at: string;
   updated_at: string;
 }
@@ -27,6 +29,7 @@ function toConnection(row: ConnectionRow): IConnection {
     username: row.username,
     sslEnabled: row.ssl_enabled === 1,
     sslConfig: row.ssl_config ? JSON.parse(row.ssl_config) : undefined,
+    ignored: row.ignored === 1,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -35,7 +38,7 @@ function toConnection(row: ConnectionRow): IConnection {
 export const connectionRepository = {
   list(): IConnection[] {
     const db = getDb();
-    const rows = db.prepare('SELECT * FROM connections ORDER BY created_at DESC').all() as ConnectionRow[];
+    const rows = db.prepare('SELECT * FROM connections ORDER BY sort_order ASC, created_at DESC').all() as ConnectionRow[];
     return rows.map(toConnection);
   },
 
@@ -58,9 +61,10 @@ export const connectionRepository = {
   }): IConnection {
     const db = getDb();
     const id = crypto.randomUUID();
+    const maxOrder = (db.prepare('SELECT COALESCE(MAX(sort_order), 0) as max_order FROM connections').get() as { max_order: number }).max_order;
     db.prepare(
-      `INSERT INTO connections (id, name, db_type, host, port, database_name, username, encrypted_password, ssl_enabled, ssl_config)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO connections (id, name, db_type, host, port, database_name, username, encrypted_password, ssl_enabled, ssl_config, sort_order)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     ).run(
       id,
       data.name,
@@ -72,6 +76,7 @@ export const connectionRepository = {
       data.encryptedPassword,
       data.sslEnabled ? 1 : 0,
       data.sslConfig ? JSON.stringify(data.sslConfig) : null,
+      maxOrder + 1,
     );
     return this.getById(id)!;
   },
@@ -113,9 +118,26 @@ export const connectionRepository = {
     return this.getById(id)!;
   },
 
+  setIgnored(id: string, ignored: boolean): IConnection {
+    const db = getDb();
+    db.prepare(`UPDATE connections SET ignored = ?, updated_at = datetime('now') WHERE id = ?`).run(ignored ? 1 : 0, id);
+    return this.getById(id)!;
+  },
+
   deleteById(id: string): void {
     const db = getDb();
     db.prepare('DELETE FROM connections WHERE id = ?').run(id);
+  },
+
+  reorder(orderedIds: string[]): void {
+    const db = getDb();
+    const stmt = db.prepare('UPDATE connections SET sort_order = ? WHERE id = ?');
+    const run = db.transaction(() => {
+      orderedIds.forEach((id, index) => {
+        stmt.run(index + 1, id);
+      });
+    });
+    run();
   },
 
   getByIdWithPassword(id: string): (IConnection & { encryptedPassword: string }) | null {

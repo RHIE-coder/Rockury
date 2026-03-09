@@ -2,6 +2,7 @@ import { connectionRepository } from '#/repositories';
 import { encrypt, decrypt } from '#/infrastructure';
 import { createMysqlConnection, closeMysqlConnection } from '#/infrastructure';
 import { createPgConnection, closePgConnection } from '#/infrastructure';
+import { createSqliteConnection, closeSqliteConnection } from '#/infrastructure';
 import type { IConnection, IConnectionFormData, IConnectionTestResult } from '~/shared/types/db';
 
 export const connectionService = {
@@ -42,7 +43,7 @@ export const connectionService = {
     if (formData.port !== undefined) updateData.port = formData.port;
     if (formData.database !== undefined) updateData.database = formData.database;
     if (formData.username !== undefined) updateData.username = formData.username;
-    if (formData.password !== undefined) updateData.encryptedPassword = encrypt(formData.password);
+    if (formData.password !== undefined && formData.password !== '') updateData.encryptedPassword = encrypt(formData.password);
     if (formData.sslEnabled !== undefined) updateData.sslEnabled = formData.sslEnabled;
     if (formData.sslConfig !== undefined) updateData.sslConfig = formData.sslConfig;
 
@@ -51,6 +52,14 @@ export const connectionService = {
 
   deleteById(id: string): void {
     connectionRepository.deleteById(id);
+  },
+
+  setIgnored(id: string, ignored: boolean): IConnection {
+    return connectionRepository.setIgnored(id, ignored);
+  },
+
+  reorder(orderedIds: string[]): void {
+    connectionRepository.reorder(orderedIds);
   },
 
   async testConnection(formData: IConnectionFormData): Promise<IConnectionTestResult> {
@@ -104,6 +113,20 @@ export const connectionService = {
         };
       }
 
+      if (dbType === 'sqlite') {
+        const db = createSqliteConnection({ database: formData.database });
+        const row = db.prepare('SELECT sqlite_version() AS version').get() as { version: string } | undefined;
+        const version = row?.version ?? 'unknown';
+        closeSqliteConnection(db);
+
+        return {
+          success: true,
+          message: 'Connection successful',
+          latencyMs: Date.now() - start,
+          serverVersion: `SQLite ${version}`,
+        };
+      }
+
       return {
         success: false,
         message: `Unsupported database type: ${dbType}`,
@@ -115,6 +138,21 @@ export const connectionService = {
         latencyMs: Date.now() - start,
       };
     }
+  },
+
+  async testConnectionById(id: string): Promise<IConnectionTestResult> {
+    const config = this.getConnectionConfig(id);
+    return this.testConnection({
+      name: config.name,
+      dbType: config.dbType,
+      host: config.host,
+      port: config.port,
+      database: config.database,
+      username: config.username,
+      password: config.password,
+      sslEnabled: config.sslEnabled,
+      sslConfig: config.sslConfig,
+    });
   },
 
   /** Get connection config with decrypted password (for internal service use only) */
