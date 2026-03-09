@@ -101,3 +101,6 @@ docs/.pdca-snapshots/
 
 # Claude Code hooks temp files
 .claude/.discord-start-time
+
+# Test DB data (SQLite files)
+scripts/test-db/data/

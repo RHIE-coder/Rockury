@@ -13,7 +13,11 @@
     "lint": "eslint --ext .ts,.tsx .",
     "test": "vitest run",
     "test:watch": "vitest",
-    "test:coverage": "vitest run --coverage"
+    "test:coverage": "vitest run --coverage",
+    "db:up": "node scripts/test-db/setup.mjs",
+    "db:down": "node scripts/test-db/teardown.mjs",
+    "db:reset": "node scripts/test-db/teardown.mjs && node scripts/test-db/setup.mjs",
+    "db:status": "node scripts/test-db/status.mjs"
   },
   "keywords": [],
   "author": {
