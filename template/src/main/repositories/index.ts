@@ -1,0 +1,1 @@
+export { promptRepository } from './promptRepository';
