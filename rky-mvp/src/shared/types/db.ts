@@ -9,7 +9,10 @@ export type TConstraintType = 'PK' | 'FK' | 'UK' | 'IDX' | 'CHECK' | 'NOT_NULL';
 export type TSchemaObjectType =
   | 'table' | 'view' | 'materialized_view'
   | 'function' | 'procedure' | 'trigger' | 'event'
-  | 'type' | 'sequence' | 'index';
+  | 'type' | 'sequence' | 'index'
+  | 'partition' | 'role' | 'policy' | 'grant'
+  | 'extension' | 'schema' | 'foreign_table'
+  | 'tablespace' | 'collation' | 'domain';
 
 export interface ISchemaObjectCategory {
   id: string;
@@ -20,7 +23,10 @@ export interface ISchemaObjectCategory {
 export const SCHEMA_OBJECT_CATEGORIES: ISchemaObjectCategory[] = [
   { id: 'core', label: 'Core', types: ['table', 'view', 'materialized_view', 'index'] },
   { id: 'routines', label: 'Routines', types: ['procedure', 'function', 'trigger', 'event'] },
-  { id: 'definitions', label: 'Definitions', types: ['type', 'sequence'] },
+  { id: 'definitions', label: 'Definitions', types: ['type', 'sequence', 'domain'] },
+  { id: 'partitioning', label: 'Partitioning', types: ['partition'] },
+  { id: 'security', label: 'Security', types: ['role', 'policy', 'grant'] },
+  { id: 'advanced', label: 'Advanced', types: ['extension', 'schema', 'foreign_table', 'tablespace', 'collation'] },
 ];
 
 export interface ISchemaView {
@@ -86,6 +92,89 @@ export interface ISchemaIndex {
   definition: string;
 }
 
+// ─── Category 8: Partitioning ───
+export interface IPartitionEntry {
+  name: string;
+  bound?: string;
+  values?: string[];
+  modulus?: number;
+  remainder?: number;
+}
+
+export interface IPartition {
+  name: string;
+  tableName: string;
+  strategy: 'range' | 'list' | 'hash';
+  expression: string;
+  partitions: IPartitionEntry[];
+  comment?: string;
+}
+
+// ─── Category 9: Security ───
+export interface IRole {
+  name: string;
+  isLogin: boolean;
+  isSuperuser: boolean;
+  inherits: boolean;
+  memberOf: string[];
+  comment?: string;
+}
+
+export interface IRlsPolicy {
+  name: string;
+  tableName: string;
+  command: 'ALL' | 'SELECT' | 'INSERT' | 'UPDATE' | 'DELETE';
+  roles: string[];
+  using?: string;
+  withCheck?: string;
+  comment?: string;
+}
+
+export interface IGrant {
+  objectType: 'table' | 'schema' | 'function' | 'sequence';
+  objectName: string;
+  grantee: string;
+  privileges: string[];
+  withGrantOption: boolean;
+}
+
+// ─── Category 10: Advanced ───
+export interface IExtension {
+  name: string;
+  version?: string;
+  schema?: string;
+  comment?: string;
+}
+
+export interface IForeignTable {
+  name: string;
+  serverName: string;
+  columns: IColumn[];
+  options: Record<string, string>;
+  comment?: string;
+}
+
+export interface ISchemaNamespace {
+  name: string;
+  owner?: string;
+  comment?: string;
+}
+
+export interface ITablespace {
+  name: string;
+  location?: string;
+  options?: Record<string, string>;
+  comment?: string;
+}
+
+export interface ICollationDef {
+  name: string;
+  provider: 'icu' | 'libc';
+  locale?: string;
+  comment?: string;
+}
+
+// ─── Schema Objects Container ───
 export interface ISchemaObjects {
   tables: ITable[];
   views: ISchemaView[];
@@ -96,6 +185,15 @@ export interface ISchemaObjects {
   types: ICustomType[];
   sequences: ISequence[];
   indexes: ISchemaIndex[];
+  partitions: IPartition[];
+  roles: IRole[];
+  policies: IRlsPolicy[];
+  grants: IGrant[];
+  extensions: IExtension[];
+  schemas: ISchemaNamespace[];
+  foreignTables: IForeignTable[];
+  tablespaces: ITablespace[];
+  collations: ICollationDef[];
 }
 
 // ─── Dialect ───
@@ -109,17 +207,26 @@ export const DIALECT_INFO: Record<TDbType, IDialectInfo> = {
   mysql: {
     dbType: 'mysql',
     name: 'MySQL',
-    supportedObjects: ['table', 'view', 'index', 'function', 'procedure', 'trigger', 'event'],
+    supportedObjects: [
+      'table', 'view', 'index', 'function', 'procedure', 'trigger', 'event',
+      'partition', 'role', 'grant', 'collation',
+    ],
   },
   mariadb: {
     dbType: 'mariadb',
     name: 'MariaDB',
-    supportedObjects: ['table', 'view', 'index', 'function', 'procedure', 'trigger', 'event'],
+    supportedObjects: [
+      'table', 'view', 'index', 'function', 'procedure', 'trigger', 'event', 'sequence',
+      'partition', 'role', 'grant', 'collation',
+    ],
   },
   postgresql: {
     dbType: 'postgresql',
     name: 'PostgreSQL',
-    supportedObjects: ['table', 'view', 'materialized_view', 'index', 'function', 'procedure', 'trigger', 'type', 'sequence'],
+    supportedObjects: [
+      'table', 'view', 'materialized_view', 'index', 'function', 'procedure', 'trigger', 'type', 'sequence',
+      'partition', 'role', 'policy', 'grant', 'extension', 'schema', 'foreign_table', 'tablespace', 'collation', 'domain',
+    ],
   },
   sqlite: {
     dbType: 'sqlite',
@@ -210,8 +317,8 @@ export interface IColumn {
 export interface IForeignKeyRef {
   table: string;
   column: string;
-  onDelete?: 'CASCADE' | 'SET NULL' | 'RESTRICT' | 'NO ACTION';
-  onUpdate?: 'CASCADE' | 'SET NULL' | 'RESTRICT' | 'NO ACTION';
+  onDelete?: 'CASCADE' | 'SET NULL' | 'SET DEFAULT' | 'RESTRICT' | 'NO ACTION';
+  onUpdate?: 'CASCADE' | 'SET NULL' | 'SET DEFAULT' | 'RESTRICT' | 'NO ACTION';
 }
 
 export interface IConstraint {
