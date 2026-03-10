@@ -5,6 +5,8 @@ import { DIALECT_INFO } from '~/shared/types/db';
 import type {
   ISchemaObjects, ISchemaView, IRoutine, ITrigger, IDbEvent,
   ICustomType, ISequence, ISchemaIndex, TSchemaObjectType, TDbType,
+  IPartition, IRole, IRlsPolicy, IGrant,
+  IExtension, IForeignTable, ISchemaNamespace, ITablespace, ICollationDef,
 } from '~/shared/types/db';
 
 // ─── MySQL / MariaDB row types ───
@@ -46,6 +48,35 @@ interface MysqlIndexRow {
   COLUMN_NAME: string;
   NON_UNIQUE: number;
   INDEX_TYPE: string;
+}
+
+interface MysqlPartitionRow {
+  TABLE_NAME: string;
+  PARTITION_METHOD: string;
+  PARTITION_EXPRESSION: string;
+  PARTITION_NAME: string | null;
+  PARTITION_DESCRIPTION: string | null;
+  SUBPARTITION_METHOD: string | null;
+}
+
+interface MysqlUserRow {
+  User: string;
+  Host: string;
+  account_locked: string;
+}
+
+interface MysqlTablePrivilegeRow {
+  GRANTEE: string;
+  TABLE_SCHEMA: string;
+  TABLE_NAME: string;
+  PRIVILEGE_TYPE: string;
+  IS_GRANTABLE: string;
+}
+
+interface MysqlCollationRow {
+  COLLATION_NAME: string;
+  CHARACTER_SET_NAME: string;
+  IS_DEFAULT: string;
 }
 
 // ─── PostgreSQL row types ───
@@ -96,6 +127,71 @@ interface PgIndexRow {
   indexname: string;
   tablename: string;
   indexdef: string;
+}
+
+interface PgPartitionRow {
+  parent_table: string;
+  partition_name: string;
+  partition_strategy: string;
+  partition_expression: string;
+  partition_bound: string;
+}
+
+interface PgRoleRow {
+  rolname: string;
+  rolcanlogin: boolean;
+  rolsuper: boolean;
+  rolinherit: boolean;
+  memberof: string | null;
+}
+
+interface PgPolicyRow {
+  policyname: string;
+  tablename: string;
+  cmd: string;
+  roles: string;
+  qual: string | null;
+  with_check: string | null;
+}
+
+interface PgGrantRow {
+  grantee: string;
+  table_schema: string;
+  table_name: string;
+  privilege_type: string;
+  is_grantable: string;
+}
+
+interface PgExtensionRow {
+  extname: string;
+  extversion: string;
+  nspname: string;
+  description: string | null;
+}
+
+interface PgSchemaRow {
+  nspname: string;
+  nspowner: string;
+  description: string | null;
+}
+
+interface PgForeignTableRow {
+  foreign_table_name: string;
+  foreign_server_name: string;
+  foreign_table_schema: string;
+}
+
+interface PgTablespaceRow {
+  spcname: string;
+  spclocation: string | null;
+  description: string | null;
+}
+
+interface PgCollationRow {
+  collname: string;
+  collprovider: string;
+  collcollate: string | null;
+  description: string | null;
 }
 
 // ─── Helpers ───
@@ -258,6 +354,121 @@ async function fetchMysqlObjects(
       });
     }
 
+    // Partitions
+    if (shouldFetch(objectTypes, 'partition')) {
+      try {
+        const [rows] = await conn.query(
+          `SELECT TABLE_NAME, PARTITION_METHOD, PARTITION_EXPRESSION,
+                  PARTITION_NAME, PARTITION_DESCRIPTION, SUBPARTITION_METHOD
+           FROM information_schema.PARTITIONS
+           WHERE TABLE_SCHEMA = ? AND PARTITION_NAME IS NOT NULL
+           ORDER BY TABLE_NAME, PARTITION_ORDINAL_POSITION`,
+          [database],
+        );
+        const partRows = rows as MysqlPartitionRow[];
+
+        // Group by table
+        const partMap = new Map<string, IPartition>();
+        for (const r of partRows) {
+          if (!partMap.has(r.TABLE_NAME)) {
+            const strategy = (r.PARTITION_METHOD ?? '').toLowerCase();
+            partMap.set(r.TABLE_NAME, {
+              name: `${r.TABLE_NAME}_partitioning`,
+              tableName: r.TABLE_NAME,
+              strategy: strategy.includes('range') ? 'range' : strategy.includes('list') ? 'list' : 'hash',
+              expression: r.PARTITION_EXPRESSION ?? '',
+              partitions: [],
+            });
+          }
+          const partition = partMap.get(r.TABLE_NAME)!;
+          partition.partitions.push({
+            name: r.PARTITION_NAME ?? '',
+            bound: r.PARTITION_DESCRIPTION ?? undefined,
+          });
+        }
+        result.partitions = Array.from(partMap.values());
+      } catch {
+        result.partitions = [];
+      }
+    }
+
+    // Roles
+    if (shouldFetch(objectTypes, 'role')) {
+      try {
+        const [rows] = await conn.query(
+          `SELECT User, Host, account_locked FROM mysql.user
+           WHERE User NOT LIKE 'mysql.%'
+             AND User != 'root'
+             AND User != ''
+           ORDER BY User`,
+        );
+        result.roles = (rows as MysqlUserRow[]).map((r) => ({
+          name: `'${r.User}'@'${r.Host}'`,
+          isLogin: r.account_locked !== 'Y',
+          isSuperuser: false,
+          inherits: true,
+          memberOf: [],
+        }));
+      } catch {
+        result.roles = [];
+      }
+    }
+
+    // Grants
+    if (shouldFetch(objectTypes, 'grant')) {
+      try {
+        const [rows] = await conn.query(
+          `SELECT GRANTEE, TABLE_SCHEMA, TABLE_NAME, PRIVILEGE_TYPE, IS_GRANTABLE
+           FROM information_schema.TABLE_PRIVILEGES
+           WHERE TABLE_SCHEMA = ?
+           ORDER BY GRANTEE, TABLE_NAME`,
+          [database],
+        );
+        const grantRows = rows as MysqlTablePrivilegeRow[];
+
+        // Group by grantee + object
+        const grantMap = new Map<string, IGrant>();
+        for (const r of grantRows) {
+          const key = `${r.GRANTEE}::${r.TABLE_NAME}`;
+          if (!grantMap.has(key)) {
+            grantMap.set(key, {
+              objectType: 'table',
+              objectName: r.TABLE_NAME,
+              grantee: r.GRANTEE,
+              privileges: [],
+              withGrantOption: false,
+            });
+          }
+          const grant = grantMap.get(key)!;
+          grant.privileges.push(r.PRIVILEGE_TYPE);
+          if (r.IS_GRANTABLE === 'YES') grant.withGrantOption = true;
+        }
+        result.grants = Array.from(grantMap.values());
+      } catch {
+        result.grants = [];
+      }
+    }
+
+    // Collations
+    if (shouldFetch(objectTypes, 'collation')) {
+      try {
+        const [rows] = await conn.query(
+          `SELECT COLLATION_NAME, CHARACTER_SET_NAME, IS_DEFAULT
+           FROM information_schema.COLLATIONS
+           WHERE IS_DEFAULT = 'No'
+           ORDER BY CHARACTER_SET_NAME, COLLATION_NAME
+           LIMIT 100`,
+        );
+        result.collations = (rows as MysqlCollationRow[]).map((r) => ({
+          name: r.COLLATION_NAME,
+          provider: 'libc' as const,
+          locale: r.CHARACTER_SET_NAME,
+        }));
+      } catch {
+        result.collations = [];
+      }
+    }
+
     return result;
   } finally {
     await closeMysqlConnection(conn);
@@ -318,6 +529,19 @@ async function fetchMysqlObjectDdl(
         const [rows] = await conn.query(`SHOW CREATE TABLE \`${objectName}\``);
         const row = (rows as Array<Record<string, string>>)[0];
         ddl = row?.['Create Table'] ?? '';
+        break;
+      }
+      case 'partition': {
+        // Partition DDL is part of CREATE TABLE; extract partition info
+        const [rows] = await conn.query(`SHOW CREATE TABLE \`${objectName}\``);
+        const row = (rows as Array<Record<string, string>>)[0];
+        const createTable = row?.['Create Table'] ?? '';
+        const partMatch = /\/\*!.*PARTITION BY[\s\S]+$/i.exec(createTable);
+        ddl = partMatch ? partMatch[0] : createTable;
+        break;
+      }
+      case 'collation': {
+        ddl = `-- Collation: ${objectName}\n-- Collations are built-in and cannot be created via DDL in MySQL`;
         break;
       }
       default:
@@ -528,6 +752,272 @@ async function fetchPgObjects(
       });
     }
 
+    // Partitions
+    if (shouldFetch(objectTypes, 'partition')) {
+      try {
+        const partResult = await client.query<PgPartitionRow>(
+          `SELECT
+             parent.relname AS parent_table,
+             child.relname AS partition_name,
+             CASE pt.partstrat
+               WHEN 'r' THEN 'range'
+               WHEN 'l' THEN 'list'
+               WHEN 'h' THEN 'hash'
+             END AS partition_strategy,
+             pg_get_partkeydef(parent.oid) AS partition_expression,
+             pg_get_expr(child.relpartbound, child.oid) AS partition_bound
+           FROM pg_partitioned_table pt
+           JOIN pg_class parent ON pt.partrelid = parent.oid
+           JOIN pg_namespace pn ON parent.relnamespace = pn.oid
+           JOIN pg_inherits inh ON parent.oid = inh.inhparent
+           JOIN pg_class child ON inh.inhrelid = child.oid
+           WHERE pn.nspname = 'public'
+           ORDER BY parent.relname, child.relname`,
+        );
+
+        // Group by parent table
+        const partMap = new Map<string, IPartition>();
+        for (const r of partResult.rows) {
+          if (!partMap.has(r.parent_table)) {
+            partMap.set(r.parent_table, {
+              name: `${r.parent_table}_partitioning`,
+              tableName: r.parent_table,
+              strategy: r.partition_strategy as IPartition['strategy'],
+              expression: r.partition_expression ?? '',
+              partitions: [],
+            });
+          }
+          const partition = partMap.get(r.parent_table)!;
+          partition.partitions.push({
+            name: r.partition_name,
+            bound: r.partition_bound ?? undefined,
+          });
+        }
+        result.partitions = Array.from(partMap.values());
+      } catch {
+        result.partitions = [];
+      }
+    }
+
+    // Roles
+    if (shouldFetch(objectTypes, 'role')) {
+      try {
+        const roleResult = await client.query<PgRoleRow>(
+          `SELECT r.rolname,
+                  r.rolcanlogin,
+                  r.rolsuper,
+                  r.rolinherit,
+                  string_agg(m.rolname, ',') AS memberof
+           FROM pg_roles r
+           LEFT JOIN pg_auth_members am ON r.oid = am.member
+           LEFT JOIN pg_roles m ON am.roleid = m.oid
+           WHERE r.rolname NOT LIKE 'pg_%'
+             AND r.rolname != 'postgres'
+           GROUP BY r.rolname, r.rolcanlogin, r.rolsuper, r.rolinherit
+           ORDER BY r.rolname`,
+        );
+        result.roles = roleResult.rows.map((r) => ({
+          name: r.rolname,
+          isLogin: r.rolcanlogin,
+          isSuperuser: r.rolsuper,
+          inherits: r.rolinherit,
+          memberOf: r.memberof ? r.memberof.split(',') : [],
+        }));
+      } catch {
+        result.roles = [];
+      }
+    }
+
+    // RLS Policies
+    if (shouldFetch(objectTypes, 'policy')) {
+      try {
+        const polResult = await client.query<PgPolicyRow>(
+          `SELECT pol.polname AS policyname,
+                  c.relname AS tablename,
+                  CASE pol.polcmd
+                    WHEN 'r' THEN 'SELECT'
+                    WHEN 'a' THEN 'INSERT'
+                    WHEN 'w' THEN 'UPDATE'
+                    WHEN 'd' THEN 'DELETE'
+                    ELSE 'ALL'
+                  END AS cmd,
+                  pg_get_expr(pol.polqual, pol.polrelid) AS qual,
+                  pg_get_expr(pol.polwithcheck, pol.polrelid) AS with_check,
+                  array_to_string(ARRAY(
+                    SELECT rolname FROM pg_roles WHERE oid = ANY(pol.polroles)
+                  ), ',') AS roles
+           FROM pg_policy pol
+           JOIN pg_class c ON pol.polrelid = c.oid
+           JOIN pg_namespace n ON c.relnamespace = n.oid
+           WHERE n.nspname = 'public'
+           ORDER BY c.relname, pol.polname`,
+        );
+        result.policies = polResult.rows.map((r) => ({
+          name: r.policyname,
+          tableName: r.tablename,
+          command: r.cmd as IRlsPolicy['command'],
+          roles: r.roles ? r.roles.split(',') : [],
+          using: r.qual ?? undefined,
+          withCheck: r.with_check ?? undefined,
+        }));
+      } catch {
+        result.policies = [];
+      }
+    }
+
+    // Grants
+    if (shouldFetch(objectTypes, 'grant')) {
+      try {
+        const grantResult = await client.query<PgGrantRow>(
+          `SELECT grantee, table_schema, table_name, privilege_type, is_grantable
+           FROM information_schema.table_privileges
+           WHERE table_schema = 'public'
+           ORDER BY grantee, table_name`,
+        );
+
+        // Group by grantee + object
+        const grantMap = new Map<string, IGrant>();
+        for (const r of grantResult.rows) {
+          const key = `${r.grantee}::${r.table_name}`;
+          if (!grantMap.has(key)) {
+            grantMap.set(key, {
+              objectType: 'table',
+              objectName: r.table_name,
+              grantee: r.grantee,
+              privileges: [],
+              withGrantOption: false,
+            });
+          }
+          const grant = grantMap.get(key)!;
+          grant.privileges.push(r.privilege_type);
+          if (r.is_grantable === 'YES') grant.withGrantOption = true;
+        }
+        result.grants = Array.from(grantMap.values());
+      } catch {
+        result.grants = [];
+      }
+    }
+
+    // Extensions
+    if (shouldFetch(objectTypes, 'extension')) {
+      try {
+        const extResult = await client.query<PgExtensionRow>(
+          `SELECT e.extname,
+                  e.extversion,
+                  n.nspname,
+                  d.description
+           FROM pg_extension e
+           JOIN pg_namespace n ON e.extnamespace = n.oid
+           LEFT JOIN pg_description d ON d.objoid = e.oid AND d.classoid = 'pg_extension'::regclass
+           WHERE e.extname != 'plpgsql'
+           ORDER BY e.extname`,
+        );
+        result.extensions = extResult.rows.map((r) => ({
+          name: r.extname,
+          version: r.extversion,
+          schema: r.nspname,
+          comment: r.description ?? undefined,
+        }));
+      } catch {
+        result.extensions = [];
+      }
+    }
+
+    // Schemas (namespaces)
+    if (shouldFetch(objectTypes, 'schema')) {
+      try {
+        const schemaResult = await client.query<PgSchemaRow>(
+          `SELECT n.nspname,
+                  r.rolname AS nspowner,
+                  d.description
+           FROM pg_namespace n
+           JOIN pg_roles r ON n.nspowner = r.oid
+           LEFT JOIN pg_description d ON d.objoid = n.oid AND d.classoid = 'pg_namespace'::regclass
+           WHERE n.nspname NOT LIKE 'pg_%'
+             AND n.nspname != 'information_schema'
+           ORDER BY n.nspname`,
+        );
+        result.schemas = schemaResult.rows.map((r) => ({
+          name: r.nspname,
+          owner: r.nspowner,
+          comment: r.description ?? undefined,
+        }));
+      } catch {
+        result.schemas = [];
+      }
+    }
+
+    // Foreign Tables
+    if (shouldFetch(objectTypes, 'foreign_table')) {
+      try {
+        const ftResult = await client.query<PgForeignTableRow>(
+          `SELECT foreign_table_name, foreign_server_name, foreign_table_schema
+           FROM information_schema.foreign_tables
+           WHERE foreign_table_schema = 'public'
+           ORDER BY foreign_table_name`,
+        );
+        result.foreignTables = ftResult.rows.map((r) => ({
+          name: r.foreign_table_name,
+          serverName: r.foreign_server_name,
+          columns: [],
+          options: {},
+        }));
+      } catch {
+        result.foreignTables = [];
+      }
+    }
+
+    // Tablespaces
+    if (shouldFetch(objectTypes, 'tablespace')) {
+      try {
+        const tsResult = await client.query<PgTablespaceRow>(
+          `SELECT s.spcname,
+                  pg_tablespace_location(s.oid) AS spclocation,
+                  d.description
+           FROM pg_tablespace s
+           LEFT JOIN pg_description d ON d.objoid = s.oid AND d.classoid = 'pg_tablespace'::regclass
+           WHERE s.spcname NOT IN ('pg_default', 'pg_global')
+           ORDER BY s.spcname`,
+        );
+        result.tablespaces = tsResult.rows.map((r) => ({
+          name: r.spcname,
+          location: r.spclocation ?? undefined,
+          comment: r.description ?? undefined,
+        }));
+      } catch {
+        result.tablespaces = [];
+      }
+    }
+
+    // Collations
+    if (shouldFetch(objectTypes, 'collation')) {
+      try {
+        const collResult = await client.query<PgCollationRow>(
+          `SELECT c.collname,
+                  CASE c.collprovider
+                    WHEN 'i' THEN 'icu'
+                    WHEN 'c' THEN 'libc'
+                    ELSE 'libc'
+                  END AS collprovider,
+                  c.collcollate,
+                  d.description
+           FROM pg_collation c
+           JOIN pg_namespace n ON c.collnamespace = n.oid
+           LEFT JOIN pg_description d ON d.objoid = c.oid AND d.classoid = 'pg_collation'::regclass
+           WHERE n.nspname = 'public'
+           ORDER BY c.collname`,
+        );
+        result.collations = collResult.rows.map((r) => ({
+          name: r.collname,
+          provider: r.collprovider as ICollationDef['provider'],
+          locale: r.collcollate ?? undefined,
+          comment: r.description ?? undefined,
+        }));
+      } catch {
+        result.collations = [];
+      }
+    }
+
     return result;
   } finally {
     await closePgConnection(client);
@@ -646,6 +1136,134 @@ async function fetchPgObjectDdl(
           );
           const attrs = attrResult.rows.map((a: { attname: string; datatype: string }) => `${a.attname} ${a.datatype}`).join(', ');
           ddl = `CREATE TYPE "${objectName}" AS (${attrs})`;
+        }
+        break;
+      }
+      case 'partition': {
+        const partResult = await client.query(
+          `SELECT pg_get_partkeydef(c.oid) AS partkey
+           FROM pg_class c
+           JOIN pg_namespace n ON c.relnamespace = n.oid
+           WHERE n.nspname = 'public' AND c.relname = $1 AND c.relkind = 'p'`,
+          [objectName],
+        );
+        const partKey = partResult.rows[0]?.partkey ?? '';
+        ddl = `-- Table "${objectName}" is partitioned by: ${partKey}`;
+        break;
+      }
+      case 'role': {
+        const roleResult = await client.query(
+          `SELECT rolcanlogin, rolsuper, rolcreaterole, rolcreatedb, rolinherit, rolreplication
+           FROM pg_roles WHERE rolname = $1`,
+          [objectName],
+        );
+        const role = roleResult.rows[0];
+        if (role) {
+          const opts: string[] = [];
+          if (role.rolcanlogin) opts.push('LOGIN');
+          if (role.rolsuper) opts.push('SUPERUSER');
+          if (role.rolcreaterole) opts.push('CREATEROLE');
+          if (role.rolcreatedb) opts.push('CREATEDB');
+          if (role.rolinherit) opts.push('INHERIT');
+          if (role.rolreplication) opts.push('REPLICATION');
+          ddl = `CREATE ROLE "${objectName}" WITH ${opts.join(' ')}`;
+        }
+        break;
+      }
+      case 'policy': {
+        const polResult = await client.query(
+          `SELECT pol.polname,
+                  c.relname,
+                  CASE pol.polcmd
+                    WHEN 'r' THEN 'SELECT'
+                    WHEN 'a' THEN 'INSERT'
+                    WHEN 'w' THEN 'UPDATE'
+                    WHEN 'd' THEN 'DELETE'
+                    ELSE 'ALL'
+                  END AS cmd,
+                  pg_get_expr(pol.polqual, pol.polrelid) AS qual,
+                  pg_get_expr(pol.polwithcheck, pol.polrelid) AS with_check
+           FROM pg_policy pol
+           JOIN pg_class c ON pol.polrelid = c.oid
+           JOIN pg_namespace n ON c.relnamespace = n.oid
+           WHERE n.nspname = 'public' AND pol.polname = $1
+           LIMIT 1`,
+          [objectName],
+        );
+        const pol = polResult.rows[0];
+        if (pol) {
+          ddl = `CREATE POLICY "${pol.polname}" ON "${pol.relname}" FOR ${pol.cmd}`;
+          if (pol.qual) ddl += `\n  USING (${pol.qual})`;
+          if (pol.with_check) ddl += `\n  WITH CHECK (${pol.with_check})`;
+        }
+        break;
+      }
+      case 'grant': {
+        ddl = `-- Grant definitions are runtime privileges and not stored as DDL objects.\n-- Use: SELECT * FROM information_schema.table_privileges WHERE grantee = '${objectName}'`;
+        break;
+      }
+      case 'extension': {
+        const extResult = await client.query(
+          `SELECT extname, extversion FROM pg_extension WHERE extname = $1`,
+          [objectName],
+        );
+        const ext = extResult.rows[0];
+        if (ext) {
+          ddl = `CREATE EXTENSION IF NOT EXISTS "${ext.extname}" VERSION '${ext.extversion}'`;
+        }
+        break;
+      }
+      case 'schema': {
+        const schResult = await client.query(
+          `SELECT n.nspname, r.rolname AS owner
+           FROM pg_namespace n
+           JOIN pg_roles r ON n.nspowner = r.oid
+           WHERE n.nspname = $1`,
+          [objectName],
+        );
+        const sch = schResult.rows[0];
+        if (sch) {
+          ddl = `CREATE SCHEMA "${sch.nspname}" AUTHORIZATION "${sch.owner}"`;
+        }
+        break;
+      }
+      case 'foreign_table': {
+        const ftResult = await client.query(
+          `SELECT foreign_table_name, foreign_server_name
+           FROM information_schema.foreign_tables
+           WHERE foreign_table_schema = 'public' AND foreign_table_name = $1`,
+          [objectName],
+        );
+        const ft = ftResult.rows[0];
+        if (ft) {
+          ddl = `-- Foreign table "${ft.foreign_table_name}" on server "${ft.foreign_server_name}"`;
+        }
+        break;
+      }
+      case 'tablespace': {
+        const tsResult = await client.query(
+          `SELECT spcname, pg_tablespace_location(oid) AS location
+           FROM pg_tablespace WHERE spcname = $1`,
+          [objectName],
+        );
+        const ts = tsResult.rows[0];
+        if (ts) {
+          ddl = `CREATE TABLESPACE "${ts.spcname}" LOCATION '${ts.location ?? ''}'`;
+        }
+        break;
+      }
+      case 'collation': {
+        const collResult = await client.query(
+          `SELECT collname, collcollate, collctype,
+                  CASE collprovider WHEN 'i' THEN 'icu' WHEN 'c' THEN 'libc' ELSE 'libc' END AS provider
+           FROM pg_collation c
+           JOIN pg_namespace n ON c.collnamespace = n.oid
+           WHERE n.nspname = 'public' AND c.collname = $1`,
+          [objectName],
+        );
+        const coll = collResult.rows[0];
+        if (coll) {
+          ddl = `CREATE COLLATION "${coll.collname}" (provider = ${coll.provider}, locale = '${coll.collcollate ?? ''}')`;
         }
         break;
       }
