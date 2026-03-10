@@ -12,9 +12,9 @@ const TABLE_WIDTH = 250;
 const TABLE_HEIGHT_BASE = 40;
 const COLUMN_ROW_HEIGHT = 22;
 const CONSTRAINT_ROW_HEIGHT = 18;
-const GRID_GAP_X = 320;
-const GRID_GAP_Y = 40;
-const COLUMNS_PER_ROW = 4;
+const GRID_GAP_X = 420;
+const GRID_GAP_Y = 60;
+const COLUMNS_PER_ROW = 3;
 
 function estimateNodeHeight(table: ITable, filter: IDiagramFilter): number {
   let height = TABLE_HEIGHT_BASE;

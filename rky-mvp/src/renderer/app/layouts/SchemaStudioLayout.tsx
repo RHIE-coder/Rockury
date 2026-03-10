@@ -23,7 +23,7 @@ const tabs: IViewTabItem[] = [
 export function SchemaStudioLayout() {
   return (
     <div className="flex flex-col h-full">
-      <ViewTabs items={tabs} />
+      <ViewTabs items={tabs} areaRoot={ROUTES.DB.SCHEMA_STUDIO.ROOT} />
       <div className="flex-1 overflow-hidden">
         <Outlet />
       </div>

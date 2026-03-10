@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useState } from 'react';
 import { Plus } from 'lucide-react';
 import {
   DndContext,
@@ -11,7 +11,7 @@ import {
 } from '@dnd-kit/core';
 import {
   SortableContext,
-  rectSortingStrategy,
+  verticalListSortingStrategy,
   arrayMove,
 } from '@dnd-kit/sortable';
 import { Button } from '@/shared/components/ui/button';
@@ -35,6 +35,7 @@ import {
   useReorderConnections,
 } from '../model/useConnections';
 import { useConnectionStore } from '../model/connectionStore';
+import { useAutoTestConnections } from '../model/useAutoTestConnections';
 import { connectionApi } from '../api/connectionApi';
 import { SortableConnectionCard } from './SortableConnectionCard';
 import { ConnectionForm } from './ConnectionForm';
@@ -47,8 +48,10 @@ export function ConnectionList() {
   const deleteConnection = useDeleteConnection();
   const reorderConnections = useReorderConnections();
   const { isFormOpen, editingConnectionId, openForm, closeForm, statusMap, setStatus } = useConnectionStore();
-  const testedRef = useRef(false);
   const [deleteTarget, setDeleteTarget] = useState<{ id: string; name: string } | null>(null);
+
+  // Auto-test all connections on mount (shared hook)
+  useAutoTestConnections();
 
   const editingConnection = editingConnectionId
     ? connections?.find((c) => c.id === editingConnectionId) ?? null
@@ -60,36 +63,6 @@ export function ConnectionList() {
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
     useSensor(KeyboardSensor),
   );
-
-  // Auto-test all non-ignored connections on mount
-  useEffect(() => {
-    if (!connections || connections.length === 0 || testedRef.current) return;
-    testedRef.current = true;
-
-    const targets = connections.filter((c) => !c.ignored);
-    for (const conn of targets) {
-      setStatus(conn.id, 'testing');
-    }
-
-    // Test all concurrently
-    targets.forEach(async (conn) => {
-      try {
-        const result = await connectionApi.testById(conn.id);
-        if (result.success && result.data) {
-          setStatus(conn.id, result.data.success ? 'connected' : 'error');
-        } else {
-          setStatus(conn.id, 'error');
-        }
-      } catch {
-        setStatus(conn.id, 'error');
-      }
-    });
-
-    // Set ignored connections status
-    for (const conn of connections.filter((c) => c.ignored)) {
-      setStatus(conn.id, 'ignored');
-    }
-  }, [connections, setStatus]);
 
   function handleSave(data: IConnectionFormData) {
     if (editingConnectionId) {
@@ -233,9 +206,9 @@ export function ConnectionList() {
         >
           <SortableContext
             items={connections.map((c) => c.id)}
-            strategy={rectSortingStrategy}
+            strategy={verticalListSortingStrategy}
           >
-            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            <div className="flex flex-col gap-2">
               {connections.map((conn) => (
                 <SortableConnectionCard
                   key={conn.id}

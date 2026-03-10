@@ -387,7 +387,7 @@ export const useDiagramStore = create<DiagramStoreState & DiagramStoreActions>((
   // Real diagram actions
   setRealTables: (tables) => set({ realTables: tables ?? [] }),
   setRealDiagramId: (id) => set({ realDiagramId: id }),
-  setRealSelectedTableId: (id) => set({ realSelectedTableId: id }),
+  setRealSelectedTableId: (id) => set({ realSelectedTableId: id, isRightPanelOpen: id !== null }),
   setRealChangelogOpen: (open) => set({ isRealChangelogOpen: open }),
   setLastRealChangelog: (changelog) => set({ lastRealChangelog: changelog }),
 

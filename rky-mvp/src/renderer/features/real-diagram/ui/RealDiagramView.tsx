@@ -1,20 +1,32 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
-import { RefreshCw, Search, SlidersHorizontal, PanelLeft, PanelRight, ArrowDownToLine, Code, History, Camera } from 'lucide-react';
+import {
+  RefreshCw, ArrowDownToLine, Code, ChevronsUpDown, Check,
+} from 'lucide-react';
 import { useMutation } from '@tanstack/react-query';
 import { Button } from '@/shared/components/ui/button';
-import { Select } from '@/shared/components/ui/select';
+import { Popover, PopoverTrigger, PopoverContent } from '@/shared/components/ui/popover';
+import { Badge } from '@/shared/components/ui/badge';
 import type { ITable, IDiagram, IDiagramLayout, ISearchResult } from '~/shared/types/db';
-import { useConnections } from '@/features/db-connection';
+import { useConnections, useAutoTestConnections } from '@/features/db-connection';
+import { useConnectionStore } from '@/features/db-connection/model/connectionStore';
+import { ConnectionBadge } from '@/entities/connection';
 import { useDiagramStore, useCreateDiagram, useDiagramLayout, useSaveDiagramLayout, useCreateDiagramVersion } from '@/features/virtual-diagram';
 import { DiagramCanvas } from '@/features/virtual-diagram/ui/DiagramCanvas';
+import { CanvasToolbar } from '@/features/virtual-diagram/ui/CanvasToolbar';
 import { TableListPanel } from '@/features/virtual-diagram/ui/TableListPanel';
 import { TableDetailPanel } from '@/features/virtual-diagram/ui/TableDetailPanel';
 import { SearchOverlay } from '@/features/virtual-diagram/ui/SearchOverlay';
 import { FilterPanel } from '@/features/virtual-diagram/ui/FilterPanel';
+import { ExportMenu } from '@/features/virtual-diagram/ui/ExportMenu';
+import { CascadeInfoPanel } from '@/features/virtual-diagram/ui/CascadeInfoPanel';
+import { NodeContextMenu } from '@/features/virtual-diagram/ui/NodeContextMenu';
 import { DdlEditorView } from '@/features/ddl-editor';
 import { realDiagramApi } from '../api/realDiagramApi';
-import { ChangelogPanel } from './ChangelogPanel';
-import { SnapshotListPanel } from '@/features/schema-snapshot';
+import { schemaToNodes } from '@/features/virtual-diagram/lib/schemaToNodes';
+import { applyDagreLayout } from '@/features/virtual-diagram/lib/autoLayout';
+import { simulateCascade, getReferencedColumns } from '@/features/virtual-diagram/lib/cascadeTraversal';
+import type { TSimulationType } from '@/features/virtual-diagram/lib/cascadeTraversal';
+
 import { sanitizeImportedTables } from '../lib/sanitizeImportedTables';
 
 export function RealDiagramView() {
@@ -24,46 +36,55 @@ export function RealDiagramView() {
     setFilter,
     setFilterPreset,
     isLeftPanelOpen,
-    toggleLeftPanel,
     isRightPanelOpen,
-    toggleRightPanel,
     selectedConnectionId: storeConnectionId,
     setSelectedConnectionId: setStoreConnectionId,
     viewMode,
     setViewMode,
-    // Persisted real diagram state from store
     realTables: tables,
     setRealTables: setTables,
     realDiagramId,
     setRealDiagramId,
     realSelectedTableId: selectedTableId,
     setRealSelectedTableId: setSelectedTableId,
-    isRealChangelogOpen: isChangelogOpen,
-    setRealChangelogOpen: setIsChangelogOpen,
-    lastRealChangelog: lastChangelog,
-    setLastRealChangelog: setLastChangelog,
+    hiddenTableIds,
+    toggleTableVisibility,
+    showAllTables: handleShowAll,
+    tableColors,
+    setTableColor,
+    lockedNodeIds,
+    toggleNodeLock,
+    cascadeSimulation,
+    setCascadeSimulation,
+    clearCascadeSimulation,
   } = useDiagramStore();
+
+  const { statusMap } = useConnectionStore();
+  useAutoTestConnections();
 
   const selectedConnectionId = storeConnectionId ?? '';
   const selectedConnection = connections?.find((c) => c.id === selectedConnectionId);
   function setSelectedConnectionId(id: string) {
     setStoreConnectionId(id || null);
   }
-  // Ephemeral UI state remains local
-  const [isSnapshotsOpen, setIsSnapshotsOpen] = useState(false);
+
+  // Ephemeral UI state
+  const [isConnectionPickerOpen, setIsConnectionPickerOpen] = useState(false);
+  const [fitViewTrigger, setFitViewTrigger] = useState(0);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<ISearchResult[]>([]);
   const [isFilterPanelOpen, setIsFilterPanelOpen] = useState(false);
+  const [isExportOpen, setIsExportOpen] = useState(false);
+  const [contextMenu, setContextMenu] = useState<{ position: { x: number; y: number }; tableId: string; tableName: string } | null>(null);
   const createDiagram = useCreateDiagram();
   const createVersion = useCreateDiagramVersion();
 
   const { data: layout } = useDiagramLayout(realDiagramId ?? '');
   const saveLayout = useSaveDiagramLayout();
-
-  // Track latest layout in ref so sync can read up-to-date positions (survives debounce race)
   const latestLayoutRef = useRef<Pick<IDiagramLayout, 'positions' | 'zoom' | 'viewport'> | null>(null);
 
+  // --- Sync ---
   const syncSchema = useMutation({
     mutationFn: (connectionId: string) => realDiagramApi.syncReal(connectionId),
     onSuccess: (result) => {
@@ -71,44 +92,32 @@ export function RealDiagramView() {
         const newTables = sanitizeImportedTables(result.data.diagram.tables);
         const newDiagramId = result.data.diagram.id;
 
-        // Remap saved positions from old table IDs to new table IDs by table name
-        const oldTables = useDiagramStore.getState().realTables;
-        const savedLayout = latestLayoutRef.current ?? layout;
-        const oldPositions = savedLayout?.positions;
-
-        if (oldPositions && oldTables.length > 0) {
-          const oldNameToId = new Map(oldTables.map((t) => [t.name, t.id]));
-          const newPositions: Record<string, { x: number; y: number }> = {};
-
-          for (const t of newTables) {
-            const oldId = oldNameToId.get(t.name);
-            if (oldId && oldPositions[oldId]) {
-              newPositions[t.id] = oldPositions[oldId];
-            }
-          }
-
-          if (Object.keys(newPositions).length > 0) {
-            saveLayout.mutate({
-              diagramId: newDiagramId,
-              positions: newPositions,
-              zoom: savedLayout?.zoom ?? 1,
-              viewport: savedLayout?.viewport ?? { x: 0, y: 0 },
-            });
-          }
+        const { nodes, edges } = schemaToNodes(newTables, { filter, hiddenTableIds });
+        const layoutedNodes = applyDagreLayout(nodes, edges);
+        const newPositions: Record<string, { x: number; y: number }> = {};
+        for (const node of layoutedNodes) {
+          newPositions[node.id] = node.position;
         }
+
+        saveLayout.mutate({
+          diagramId: newDiagramId,
+          positions: newPositions,
+          zoom: 1,
+          viewport: { x: 0, y: 0 },
+          hiddenTableIds,
+          tableColors,
+        });
 
         setTables(newTables);
         setRealDiagramId(newDiagramId);
         setSelectedTableId(null);
-        if (result.data.changelog) {
-          setLastChangelog(result.data.changelog);
-          setIsChangelogOpen(true);
-        }
+        clearCascadeSimulation();
+        setTimeout(() => setFitViewTrigger((v) => v + 1), 100);
       }
     },
   });
 
-  // Auto-load saved diagram from local DB when connection is selected
+  // Auto-load saved diagram when connection selected
   useEffect(() => {
     if (!selectedConnectionId) {
       setTables([]);
@@ -117,7 +126,6 @@ export function RealDiagramView() {
       latestLayoutRef.current = null;
       return;
     }
-
     realDiagramApi.fetchReal(selectedConnectionId).then((result) => {
       if (result.success && result.data && result.data.tables?.length > 0) {
         setTables(sanitizeImportedTables(result.data.tables));
@@ -137,18 +145,24 @@ export function RealDiagramView() {
     syncSchema.mutate(selectedConnectionId);
   }
 
-  // Cmd+F shortcut
+  // --- Keyboard shortcuts (same as Studio) ---
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
       if ((e.metaKey || e.ctrlKey) && e.key === 'f') {
         e.preventDefault();
-        setIsSearchOpen(true);
+        setIsSearchOpen((v) => !v);
+        return;
+      }
+      if (e.key === 'Escape') {
+        if (cascadeSimulation) { clearCascadeSimulation(); return; }
+        if (isSearchOpen) { setIsSearchOpen(false); setSearchQuery(''); setSearchResults([]); return; }
       }
     }
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
-  }, []);
+  }, [cascadeSimulation, clearCascadeSimulation, isSearchOpen]);
 
+  // --- Table selection ---
   const selectedTable = tables.find((t) => t.id === selectedTableId) ?? null;
   const highlightedTableIds = useMemo(
     () => searchResults.filter((r) => r.type === 'table').map((r) => r.tableId),
@@ -156,9 +170,107 @@ export function RealDiagramView() {
   );
 
   const handleTableSelect = useCallback((tableId: string) => {
+    if (viewMode === 'ddl') {
+      useDiagramStore.setState({ realSelectedTableId: tableId || null });
+      return;
+    }
     setSelectedTableId(tableId || null);
-  }, [setSelectedTableId]);
+    if (!tableId && cascadeSimulation) {
+      clearCascadeSimulation();
+    }
+  }, [viewMode, setSelectedTableId, cascadeSimulation, clearCascadeSimulation]);
 
+  function handleSearchSelect(result: ISearchResult) {
+    setSelectedTableId(result.tableId);
+    setIsSearchOpen(false);
+  }
+
+  // --- Layout ---
+  const handleLayoutChange = useCallback(
+    (layoutUpdate: Pick<IDiagramLayout, 'positions' | 'zoom' | 'viewport'>) => {
+      if (!realDiagramId) return;
+      latestLayoutRef.current = layoutUpdate;
+      saveLayout.mutate({
+        diagramId: realDiagramId,
+        ...layoutUpdate,
+        hiddenTableIds,
+        tableColors,
+      });
+    },
+    [realDiagramId, saveLayout, hiddenTableIds, tableColors],
+  );
+
+  // --- Auto Layout ---
+  function handleAutoLayout() {
+    if (tables.length === 0) return;
+    const { nodes, edges } = schemaToNodes(tables, { filter, hiddenTableIds });
+    const layoutedNodes = applyDagreLayout(nodes, edges);
+    const positions: Record<string, { x: number; y: number }> = {};
+    for (const node of layoutedNodes) {
+      positions[node.id] = node.position;
+    }
+    if (realDiagramId) {
+      saveLayout.mutate({
+        diagramId: realDiagramId,
+        positions,
+        zoom: 1,
+        viewport: { x: 0, y: 0 },
+        hiddenTableIds,
+        tableColors,
+      });
+    }
+    setTimeout(() => setFitViewTrigger((v) => v + 1), 100);
+  }
+
+  // --- Table Color ---
+  function handleTableColorChange(color: string | null) {
+    if (!selectedTableId) return;
+    setTableColor(selectedTableId, color);
+    if (realDiagramId && layout) {
+      const newColors = { ...useDiagramStore.getState().tableColors };
+      if (color) { newColors[selectedTableId] = color; }
+      else { delete newColors[selectedTableId]; }
+      saveLayout.mutate({
+        diagramId: realDiagramId,
+        positions: layout.positions,
+        zoom: layout.zoom,
+        viewport: layout.viewport,
+        hiddenTableIds,
+        tableColors: newColors,
+      });
+    }
+  }
+
+  // --- Table Visibility ---
+  function handleToggleVisibility(tableId: string) {
+    toggleTableVisibility(tableId);
+    if (realDiagramId && layout) {
+      const currentHidden = useDiagramStore.getState().hiddenTableIds;
+      const newHidden = currentHidden.includes(tableId)
+        ? currentHidden.filter((id) => id !== tableId)
+        : [...currentHidden, tableId];
+      saveLayout.mutate({
+        diagramId: realDiagramId,
+        positions: layout.positions,
+        zoom: layout.zoom,
+        viewport: layout.viewport,
+        hiddenTableIds: newHidden,
+        tableColors,
+      });
+    }
+  }
+
+  // --- Cascade Simulation ---
+  function handleNodeContextMenu(event: React.MouseEvent, tableId: string, tableName: string) {
+    setContextMenu({ position: { x: event.clientX, y: event.clientY }, tableId, tableName });
+  }
+
+  function handleSimulate(tableId: string, type: TSimulationType, columnName?: string) {
+    const result = simulateCascade(tables, tableId, type, columnName);
+    setCascadeSimulation(result);
+  }
+
+  // --- Import as Virtual ---
   function handleImportAsVirtual() {
     if (tables.length === 0) return;
     const importTables = sanitizeImportedTables(tables);
@@ -170,14 +282,12 @@ export function RealDiagramView() {
         onSuccess: (result) => {
           if (result.success) {
             const newDiagram = result.data;
-            // Auto-create initial version with imported tables
             createVersion.mutate({
               diagramId: newDiagram.id,
               name: 'v0.0.0',
               ddlContent: '',
               schemaSnapshot: { ...newDiagram, tables: importTables },
             });
-            // Switch to virtual tab
             useDiagramStore.getState().setActiveTab('virtual');
             useDiagramStore.getState().setSelectedDiagramId(newDiagram.id);
           }
@@ -186,24 +296,7 @@ export function RealDiagramView() {
     );
   }
 
-  function handleSearchSelect(result: ISearchResult) {
-    setSelectedTableId(result.tableId);
-    setIsSearchOpen(false);
-  }
-
-  const handleLayoutChange = useCallback(
-    (layoutUpdate: Pick<IDiagramLayout, 'positions' | 'zoom' | 'viewport'>) => {
-      if (!realDiagramId) return;
-      latestLayoutRef.current = layoutUpdate;
-      saveLayout.mutate({
-        diagramId: realDiagramId,
-        ...layoutUpdate,
-      });
-    },
-    [realDiagramId, saveLayout],
-  );
-
-  // Build IDiagram for the canvas (use persisted ID if available)
+  // Build IDiagram for the canvas
   const realDiagram: IDiagram | null = tables.length > 0
     ? {
         id: realDiagramId ?? `real-${selectedConnectionId}`,
@@ -217,21 +310,61 @@ export function RealDiagramView() {
     : null;
 
   return (
-    <div className="flex h-full flex-col">
-      {/* Toolbar */}
+    <div className="flex h-full w-full flex-col">
+      {/* Top Toolbar — Console-specific controls only (mirrors DiagramToolbar position) */}
       <div className="flex items-center gap-2 border-b border-border px-3 py-1.5">
-        <Select
-          className="h-7 w-48 text-xs"
-          value={selectedConnectionId}
-          onChange={(e) => setSelectedConnectionId(e.target.value)}
-        >
-          <option value="">Select connection...</option>
-          {connections?.map((c) => (
-            <option key={c.id} value={c.id}>
-              {c.name} ({c.dbType})
-            </option>
-          ))}
-        </Select>
+        {/* Connection Picker */}
+        <Popover open={isConnectionPickerOpen} onOpenChange={setIsConnectionPickerOpen}>
+          <PopoverTrigger asChild>
+            <Button variant="outline" size="xs" className="h-7 w-48 justify-between text-xs font-normal">
+              {selectedConnection ? (
+                <span className="flex items-center gap-1.5 truncate">
+                  <ConnectionBadge status={statusMap[selectedConnection.id] ?? (selectedConnection.ignored ? 'ignored' : 'disconnected')} />
+                  <span className="truncate">{selectedConnection.name}</span>
+                  <Badge variant="outline" className="text-[10px] px-1 py-0">{selectedConnection.dbType}</Badge>
+                </span>
+              ) : (
+                <span className="text-muted-foreground">Select connection...</span>
+              )}
+              <ChevronsUpDown className="size-3 shrink-0 text-muted-foreground" />
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent align="start" className="w-56 p-1">
+            {connections && connections.length > 0 ? (
+              <div className="flex max-h-64 flex-col overflow-y-auto">
+                {connections.map((c) => {
+                  const connStatus = statusMap[c.id] ?? (c.ignored ? 'ignored' : 'disconnected');
+                  const isConnected = connStatus === 'connected';
+                  const isSelected = c.id === selectedConnectionId;
+                  return (
+                    <button
+                      key={c.id}
+                      type="button"
+                      disabled={!isConnected}
+                      className={`flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-xs ${
+                        isConnected ? 'hover:bg-accent cursor-pointer' : 'opacity-40 cursor-not-allowed'
+                      } ${isSelected ? 'bg-accent' : ''}`}
+                      onClick={() => {
+                        if (!isConnected) return;
+                        setSelectedConnectionId(c.id);
+                        setIsConnectionPickerOpen(false);
+                      }}
+                    >
+                      <ConnectionBadge status={connStatus} />
+                      <span className="flex-1 truncate text-left">{c.name}</span>
+                      <Badge variant="outline" className="text-[10px] px-1 py-0 shrink-0">{c.dbType}</Badge>
+                      {isSelected && <Check className="size-3 shrink-0 text-primary" />}
+                    </button>
+                  );
+                })}
+              </div>
+            ) : (
+              <p className="px-2 py-3 text-center text-xs text-muted-foreground">No connections</p>
+            )}
+          </PopoverContent>
+        </Popover>
+
+        {/* Sync */}
         <Button
           variant="outline"
           size="xs"
@@ -244,32 +377,18 @@ export function RealDiagramView() {
 
         {realDiagram && (
           <>
+            {/* Import as Virtual */}
             <Button
               variant="outline"
               size="xs"
               onClick={handleImportAsVirtual}
               disabled={createDiagram.isPending}
-              title="Import as Virtual Diagram (Reverse Engineering)"
+              title="Import as Virtual Diagram"
             >
               <ArrowDownToLine className="size-3.5" />
               {createDiagram.isPending ? 'Importing...' : 'Import as Virtual'}
             </Button>
-            <Button
-              variant={isSnapshotsOpen ? 'secondary' : 'ghost'}
-              size="xs"
-              onClick={() => setIsSnapshotsOpen(!isSnapshotsOpen)}
-              title="Schema Snapshots"
-            >
-              <Camera className="size-3.5" />
-            </Button>
-            <Button
-              variant={isChangelogOpen ? 'secondary' : 'ghost'}
-              size="xs"
-              onClick={() => setIsChangelogOpen(!isChangelogOpen)}
-              title="Changelog"
-            >
-              <History className="size-3.5" />
-            </Button>
+
           </>
         )}
 
@@ -278,48 +397,14 @@ export function RealDiagramView() {
         {realDiagram && (
           <span className="text-xs text-muted-foreground">
             {tables.length} tables
+            {hiddenTableIds.length > 0 && (
+              <span className="ml-1 text-muted-foreground/60">({hiddenTableIds.length} hidden)</span>
+            )}
           </span>
         )}
 
+        {/* DDL Toggle — same position as Studio (right side of toolbar) */}
         <div className="flex items-center gap-1">
-          <Button
-            variant="ghost"
-            size="xs"
-            onClick={() => setIsSearchOpen(!isSearchOpen)}
-            title="Search (Cmd+F)"
-          >
-            <Search className="size-3.5" />
-          </Button>
-
-          <Button
-            variant={isFilterPanelOpen ? 'secondary' : 'ghost'}
-            size="xs"
-            onClick={() => setIsFilterPanelOpen((v) => !v)}
-            title="Filter"
-          >
-            <SlidersHorizontal className="size-3.5" />
-          </Button>
-
-          <Button
-            variant={isLeftPanelOpen ? 'secondary' : 'ghost'}
-            size="xs"
-            onClick={toggleLeftPanel}
-            title="Toggle left panel"
-          >
-            <PanelLeft className="size-3.5" />
-          </Button>
-
-          <Button
-            variant={isRightPanelOpen ? 'secondary' : 'ghost'}
-            size="xs"
-            onClick={toggleRightPanel}
-            title="Toggle right panel"
-          >
-            <PanelRight className="size-3.5" />
-          </Button>
-
-          <div className="h-4 w-px bg-border" />
-
           <Button
             variant={viewMode === 'ddl' ? 'secondary' : 'ghost'}
             size="xs"
@@ -332,7 +417,7 @@ export function RealDiagramView() {
         </div>
       </div>
 
-      {/* 3-Panel Layout */}
+      {/* 3-Panel Layout (identical structure to VirtualDiagramView) */}
       <div className="relative flex flex-1 overflow-hidden">
         {/* Left Panel: Table List */}
         {isLeftPanelOpen && realDiagram && (
@@ -341,20 +426,46 @@ export function RealDiagramView() {
             selectedTableId={selectedTableId}
             searchResults={searchResults}
             onTableSelect={handleTableSelect}
-            onClose={toggleLeftPanel}
+            onClose={() => {}}
+            hiddenTableIds={hiddenTableIds}
+            onToggleVisibility={handleToggleVisibility}
+            onShowAll={handleShowAll}
           />
         )}
 
-        {/* Center: Canvas */}
+        {/* Center: Canvas or DDL */}
         <div className="relative w-0 min-w-0 flex-1">
-          {/* Filter Panel (floating) */}
+          {/* Canvas Floating Toolbar (same as Studio CanvasToolbar) */}
+          {viewMode === 'canvas' && realDiagram && (
+            <CanvasToolbar
+              onAutoLayout={handleAutoLayout}
+              onToggleSearch={() => setIsSearchOpen((v) => !v)}
+              isSearchOpen={isSearchOpen}
+              onToggleFilter={() => setIsFilterPanelOpen((v) => !v)}
+              isFilterOpen={isFilterPanelOpen}
+              onToggleExport={() => setIsExportOpen((v) => !v)}
+              isExportOpen={isExportOpen}
+            />
+          )}
+
+          {/* Filter Panel (floating, same position as Studio) */}
           {isFilterPanelOpen && (
-            <div className="absolute right-2 top-2 z-50">
+            <div className="absolute right-2 top-12 z-50">
               <FilterPanel
                 filter={filter}
                 onFilterChange={setFilter}
                 onPresetChange={setFilterPreset}
                 onClose={() => setIsFilterPanelOpen(false)}
+              />
+            </div>
+          )}
+
+          {/* Export Menu (floating, same position as Studio) */}
+          {isExportOpen && (
+            <div className="absolute right-2 top-12 z-50">
+              <ExportMenu
+                tables={tables}
+                onClose={() => setIsExportOpen(false)}
               />
             </div>
           )}
@@ -367,67 +478,88 @@ export function RealDiagramView() {
               onQueryChange={setSearchQuery}
               onResults={setSearchResults}
               onSelect={handleSearchSelect}
-              onClose={() => setIsSearchOpen(false)}
+              onClose={() => { setIsSearchOpen(false); setSearchQuery(''); setSearchResults([]); }}
               results={searchResults}
             />
           )}
 
-          {viewMode === 'ddl' && realDiagram ? (
+          {/* Canvas: always mounted when diagram exists, hidden via CSS (same as Studio) */}
+          <div className={viewMode === 'canvas' ? 'h-full w-full' : 'hidden'}>
+            {realDiagram ? (
+              <DiagramCanvas
+                diagram={realDiagram}
+                layout={layout}
+                filter={filter}
+                highlightedTableIds={highlightedTableIds}
+                selectedTableId={viewMode === 'canvas' ? selectedTableId : null}
+                onTableSelect={handleTableSelect}
+                onLayoutChange={handleLayoutChange}
+                hiddenTableIds={hiddenTableIds}
+                tableColors={tableColors}
+                lockedNodeIds={lockedNodeIds}
+                onNodeLockToggle={toggleNodeLock}
+                onNodeContextMenu={handleNodeContextMenu}
+                cascadeSimulation={cascadeSimulation}
+                fitViewTrigger={fitViewTrigger}
+              />
+            ) : (
+              <div className="flex h-full items-center justify-center bg-muted/30">
+                <p className="text-sm text-muted-foreground">
+                  {syncSchema.isError
+                    ? 'Failed to fetch schema. Please check your connection.'
+                    : 'Select a connection and click "Sync" to view the real database structure.'}
+                </p>
+              </div>
+            )}
+          </div>
+
+          {/* DDL Editor (rendered only when active, same as Studio) */}
+          {viewMode === 'ddl' && realDiagram && (
             <DdlEditorView
-              tables={tables}
+              tables={hiddenTableIds.length > 0
+                ? tables.filter((t) => !hiddenTableIds.includes(t.id))
+                : tables}
               readOnly
               initialDbType={selectedConnection?.dbType ?? 'mysql'}
               focusTableName={selectedTableId ? tables.find((t) => t.id === selectedTableId)?.name ?? null : null}
             />
-          ) : realDiagram ? (
-            <DiagramCanvas
-              diagram={realDiagram}
-              layout={layout}
-              filter={filter}
-              highlightedTableIds={highlightedTableIds}
-              selectedTableId={selectedTableId}
-              onTableSelect={handleTableSelect}
-              onLayoutChange={handleLayoutChange}
+          )}
+
+          {/* Cascade Info Panel (floating, same as Studio) */}
+          {cascadeSimulation && (
+            <CascadeInfoPanel
+              simulation={cascadeSimulation}
+              onClose={clearCascadeSimulation}
             />
-          ) : (
-            <div className="flex h-full items-center justify-center bg-muted/30">
-              <p className="text-sm text-muted-foreground">
-                {syncSchema.isError
-                  ? 'Failed to fetch schema. Please check your connection.'
-                  : 'Select a connection and click "Sync" to view the real database structure.'}
-              </p>
-            </div>
           )}
         </div>
 
-        {/* Right Panel: Table Detail (read-only) */}
-        {isRightPanelOpen && selectedTable && realDiagram && (
+        {/* Right Panel: Table Detail (hidden in DDL mode, same as Studio) */}
+        {viewMode !== 'ddl' && isRightPanelOpen && selectedTable && realDiagram && (
           <TableDetailPanel
             table={selectedTable}
             allTables={tables}
-            onChange={() => {}} // read-only
-            onDelete={() => {}} // read-only
+            onChange={() => {}}
+            onDelete={() => {}}
             onClose={() => setSelectedTableId(null)}
+            color={selectedTableId ? tableColors[selectedTableId] : undefined}
+            onColorChange={handleTableColorChange}
+            readOnly
           />
         )}
 
-        {/* Snapshots Panel */}
-        {isSnapshotsOpen && selectedConnectionId && (
-          <div className="w-72 shrink-0 overflow-y-auto border-l border-border p-3">
-            <SnapshotListPanel connectionId={selectedConnectionId} />
-          </div>
-        )}
-
-        {/* Changelog Panel */}
-        {isChangelogOpen && selectedConnectionId && (
-          <div className="w-72 shrink-0 border-l border-border">
-            <ChangelogPanel
-              connectionId={selectedConnectionId}
-              onClose={() => setIsChangelogOpen(false)}
-            />
-          </div>
-        )}
       </div>
+
+      {/* Node Context Menu (floating, same as Studio) */}
+      {contextMenu && (
+        <NodeContextMenu
+          position={contextMenu.position}
+          tableName={contextMenu.tableName}
+          referencedColumns={getReferencedColumns(tables, contextMenu.tableId)}
+          onSimulate={(type, columnName) => handleSimulate(contextMenu.tableId, type, columnName)}
+          onClose={() => setContextMenu(null)}
+        />
+      )}
     </div>
   );
 }

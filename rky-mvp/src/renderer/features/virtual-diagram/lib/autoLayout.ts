@@ -109,10 +109,10 @@ function layoutComponent(nodes: Node[], edges: Edge[], options: Required<AutoLay
   }));
 }
 
-const GROUP_GAP = 120;
-const ISOLATED_COLUMNS = 4;
-const ISOLATED_GAP_X = 300;
-const ISOLATED_GAP_Y = 40;
+const GROUP_GAP = 160;
+const ISOLATED_COLUMNS = 3;
+const ISOLATED_GAP_X = 400;
+const ISOLATED_GAP_Y = 60;
 
 /**
  * Smart auto-layout: handles disconnected subgraphs and isolated nodes.
@@ -129,7 +129,7 @@ export function applyDagreLayout(
 ): Node[] {
   if (nodes.length === 0) return [];
 
-  const { direction = 'LR', rankSep = 180, nodeSep = 60 } = options;
+  const { direction = 'LR', rankSep = 220, nodeSep = 100 } = options;
   const fullOptions = { direction, rankSep, nodeSep };
 
   const components = findConnectedComponents(nodes, edges);

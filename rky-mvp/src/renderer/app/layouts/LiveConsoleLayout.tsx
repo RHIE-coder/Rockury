@@ -27,7 +27,7 @@ const tabs: IViewTabItem[] = [
 export function LiveConsoleLayout() {
   return (
     <div className="flex flex-col h-full">
-      <ViewTabs items={tabs} />
+      <ViewTabs items={tabs} areaRoot={ROUTES.DB.LIVE_CONSOLE.ROOT} />
       <div className="flex-1 overflow-hidden">
         <Outlet />
       </div>

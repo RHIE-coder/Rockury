@@ -1,6 +1,7 @@
 import { connectionService } from './connectionService';
 import { createMysqlConnection, closeMysqlConnection } from '#/infrastructure';
 import { createPgConnection, closePgConnection } from '#/infrastructure';
+import { createSqliteConnection, closeSqliteConnection } from '#/infrastructure';
 import type { ITable, IColumn, IConstraint, IForeignKeyRef, TKeyType, TDbType } from '~/shared/types/db';
 
 interface MysqlColumnRow {
@@ -426,6 +427,159 @@ function buildTablesFromPg(
   return tables;
 }
 
+interface SqliteColumnRow {
+  cid: number;
+  name: string;
+  type: string;
+  notnull: number;
+  dflt_value: string | null;
+  pk: number;
+}
+
+interface SqliteForeignKeyRow {
+  id: number;
+  seq: number;
+  table: string;
+  from: string;
+  to: string;
+  on_update: string;
+  on_delete: string;
+}
+
+interface SqliteIndexRow {
+  name: string;
+  unique: number;
+}
+
+interface SqliteIndexInfoRow {
+  name: string;
+}
+
+function fetchSqliteSchema(connectionId: string): ITable[] {
+  const config = connectionService.getConnectionConfig(connectionId);
+  const db = createSqliteConnection({ database: config.database });
+
+  try {
+    // Get all table names
+    const tableRows = db.prepare(
+      `SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' ORDER BY name`,
+    ).all() as { name: string }[];
+
+    const tables: ITable[] = [];
+
+    for (const tableRow of tableRows) {
+      const tableName = tableRow.name;
+
+      // Fetch columns
+      const columns = db.prepare(`PRAGMA table_info('${tableName}')`).all() as SqliteColumnRow[];
+
+      // Fetch foreign keys
+      const foreignKeys = db.prepare(`PRAGMA foreign_key_list('${tableName}')`).all() as SqliteForeignKeyRow[];
+      const fkMap = new Map<string, SqliteForeignKeyRow>();
+      for (const fk of foreignKeys) {
+        fkMap.set(fk.from, fk);
+      }
+
+      // Fetch indexes for unique constraints
+      const indexes = db.prepare(`PRAGMA index_list('${tableName}')`).all() as SqliteIndexRow[];
+      const uniqueColumns = new Set<string>();
+      for (const idx of indexes) {
+        if (idx.unique) {
+          const indexInfo = db.prepare(`PRAGMA index_info('${idx.name}')`).all() as SqliteIndexInfoRow[];
+          for (const col of indexInfo) {
+            uniqueColumns.add(col.name);
+          }
+        }
+      }
+
+      // Build IColumn[]
+      const tableColumns: IColumn[] = columns.map((col) => {
+        const keyTypes: TKeyType[] = [];
+        let reference: IForeignKeyRef | null = null;
+
+        if (col.pk > 0) keyTypes.push('PK');
+
+        const fk = fkMap.get(col.name);
+        if (fk) {
+          keyTypes.push('FK');
+          reference = {
+            table: fk.table,
+            column: fk.to,
+            onDelete: resolveRefAction(fk.on_delete),
+            onUpdate: resolveRefAction(fk.on_update),
+          };
+        }
+
+        if (uniqueColumns.has(col.name) && !keyTypes.includes('PK')) {
+          keyTypes.push('UK');
+        }
+
+        return {
+          id: crypto.randomUUID(),
+          name: col.name,
+          dataType: col.type || 'TEXT',
+          keyTypes,
+          isAutoIncrement: col.pk === 1 && col.type.toUpperCase().includes('INTEGER'),
+          defaultValue: col.dflt_value,
+          nullable: col.notnull === 0,
+          comment: '',
+          reference,
+          constraints: [],
+          ordinalPosition: col.cid + 1,
+        };
+      });
+
+      // Build table-level constraints
+      const constraints: IConstraint[] = [];
+
+      // PK constraint
+      const pkCols = columns.filter((c) => c.pk > 0).map((c) => c.name);
+      if (pkCols.length > 0) {
+        constraints.push({ type: 'PK', name: `pk_${tableName}`, columns: pkCols });
+      }
+
+      // FK constraints
+      for (const fk of foreignKeys) {
+        constraints.push({
+          type: 'FK',
+          name: `fk_${tableName}_${fk.from}`,
+          columns: [fk.from],
+          reference: {
+            table: fk.table,
+            column: fk.to,
+            onDelete: resolveRefAction(fk.on_delete),
+            onUpdate: resolveRefAction(fk.on_update),
+          },
+        });
+      }
+
+      // Unique constraints
+      for (const idx of indexes) {
+        if (idx.unique) {
+          const indexInfo = db.prepare(`PRAGMA index_info('${idx.name}')`).all() as SqliteIndexInfoRow[];
+          constraints.push({
+            type: 'UK',
+            name: idx.name,
+            columns: indexInfo.map((c) => c.name),
+          });
+        }
+      }
+
+      tables.push({
+        id: crypto.randomUUID(),
+        name: tableName,
+        comment: '',
+        columns: tableColumns,
+        constraints,
+      });
+    }
+
+    return tables;
+  } finally {
+    closeSqliteConnection(db);
+  }
+}
+
 export const schemaService = {
   async fetchRealSchema(connectionId: string): Promise<ITable[]> {
     const config = connectionService.getConnectionConfig(connectionId);
@@ -437,6 +591,10 @@ export const schemaService = {
 
     if (dbType === 'postgresql') {
       return fetchPgSchema(connectionId);
+    }
+
+    if (dbType === 'sqlite') {
+      return fetchSqliteSchema(connectionId);
     }
 
     throw new Error(`Unsupported database type: ${dbType}`);

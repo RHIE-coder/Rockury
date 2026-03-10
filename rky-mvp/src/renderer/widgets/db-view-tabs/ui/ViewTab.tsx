@@ -1,13 +1,25 @@
-import { NavLink } from 'react-router';
+import { NavLink, useLocation } from 'react-router';
+import { useEffect } from 'react';
 import { cn } from '@/shared/lib/utils';
+import { useLastTabStore } from '@/shared/model/lastTabStore';
 import type { IViewTabItem } from '../model/types';
 
 interface ViewTabProps {
   item: IViewTabItem;
+  areaRoot?: string;
 }
 
-export function ViewTab({ item }: ViewTabProps) {
+export function ViewTab({ item, areaRoot }: ViewTabProps) {
   const Icon = item.icon;
+  const location = useLocation();
+  const setLastTab = useLastTabStore((s) => s.setLastTab);
+
+  // Save the current tab as last visited when it becomes active
+  useEffect(() => {
+    if (areaRoot && location.pathname === item.path) {
+      setLastTab(areaRoot, item.path);
+    }
+  }, [areaRoot, location.pathname, item.path, setLastTab]);
 
   return (
     <NavLink

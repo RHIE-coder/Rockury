@@ -1046,7 +1046,7 @@ export function VirtualDiagramView() {
               onQueryChange={setSearchQuery}
               onResults={setSearchResults}
               onSelect={handleSearchSelect}
-              onClose={() => setSearchOpen(false)}
+              onClose={() => { setSearchOpen(false); setSearchQuery(''); setSearchResults([]); }}
               results={searchResults}
             />
           )}
