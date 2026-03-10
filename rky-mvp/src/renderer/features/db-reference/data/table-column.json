@@ -1,0 +1,314 @@
+[
+  {
+    "id": "table",
+    "category": "table-column",
+    "name": "Table",
+    "summary": "The fundamental structure for storing data in rows and columns.",
+    "description": "A table is the most basic building block of a relational database. It organizes data into rows (records) and columns (fields), similar to a spreadsheet. Every piece of data you store in a database lives inside a table. Tables have a defined structure (schema) that specifies what columns exist and what type of data each column can hold.",
+    "syntax": {
+      "postgresql": "CREATE TABLE users (\n  id SERIAL PRIMARY KEY,\n  username VARCHAR(50) NOT NULL,\n  email VARCHAR(100) UNIQUE NOT NULL,\n  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP\n);",
+      "mysql": "CREATE TABLE users (\n  id INT AUTO_INCREMENT PRIMARY KEY,\n  username VARCHAR(50) NOT NULL,\n  email VARCHAR(100) UNIQUE NOT NULL,\n  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP\n) ENGINE=InnoDB;",
+      "mariadb": "CREATE TABLE users (\n  id INT AUTO_INCREMENT PRIMARY KEY,\n  username VARCHAR(50) NOT NULL,\n  email VARCHAR(100) UNIQUE NOT NULL,\n  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP\n) ENGINE=InnoDB;",
+      "sqlite": "CREATE TABLE users (\n  id INTEGER PRIMARY KEY AUTOINCREMENT,\n  username TEXT NOT NULL,\n  email TEXT UNIQUE NOT NULL,\n  created_at TEXT DEFAULT CURRENT_TIMESTAMP\n);"
+    },
+    "vendorSupport": {
+      "postgresql": { "supported": true, "level": "full" },
+      "mysql": { "supported": true, "level": "full" },
+      "mariadb": { "supported": true, "level": "full" },
+      "sqlite": { "supported": true, "level": "full" }
+    },
+    "tips": [
+      "Always choose meaningful table names that describe the data they hold, using plural nouns (e.g., 'users', 'orders').",
+      "Define a PRIMARY KEY for every table to uniquely identify each row.",
+      "Keep tables focused on a single entity — if a table has too many unrelated columns, consider splitting it."
+    ],
+    "relatedItems": ["column", "temporary-table", "foreign-table", "table-comment"],
+    "seeAlso": []
+  },
+  {
+    "id": "temporary-table",
+    "category": "table-column",
+    "name": "Temporary Table",
+    "summary": "A table that exists only for the duration of a session or transaction.",
+    "description": "A temporary table is a short-lived table that is automatically dropped when the session ends or the connection is closed. It is useful for storing intermediate results during complex queries or batch processing. Temporary tables are only visible to the session that created them, so they won't interfere with other users.",
+    "syntax": {
+      "postgresql": "CREATE TEMPORARY TABLE temp_active_users (\n  user_id INT,\n  username VARCHAR(50),\n  last_login TIMESTAMP\n);\n\n-- Automatically dropped when the session ends",
+      "mysql": "CREATE TEMPORARY TABLE temp_active_users (\n  user_id INT,\n  username VARCHAR(50),\n  last_login TIMESTAMP\n);\n\n-- Automatically dropped when the session ends",
+      "mariadb": "CREATE TEMPORARY TABLE temp_active_users (\n  user_id INT,\n  username VARCHAR(50),\n  last_login TIMESTAMP\n);\n\n-- Automatically dropped when the session ends",
+      "sqlite": "CREATE TEMPORARY TABLE temp_active_users (\n  user_id INTEGER,\n  username TEXT,\n  last_login TEXT\n);\n\n-- Automatically dropped when the connection closes"
+    },
+    "vendorSupport": {
+      "postgresql": { "supported": true, "level": "full" },
+      "mysql": { "supported": true, "level": "full" },
+      "mariadb": { "supported": true, "level": "full" },
+      "sqlite": { "supported": true, "level": "full" }
+    },
+    "tips": [
+      "Use temporary tables when you need to store intermediate query results for multi-step data processing.",
+      "Temporary tables are session-scoped, so two different users can create temp tables with the same name without conflict.",
+      "In PostgreSQL, you can use ON COMMIT DROP to make a temp table last only for the current transaction."
+    ],
+    "relatedItems": ["table"],
+    "seeAlso": []
+  },
+  {
+    "id": "foreign-table",
+    "category": "table-column",
+    "name": "Foreign Table",
+    "summary": "A table that references data stored in an external data source.",
+    "description": "A foreign table allows you to query data from an external source (another database, a CSV file, a remote server) as if it were a regular table in your database. This is part of the SQL/MED (Management of External Data) standard. Foreign tables are commonly used to integrate data across different systems without copying it.",
+    "syntax": {
+      "postgresql": "-- First, create a foreign data wrapper and server\nCREATE EXTENSION postgres_fdw;\n\nCREATE SERVER remote_server\n  FOREIGN DATA WRAPPER postgres_fdw\n  OPTIONS (host 'remote-host', dbname 'remote_db');\n\nCREATE FOREIGN TABLE remote_users (\n  id INT,\n  username VARCHAR(50),\n  email VARCHAR(100)\n) SERVER remote_server\n  OPTIONS (table_name 'users');",
+      "mysql": "CREATE SERVER remote_server\n  FOREIGN DATA WRAPPER mysql\n  OPTIONS (HOST 'remote-host', DATABASE 'remote_db', USER 'admin', PASSWORD 'secret');\n\nCREATE TABLE remote_users (\n  id INT,\n  username VARCHAR(50),\n  email VARCHAR(100)\n) ENGINE=FEDERATED\n  CONNECTION='remote_server/users';",
+      "mariadb": "CREATE SERVER remote_server\n  FOREIGN DATA WRAPPER mysql\n  OPTIONS (HOST 'remote-host', DATABASE 'remote_db', USER 'admin', PASSWORD 'secret');\n\nCREATE TABLE remote_users (\n  id INT,\n  username VARCHAR(50),\n  email VARCHAR(100)\n) ENGINE=FEDERATED\n  CONNECTION='remote_server/users';",
+      "sqlite": null
+    },
+    "vendorSupport": {
+      "postgresql": { "supported": true, "level": "full" },
+      "mysql": { "supported": true, "level": "partial", "notes": "MySQL uses the FEDERATED storage engine instead of the SQL/MED standard. It must be explicitly enabled." },
+      "mariadb": { "supported": true, "level": "partial", "notes": "MariaDB uses the FEDERATED or CONNECT engine for remote table access." },
+      "sqlite": { "supported": false, "level": "none" }
+    },
+    "tips": [
+      "Foreign tables are read-heavy — writing to them may be slow or unsupported depending on the wrapper.",
+      "In PostgreSQL, use postgres_fdw for connecting to other PostgreSQL databases, or file_fdw for reading CSV/text files.",
+      "Always test query performance on foreign tables, as network latency can make them significantly slower than local tables."
+    ],
+    "relatedItems": ["table", "fdw"],
+    "seeAlso": []
+  },
+  {
+    "id": "column",
+    "category": "table-column",
+    "name": "Column",
+    "summary": "A named field in a table that holds a specific type of data.",
+    "description": "A column defines one attribute of the data stored in a table. For example, a 'users' table might have columns like 'username', 'email', and 'created_at'. Each column has a name and a data type that determines what kind of values it can store (text, numbers, dates, etc.). Columns can also have constraints like NOT NULL or DEFAULT values.",
+    "syntax": {
+      "postgresql": "-- Adding a column to an existing table\nALTER TABLE users ADD COLUMN phone VARCHAR(20);\n\n-- Adding a column with constraints\nALTER TABLE users ADD COLUMN status VARCHAR(10) NOT NULL DEFAULT 'active';",
+      "mysql": "-- Adding a column to an existing table\nALTER TABLE users ADD COLUMN phone VARCHAR(20);\n\n-- Adding a column with constraints\nALTER TABLE users ADD COLUMN status VARCHAR(10) NOT NULL DEFAULT 'active';",
+      "mariadb": "-- Adding a column to an existing table\nALTER TABLE users ADD COLUMN phone VARCHAR(20);\n\n-- Adding a column with constraints\nALTER TABLE users ADD COLUMN status VARCHAR(10) NOT NULL DEFAULT 'active';",
+      "sqlite": "-- Adding a column to an existing table\nALTER TABLE users ADD COLUMN phone TEXT;\n\n-- SQLite has limited ALTER TABLE support\nALTER TABLE users ADD COLUMN status TEXT DEFAULT 'active';"
+    },
+    "vendorSupport": {
+      "postgresql": { "supported": true, "level": "full" },
+      "mysql": { "supported": true, "level": "full" },
+      "mariadb": { "supported": true, "level": "full" },
+      "sqlite": { "supported": true, "level": "partial", "notes": "SQLite only supports ADD COLUMN. You cannot drop or rename columns in older versions (before 3.35.0)." }
+    },
+    "tips": [
+      "Use descriptive column names that clearly convey the data they hold (e.g., 'created_at' instead of 'date1').",
+      "Always specify NOT NULL for columns that should never be empty to enforce data integrity.",
+      "Consider adding DEFAULT values for columns so that inserts don't fail if the column is omitted."
+    ],
+    "relatedItems": ["data-type", "default-value", "not-null", "column-comment"],
+    "seeAlso": []
+  },
+  {
+    "id": "data-type",
+    "category": "table-column",
+    "name": "Data Type",
+    "summary": "Defines what kind of value a column can store (text, number, date, etc.).",
+    "description": "A data type tells the database what kind of value a column holds, such as integers, text, dates, or booleans. Choosing the right data type is important because it affects storage efficiency, query performance, and data validation. Each database vendor has its own set of data types, though many are shared across vendors.",
+    "syntax": {
+      "postgresql": "CREATE TABLE products (\n  id SERIAL PRIMARY KEY,\n  name VARCHAR(100) NOT NULL,\n  price NUMERIC(10, 2) NOT NULL,\n  in_stock BOOLEAN DEFAULT TRUE,\n  tags TEXT[],\n  metadata JSONB,\n  created_at TIMESTAMPTZ DEFAULT NOW()\n);",
+      "mysql": "CREATE TABLE products (\n  id INT AUTO_INCREMENT PRIMARY KEY,\n  name VARCHAR(100) NOT NULL,\n  price DECIMAL(10, 2) NOT NULL,\n  in_stock TINYINT(1) DEFAULT 1,\n  tags JSON,\n  metadata JSON,\n  created_at DATETIME DEFAULT CURRENT_TIMESTAMP\n);",
+      "mariadb": "CREATE TABLE products (\n  id INT AUTO_INCREMENT PRIMARY KEY,\n  name VARCHAR(100) NOT NULL,\n  price DECIMAL(10, 2) NOT NULL,\n  in_stock TINYINT(1) DEFAULT 1,\n  tags JSON,\n  metadata JSON,\n  created_at DATETIME DEFAULT CURRENT_TIMESTAMP\n);",
+      "sqlite": "CREATE TABLE products (\n  id INTEGER PRIMARY KEY AUTOINCREMENT,\n  name TEXT NOT NULL,\n  price REAL NOT NULL,\n  in_stock INTEGER DEFAULT 1,\n  tags TEXT,\n  metadata TEXT,\n  created_at TEXT DEFAULT CURRENT_TIMESTAMP\n);"
+    },
+    "vendorSupport": {
+      "postgresql": { "supported": true, "level": "full" },
+      "mysql": { "supported": true, "level": "full" },
+      "mariadb": { "supported": true, "level": "full" },
+      "sqlite": { "supported": true, "level": "partial", "notes": "SQLite uses dynamic typing with type affinities (TEXT, INTEGER, REAL, BLOB, NUMERIC) rather than strict data types." }
+    },
+    "tips": [
+      "Use the smallest data type that fits your data — e.g., SMALLINT instead of BIGINT for small numbers, to save storage.",
+      "Use VARCHAR with a sensible maximum length instead of TEXT when you want to enforce a size limit.",
+      "For monetary values, always use NUMERIC/DECIMAL instead of FLOAT to avoid rounding errors."
+    ],
+    "relatedItems": ["column", "json-column"],
+    "seeAlso": []
+  },
+  {
+    "id": "generated-column",
+    "category": "table-column",
+    "name": "Generated Column",
+    "summary": "A column whose value is automatically computed from other columns.",
+    "description": "A generated column (also called a computed column) is a column whose value is derived from an expression using other columns in the same row. Instead of manually computing and storing a value, the database calculates it for you. Generated columns can be 'stored' (physically saved to disk) or 'virtual' (computed on-the-fly when queried).",
+    "syntax": {
+      "postgresql": "CREATE TABLE orders (\n  id SERIAL PRIMARY KEY,\n  quantity INT NOT NULL,\n  unit_price NUMERIC(10, 2) NOT NULL,\n  total_price NUMERIC(10, 2) GENERATED ALWAYS AS (quantity * unit_price) STORED\n);",
+      "mysql": "CREATE TABLE orders (\n  id INT AUTO_INCREMENT PRIMARY KEY,\n  quantity INT NOT NULL,\n  unit_price DECIMAL(10, 2) NOT NULL,\n  total_price DECIMAL(10, 2) GENERATED ALWAYS AS (quantity * unit_price) STORED\n);",
+      "mariadb": "CREATE TABLE orders (\n  id INT AUTO_INCREMENT PRIMARY KEY,\n  quantity INT NOT NULL,\n  unit_price DECIMAL(10, 2) NOT NULL,\n  total_price DECIMAL(10, 2) AS (quantity * unit_price) PERSISTENT\n);",
+      "sqlite": "CREATE TABLE orders (\n  id INTEGER PRIMARY KEY AUTOINCREMENT,\n  quantity INTEGER NOT NULL,\n  unit_price REAL NOT NULL,\n  total_price REAL GENERATED ALWAYS AS (quantity * unit_price) STORED\n);"
+    },
+    "vendorSupport": {
+      "postgresql": { "supported": true, "level": "partial", "notes": "PostgreSQL only supports STORED generated columns (not VIRTUAL) as of version 16." },
+      "mysql": { "supported": true, "level": "full" },
+      "mariadb": { "supported": true, "level": "full" },
+      "sqlite": { "supported": true, "level": "full" }
+    },
+    "tips": [
+      "Use generated columns to avoid data inconsistency — the database guarantees the computed value is always correct.",
+      "Virtual generated columns save disk space since they are computed on read, but stored columns are faster to query.",
+      "You cannot directly INSERT or UPDATE a generated column — the database manages its value automatically."
+    ],
+    "relatedItems": ["column", "expression-index"],
+    "seeAlso": []
+  },
+  {
+    "id": "identity-column",
+    "category": "table-column",
+    "name": "Identity Column",
+    "summary": "A column that auto-generates unique sequential values using the SQL standard syntax.",
+    "description": "An identity column is the SQL standard way of defining a column that automatically generates unique, sequential values. It is the modern replacement for vendor-specific auto-increment features. Identity columns give you more control than auto-increment, such as specifying start values, increments, and whether the generated value can be overridden.",
+    "syntax": {
+      "postgresql": "CREATE TABLE users (\n  id INT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,\n  username VARCHAR(50) NOT NULL\n);\n\n-- With custom sequence options\nCREATE TABLE orders (\n  id INT GENERATED BY DEFAULT AS IDENTITY (START WITH 1000 INCREMENT BY 1) PRIMARY KEY,\n  user_id INT NOT NULL\n);",
+      "mysql": null,
+      "mariadb": null,
+      "sqlite": null
+    },
+    "vendorSupport": {
+      "postgresql": { "supported": true, "level": "full" },
+      "mysql": { "supported": false, "level": "none", "notes": "MySQL does not support identity columns. Use AUTO_INCREMENT instead." },
+      "mariadb": { "supported": false, "level": "none", "notes": "MariaDB does not support identity columns. Use AUTO_INCREMENT or SEQUENCE instead." },
+      "sqlite": { "supported": false, "level": "none", "notes": "SQLite does not support identity columns. Use INTEGER PRIMARY KEY AUTOINCREMENT instead." }
+    },
+    "tips": [
+      "Prefer GENERATED ALWAYS over GENERATED BY DEFAULT — it prevents accidental manual inserts that could cause conflicts.",
+      "In PostgreSQL, identity columns are the recommended way to create auto-incrementing IDs instead of using SERIAL.",
+      "You can customize the start value and increment step using sequence options inside the identity definition."
+    ],
+    "relatedItems": ["auto-increment", "sequence"],
+    "seeAlso": []
+  },
+  {
+    "id": "auto-increment",
+    "category": "table-column",
+    "name": "Auto Increment",
+    "summary": "Automatically generates a unique incrementing number for each new row.",
+    "description": "Auto increment is a column feature that automatically assigns a unique, incrementing integer to each new row inserted into a table. It is most commonly used for primary key columns to ensure every row has a unique identifier without manual input. Each vendor implements this slightly differently, but the concept is the same.",
+    "syntax": {
+      "postgresql": "-- PostgreSQL uses SERIAL (shorthand) or IDENTITY (preferred)\nCREATE TABLE users (\n  id SERIAL PRIMARY KEY,\n  username VARCHAR(50) NOT NULL\n);\n\n-- Equivalent to:\n-- CREATE SEQUENCE users_id_seq;\n-- id INT DEFAULT nextval('users_id_seq')",
+      "mysql": "CREATE TABLE users (\n  id INT AUTO_INCREMENT PRIMARY KEY,\n  username VARCHAR(50) NOT NULL\n);",
+      "mariadb": "CREATE TABLE users (\n  id INT AUTO_INCREMENT PRIMARY KEY,\n  username VARCHAR(50) NOT NULL\n);",
+      "sqlite": "CREATE TABLE users (\n  id INTEGER PRIMARY KEY AUTOINCREMENT,\n  username TEXT NOT NULL\n);"
+    },
+    "vendorSupport": {
+      "postgresql": { "supported": true, "level": "full", "notes": "PostgreSQL uses SERIAL or IDENTITY syntax instead of AUTO_INCREMENT keyword." },
+      "mysql": { "supported": true, "level": "full" },
+      "mariadb": { "supported": true, "level": "full" },
+      "sqlite": { "supported": true, "level": "full" }
+    },
+    "tips": [
+      "In SQLite, INTEGER PRIMARY KEY already auto-increments. Adding AUTOINCREMENT just prevents ID reuse after deletion.",
+      "Never assume auto-increment values are gap-free — deletions and failed inserts can create gaps.",
+      "In PostgreSQL, prefer IDENTITY columns over SERIAL for new projects as they follow the SQL standard."
+    ],
+    "relatedItems": ["identity-column", "pk", "sequence"],
+    "seeAlso": []
+  },
+  {
+    "id": "column-comment",
+    "category": "table-column",
+    "name": "Column Comment",
+    "summary": "A text description attached to a column for documentation purposes.",
+    "description": "A column comment is a piece of metadata that describes the purpose or content of a column. Comments help other developers (and future you) understand what data a column holds, its format, or any business rules it encodes. Comments are stored in the database catalog and can be viewed using database tools.",
+    "syntax": {
+      "postgresql": "-- Add a comment to an existing column\nCOMMENT ON COLUMN users.email IS 'Primary email address used for login and notifications';",
+      "mysql": "-- Add comment during table creation\nCREATE TABLE users (\n  id INT AUTO_INCREMENT PRIMARY KEY,\n  email VARCHAR(100) NOT NULL COMMENT 'Primary email address used for login and notifications'\n);\n\n-- Add comment to existing column\nALTER TABLE users MODIFY COLUMN email VARCHAR(100) NOT NULL COMMENT 'Primary email address used for login and notifications';",
+      "mariadb": "-- Add comment during table creation\nCREATE TABLE users (\n  id INT AUTO_INCREMENT PRIMARY KEY,\n  email VARCHAR(100) NOT NULL COMMENT 'Primary email address used for login and notifications'\n);\n\n-- Add comment to existing column\nALTER TABLE users MODIFY COLUMN email VARCHAR(100) NOT NULL COMMENT 'Primary email address used for login and notifications';",
+      "sqlite": null
+    },
+    "vendorSupport": {
+      "postgresql": { "supported": true, "level": "full" },
+      "mysql": { "supported": true, "level": "full" },
+      "mariadb": { "supported": true, "level": "full" },
+      "sqlite": { "supported": false, "level": "none", "notes": "SQLite does not support column comments. Use SQL comments in your schema file instead." }
+    },
+    "tips": [
+      "Write comments for columns with non-obvious meanings, coded values, or specific format requirements.",
+      "Keep comments concise but informative — focus on what the business meaning is, not just the data type.",
+      "In MySQL/MariaDB, you must re-specify the full column definition when modifying a comment."
+    ],
+    "relatedItems": ["table-comment", "column"],
+    "seeAlso": []
+  },
+  {
+    "id": "table-comment",
+    "category": "table-column",
+    "name": "Table Comment",
+    "summary": "A text description attached to a table for documentation purposes.",
+    "description": "A table comment is a metadata description that explains the purpose of a table. It helps developers and database administrators understand the role of each table at a glance, which is especially valuable in large databases with hundreds of tables. Comments are stored in the database catalog and are visible in most database management tools.",
+    "syntax": {
+      "postgresql": "-- Add a comment to a table\nCOMMENT ON TABLE users IS 'Stores registered user accounts and their profile information';",
+      "mysql": "-- Add comment during table creation\nCREATE TABLE users (\n  id INT AUTO_INCREMENT PRIMARY KEY\n) COMMENT = 'Stores registered user accounts and their profile information';\n\n-- Add comment to existing table\nALTER TABLE users COMMENT = 'Stores registered user accounts and their profile information';",
+      "mariadb": "-- Add comment during table creation\nCREATE TABLE users (\n  id INT AUTO_INCREMENT PRIMARY KEY\n) COMMENT = 'Stores registered user accounts and their profile information';\n\n-- Add comment to existing table\nALTER TABLE users COMMENT = 'Stores registered user accounts and their profile information';",
+      "sqlite": null
+    },
+    "vendorSupport": {
+      "postgresql": { "supported": true, "level": "full" },
+      "mysql": { "supported": true, "level": "full" },
+      "mariadb": { "supported": true, "level": "full" },
+      "sqlite": { "supported": false, "level": "none", "notes": "SQLite does not support table comments natively." }
+    },
+    "tips": [
+      "Add a table comment to every table describing its purpose and the type of data it stores.",
+      "Include business context in comments (e.g., 'Stores user orders placed through the web checkout flow').",
+      "Table comments are great for onboarding new team members who need to understand the database schema quickly."
+    ],
+    "relatedItems": ["column-comment", "table"],
+    "seeAlso": []
+  },
+  {
+    "id": "default-value",
+    "category": "table-column",
+    "name": "Default Value",
+    "summary": "A value automatically assigned to a column when no value is provided during INSERT.",
+    "description": "A default value is a fallback value that the database uses when you insert a row without specifying a value for that column. Defaults help ensure data consistency and reduce the amount of data you need to provide in every INSERT statement. Common defaults include timestamps (NOW()), boolean flags (TRUE/FALSE), and status strings ('active').",
+    "syntax": {
+      "postgresql": "CREATE TABLE orders (\n  id SERIAL PRIMARY KEY,\n  status VARCHAR(20) DEFAULT 'pending',\n  is_paid BOOLEAN DEFAULT FALSE,\n  created_at TIMESTAMPTZ DEFAULT NOW(),\n  order_number UUID DEFAULT gen_random_uuid()\n);",
+      "mysql": "CREATE TABLE orders (\n  id INT AUTO_INCREMENT PRIMARY KEY,\n  status VARCHAR(20) DEFAULT 'pending',\n  is_paid TINYINT(1) DEFAULT 0,\n  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,\n  order_number CHAR(36) DEFAULT (UUID())\n);",
+      "mariadb": "CREATE TABLE orders (\n  id INT AUTO_INCREMENT PRIMARY KEY,\n  status VARCHAR(20) DEFAULT 'pending',\n  is_paid TINYINT(1) DEFAULT 0,\n  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,\n  order_number CHAR(36) DEFAULT (UUID())\n);",
+      "sqlite": "CREATE TABLE orders (\n  id INTEGER PRIMARY KEY AUTOINCREMENT,\n  status TEXT DEFAULT 'pending',\n  is_paid INTEGER DEFAULT 0,\n  created_at TEXT DEFAULT CURRENT_TIMESTAMP\n);"
+    },
+    "vendorSupport": {
+      "postgresql": { "supported": true, "level": "full" },
+      "mysql": { "supported": true, "level": "full" },
+      "mariadb": { "supported": true, "level": "full" },
+      "sqlite": { "supported": true, "level": "full" }
+    },
+    "tips": [
+      "Use DEFAULT for timestamps so you don't have to pass the current time from your application code.",
+      "Combine DEFAULT with NOT NULL to ensure a column always has a meaningful value.",
+      "In MySQL 8.0+, you can use expressions as defaults (e.g., UUID()), but wrap them in parentheses."
+    ],
+    "relatedItems": ["column", "not-null", "default-constraint"],
+    "seeAlso": []
+  },
+  {
+    "id": "json-column",
+    "category": "table-column",
+    "name": "JSON Column",
+    "summary": "A column that stores structured JSON data inside a relational table.",
+    "description": "A JSON column lets you store semi-structured data (objects, arrays) inside a relational table. This is useful when you have flexible or nested data that doesn't fit neatly into traditional columns, such as user preferences, API responses, or metadata. Most modern databases can query, index, and validate JSON data efficiently.",
+    "syntax": {
+      "postgresql": "CREATE TABLE products (\n  id SERIAL PRIMARY KEY,\n  name VARCHAR(100) NOT NULL,\n  attributes JSONB NOT NULL DEFAULT '{}'\n);\n\n-- Query JSON data\nSELECT name, attributes->>'color' AS color\nFROM products\nWHERE attributes @> '{\"category\": \"electronics\"}';",
+      "mysql": "CREATE TABLE products (\n  id INT AUTO_INCREMENT PRIMARY KEY,\n  name VARCHAR(100) NOT NULL,\n  attributes JSON NOT NULL\n);\n\n-- Query JSON data\nSELECT name, JSON_EXTRACT(attributes, '$.color') AS color\nFROM products\nWHERE JSON_CONTAINS(attributes, '\"electronics\"', '$.category');",
+      "mariadb": "CREATE TABLE products (\n  id INT AUTO_INCREMENT PRIMARY KEY,\n  name VARCHAR(100) NOT NULL,\n  attributes JSON NOT NULL\n);\n\n-- Query JSON data\nSELECT name, JSON_VALUE(attributes, '$.color') AS color\nFROM products\nWHERE JSON_CONTAINS(attributes, '\"electronics\"', '$.category');",
+      "sqlite": "CREATE TABLE products (\n  id INTEGER PRIMARY KEY AUTOINCREMENT,\n  name TEXT NOT NULL,\n  attributes TEXT NOT NULL DEFAULT '{}'\n);\n\n-- Query JSON data (requires JSON1 extension)\nSELECT name, json_extract(attributes, '$.color') AS color\nFROM products\nWHERE json_extract(attributes, '$.category') = 'electronics';"
+    },
+    "vendorSupport": {
+      "postgresql": { "supported": true, "level": "full", "notes": "PostgreSQL offers both JSON (text-based) and JSONB (binary, faster queries, indexable). Prefer JSONB." },
+      "mysql": { "supported": true, "level": "full" },
+      "mariadb": { "supported": true, "level": "partial", "notes": "MariaDB stores JSON as a LONGTEXT alias with validation. Some advanced JSON functions differ from MySQL." },
+      "sqlite": { "supported": true, "level": "partial", "notes": "SQLite stores JSON as TEXT. JSON functions require the JSON1 extension (built-in since 3.38.0)." }
+    },
+    "tips": [
+      "In PostgreSQL, always use JSONB instead of JSON — it is faster to query and supports indexing with GIN indexes.",
+      "Don't store everything in JSON just because you can — if the data has a fixed structure, use regular columns for better performance.",
+      "Create GIN indexes on JSONB columns in PostgreSQL to speed up queries that filter by JSON keys or values."
+    ],
+    "relatedItems": ["data-type", "gin-index"],
+    "seeAlso": []
+  }
+]

@@ -1,0 +1,132 @@
+[
+  {
+    "id": "row-trigger",
+    "category": "triggers-events",
+    "name": "Row-Level Trigger",
+    "summary": "A trigger that fires once for each row affected by the triggering statement.",
+    "description": "A row-level trigger executes its code once for every row that is inserted, updated, or deleted. Inside the trigger, you can access the old and new values of the row using special variables (OLD and NEW). Row triggers are perfect for auditing changes, validating data, or maintaining derived values on a per-row basis.",
+    "syntax": {
+      "postgresql": "-- Trigger function to auto-update updated_at timestamp\nCREATE FUNCTION update_timestamp()\nRETURNS TRIGGER\nLANGUAGE plpgsql\nAS $$\nBEGIN\n  NEW.updated_at = NOW();\n  RETURN NEW;\nEND;\n$$;\n\n-- Row-level trigger\nCREATE TRIGGER trg_users_updated\n  BEFORE UPDATE ON users\n  FOR EACH ROW\n  EXECUTE FUNCTION update_timestamp();",
+      "mysql": "-- Row-level trigger to auto-update timestamp\nDELIMITER //\nCREATE TRIGGER trg_users_updated\n  BEFORE UPDATE ON users\n  FOR EACH ROW\nBEGIN\n  SET NEW.updated_at = NOW();\nEND //\nDELIMITER ;",
+      "mariadb": "-- Row-level trigger to auto-update timestamp\nDELIMITER //\nCREATE TRIGGER trg_users_updated\n  BEFORE UPDATE ON users\n  FOR EACH ROW\nBEGIN\n  SET NEW.updated_at = NOW();\nEND //\nDELIMITER ;",
+      "sqlite": "-- Row-level trigger to validate data\nCREATE TRIGGER trg_orders_validate\n  BEFORE INSERT ON orders\n  FOR EACH ROW\nBEGIN\n  SELECT RAISE(ABORT, 'Total must be positive')\n  WHERE NEW.total <= 0;\nEND;"
+    },
+    "vendorSupport": {
+      "postgresql": { "supported": true, "level": "full" },
+      "mysql": { "supported": true, "level": "full", "notes": "MySQL only supports row-level triggers (FOR EACH ROW is the only option)." },
+      "mariadb": { "supported": true, "level": "full", "notes": "MariaDB only supports row-level triggers." },
+      "sqlite": { "supported": true, "level": "full" }
+    },
+    "tips": [
+      "Use row triggers for auditing — log OLD and NEW values to an audit table on every UPDATE.",
+      "Be careful with triggers on high-traffic tables — a row trigger fires for every affected row, which can impact performance.",
+      "In PostgreSQL, the trigger function must RETURN NEW for BEFORE INSERT/UPDATE triggers, or the operation will be cancelled."
+    ],
+    "relatedItems": ["statement-trigger", "trigger-timing", "trigger-event"],
+    "seeAlso": []
+  },
+  {
+    "id": "statement-trigger",
+    "category": "triggers-events",
+    "name": "Statement-Level Trigger",
+    "summary": "A trigger that fires once per SQL statement, regardless of how many rows are affected.",
+    "description": "A statement-level trigger fires exactly once for the entire SQL statement, no matter how many rows are affected (even zero). Unlike row triggers, statement triggers do not have access to individual OLD/NEW row values. They are useful for logging operations, sending notifications, or enforcing rules that apply to the entire operation as a whole.",
+    "syntax": {
+      "postgresql": "-- Statement-level trigger for logging bulk operations\nCREATE FUNCTION log_bulk_insert()\nRETURNS TRIGGER\nLANGUAGE plpgsql\nAS $$\nBEGIN\n  INSERT INTO audit_log (table_name, operation, executed_at)\n  VALUES (TG_TABLE_NAME, TG_OP, NOW());\n  RETURN NULL;\nEND;\n$$;\n\nCREATE TRIGGER trg_orders_bulk_log\n  AFTER INSERT ON orders\n  FOR EACH STATEMENT\n  EXECUTE FUNCTION log_bulk_insert();",
+      "mysql": null,
+      "mariadb": null,
+      "sqlite": null
+    },
+    "vendorSupport": {
+      "postgresql": { "supported": true, "level": "full" },
+      "mysql": { "supported": false, "level": "none", "notes": "MySQL only supports row-level triggers. Statement-level triggers are not available." },
+      "mariadb": { "supported": false, "level": "none", "notes": "MariaDB only supports row-level triggers." },
+      "sqlite": { "supported": false, "level": "none", "notes": "SQLite only supports row-level triggers." }
+    },
+    "tips": [
+      "Use statement triggers for operations that should happen once per query (e.g., logging, cache invalidation), not per row.",
+      "Statement triggers cannot access OLD/NEW values — use transition tables in PostgreSQL to see all affected rows.",
+      "AFTER statement triggers with REFERENCING clauses let you access all inserted/deleted rows as a set."
+    ],
+    "relatedItems": ["row-trigger", "trigger-timing"],
+    "seeAlso": []
+  },
+  {
+    "id": "trigger-timing",
+    "category": "triggers-events",
+    "name": "Trigger Timing",
+    "summary": "Determines whether a trigger fires BEFORE, AFTER, or INSTEAD OF the triggering operation.",
+    "description": "Trigger timing controls when the trigger code runs relative to the data change. BEFORE triggers run before the data is modified — they can validate or alter the new values. AFTER triggers run after the data is committed — they are ideal for logging or cascading actions. INSTEAD OF triggers replace the operation entirely and are used on views to make them updatable.",
+    "syntax": {
+      "postgresql": "-- BEFORE trigger: validate or modify data before it's saved\nCREATE TRIGGER trg_users_before_insert\n  BEFORE INSERT ON users\n  FOR EACH ROW\n  EXECUTE FUNCTION validate_user();\n\n-- AFTER trigger: log the change after it's committed\nCREATE TRIGGER trg_users_after_update\n  AFTER UPDATE ON users\n  FOR EACH ROW\n  EXECUTE FUNCTION log_user_change();\n\n-- INSTEAD OF trigger: make a view updatable\nCREATE TRIGGER trg_active_users_insert\n  INSTEAD OF INSERT ON active_users\n  FOR EACH ROW\n  EXECUTE FUNCTION insert_active_user();",
+      "mysql": "-- BEFORE trigger: validate or modify data\nDELIMITER //\nCREATE TRIGGER trg_users_before_insert\n  BEFORE INSERT ON users\n  FOR EACH ROW\nBEGIN\n  SET NEW.username = LOWER(NEW.username);\nEND //\n\n-- AFTER trigger: log the change\nCREATE TRIGGER trg_users_after_update\n  AFTER UPDATE ON users\n  FOR EACH ROW\nBEGIN\n  INSERT INTO audit_log (table_name, record_id, action)\n  VALUES ('users', OLD.id, 'UPDATE');\nEND //\nDELIMITER ;",
+      "mariadb": "-- BEFORE trigger: validate or modify data\nDELIMITER //\nCREATE TRIGGER trg_users_before_insert\n  BEFORE INSERT ON users\n  FOR EACH ROW\nBEGIN\n  SET NEW.username = LOWER(NEW.username);\nEND //\n\n-- AFTER trigger: log the change\nCREATE TRIGGER trg_users_after_update\n  AFTER UPDATE ON users\n  FOR EACH ROW\nBEGIN\n  INSERT INTO audit_log (table_name, record_id, action)\n  VALUES ('users', OLD.id, 'UPDATE');\nEND //\nDELIMITER ;",
+      "sqlite": "-- BEFORE trigger\nCREATE TRIGGER trg_users_before_insert\n  BEFORE INSERT ON users\nBEGIN\n  SELECT RAISE(ABORT, 'Username cannot be empty')\n  WHERE NEW.username = '';\nEND;\n\n-- AFTER trigger\nCREATE TRIGGER trg_users_after_delete\n  AFTER DELETE ON users\nBEGIN\n  DELETE FROM orders WHERE user_id = OLD.id;\nEND;"
+    },
+    "vendorSupport": {
+      "postgresql": { "supported": true, "level": "full" },
+      "mysql": { "supported": true, "level": "partial", "notes": "MySQL supports BEFORE and AFTER timing but not INSTEAD OF triggers." },
+      "mariadb": { "supported": true, "level": "partial", "notes": "MariaDB supports BEFORE and AFTER timing but not INSTEAD OF triggers." },
+      "sqlite": { "supported": true, "level": "partial", "notes": "SQLite supports BEFORE, AFTER, and INSTEAD OF (on views only)." }
+    },
+    "tips": [
+      "Use BEFORE triggers when you need to validate or transform data before it is written to the table.",
+      "Use AFTER triggers for logging and audit trails — the data is already committed so you know it was successful.",
+      "INSTEAD OF triggers are only used on views — they replace the default INSERT/UPDATE/DELETE behavior."
+    ],
+    "relatedItems": ["row-trigger", "statement-trigger", "trigger-event"],
+    "seeAlso": []
+  },
+  {
+    "id": "trigger-event",
+    "category": "triggers-events",
+    "name": "Trigger Event",
+    "summary": "The DML operation (INSERT, UPDATE, DELETE, or TRUNCATE) that activates a trigger.",
+    "description": "A trigger event specifies which data modification operation causes the trigger to fire. The three main events are INSERT (new row added), UPDATE (existing row modified), and DELETE (row removed). PostgreSQL also supports TRUNCATE as a trigger event. You can combine multiple events in a single trigger, and for UPDATE triggers, you can specify which columns trigger the action.",
+    "syntax": {
+      "postgresql": "-- Trigger on INSERT\nCREATE TRIGGER trg_on_insert\n  AFTER INSERT ON orders\n  FOR EACH ROW EXECUTE FUNCTION notify_new_order();\n\n-- Trigger on specific column UPDATE\nCREATE TRIGGER trg_on_status_change\n  AFTER UPDATE OF status ON orders\n  FOR EACH ROW\n  WHEN (OLD.status IS DISTINCT FROM NEW.status)\n  EXECUTE FUNCTION handle_status_change();\n\n-- Trigger on multiple events\nCREATE TRIGGER trg_audit_products\n  AFTER INSERT OR UPDATE OR DELETE ON products\n  FOR EACH ROW EXECUTE FUNCTION audit_product_change();",
+      "mysql": "-- Trigger on INSERT\nDELIMITER //\nCREATE TRIGGER trg_on_insert\n  AFTER INSERT ON orders\n  FOR EACH ROW\nBEGIN\n  INSERT INTO notifications (message) VALUES (CONCAT('New order: ', NEW.id));\nEND //\n\n-- Trigger on DELETE\nCREATE TRIGGER trg_on_delete\n  BEFORE DELETE ON users\n  FOR EACH ROW\nBEGIN\n  INSERT INTO deleted_users (user_id, deleted_at) VALUES (OLD.id, NOW());\nEND //\nDELIMITER ;",
+      "mariadb": "-- Trigger on INSERT\nDELIMITER //\nCREATE TRIGGER trg_on_insert\n  AFTER INSERT ON orders\n  FOR EACH ROW\nBEGIN\n  INSERT INTO notifications (message) VALUES (CONCAT('New order: ', NEW.id));\nEND //\n\n-- Trigger on DELETE\nCREATE TRIGGER trg_on_delete\n  BEFORE DELETE ON users\n  FOR EACH ROW\nBEGIN\n  INSERT INTO deleted_users (user_id, deleted_at) VALUES (OLD.id, NOW());\nEND //\nDELIMITER ;",
+      "sqlite": "-- Trigger on INSERT\nCREATE TRIGGER trg_on_insert\n  AFTER INSERT ON orders\nBEGIN\n  INSERT INTO notifications (message) VALUES ('New order: ' || NEW.id);\nEND;\n\n-- Trigger on UPDATE of specific columns\nCREATE TRIGGER trg_on_status_change\n  AFTER UPDATE OF status ON orders\nBEGIN\n  INSERT INTO status_history (order_id, old_status, new_status)\n  VALUES (OLD.id, OLD.status, NEW.status);\nEND;"
+    },
+    "vendorSupport": {
+      "postgresql": { "supported": true, "level": "full", "notes": "PostgreSQL supports INSERT, UPDATE, DELETE, and TRUNCATE events. UPDATE OF column_name is also supported." },
+      "mysql": { "supported": true, "level": "partial", "notes": "MySQL supports INSERT, UPDATE, and DELETE events. You cannot combine multiple events in one trigger." },
+      "mariadb": { "supported": true, "level": "partial", "notes": "MariaDB supports INSERT, UPDATE, and DELETE events. You cannot combine multiple events in one trigger." },
+      "sqlite": { "supported": true, "level": "full", "notes": "SQLite supports INSERT, UPDATE, DELETE, and UPDATE OF column_name events." }
+    },
+    "tips": [
+      "Use UPDATE OF column_name to fire the trigger only when specific columns change, not on every UPDATE.",
+      "In PostgreSQL, add a WHEN clause to conditionally fire the trigger (e.g., WHEN OLD.status IS DISTINCT FROM NEW.status).",
+      "In MySQL/MariaDB, you need separate triggers for each event — you cannot combine INSERT OR UPDATE in one trigger."
+    ],
+    "relatedItems": ["row-trigger", "trigger-timing"],
+    "seeAlso": []
+  },
+  {
+    "id": "scheduled-event",
+    "category": "triggers-events",
+    "name": "Scheduled Event",
+    "summary": "A task that runs automatically on a schedule, like a database-level cron job.",
+    "description": "A scheduled event is a database-managed task that executes SQL statements on a defined schedule (one-time or recurring). It is like a cron job but managed entirely within the database. Scheduled events are commonly used for periodic maintenance tasks like purging old data, refreshing materialized views, or generating reports.",
+    "syntax": {
+      "postgresql": "-- PostgreSQL uses the pg_cron extension for scheduled events\n-- Install: CREATE EXTENSION pg_cron;\n\n-- Delete old audit logs every day at midnight\nSELECT cron.schedule(\n  'cleanup-audit-logs',\n  '0 0 * * *',\n  $$DELETE FROM audit_log WHERE created_at < NOW() - INTERVAL '90 days'$$\n);\n\n-- Refresh materialized view every 5 minutes\nSELECT cron.schedule(\n  'refresh-order-summary',\n  '*/5 * * * *',\n  'REFRESH MATERIALIZED VIEW CONCURRENTLY order_summary'\n);",
+      "mysql": "-- Create a recurring event to clean up old logs\nCREATE EVENT evt_cleanup_audit_logs\nON SCHEDULE EVERY 1 DAY\nSTARTS CURRENT_TIMESTAMP\nDO\n  DELETE FROM audit_log WHERE created_at < NOW() - INTERVAL 90 DAY;\n\n-- One-time event\nCREATE EVENT evt_one_time_cleanup\nON SCHEDULE AT CURRENT_TIMESTAMP + INTERVAL 1 HOUR\nDO\n  DELETE FROM temp_data;\n\n-- Make sure the event scheduler is enabled\n-- SET GLOBAL event_scheduler = ON;",
+      "mariadb": "-- Create a recurring event to clean up old logs\nCREATE EVENT evt_cleanup_audit_logs\nON SCHEDULE EVERY 1 DAY\nSTARTS CURRENT_TIMESTAMP\nDO\n  DELETE FROM audit_log WHERE created_at < NOW() - INTERVAL 90 DAY;\n\n-- One-time event\nCREATE EVENT evt_one_time_cleanup\nON SCHEDULE AT CURRENT_TIMESTAMP + INTERVAL 1 HOUR\nDO\n  DELETE FROM temp_data;\n\n-- Make sure the event scheduler is enabled\n-- SET GLOBAL event_scheduler = ON;",
+      "sqlite": null
+    },
+    "vendorSupport": {
+      "postgresql": { "supported": true, "level": "partial", "notes": "PostgreSQL requires the pg_cron extension. It is not built-in but is widely available." },
+      "mysql": { "supported": true, "level": "full", "notes": "MySQL has built-in event scheduler. It must be enabled with SET GLOBAL event_scheduler = ON." },
+      "mariadb": { "supported": true, "level": "full", "notes": "MariaDB has built-in event scheduler. It must be enabled with SET GLOBAL event_scheduler = ON." },
+      "sqlite": { "supported": false, "level": "none", "notes": "SQLite does not support scheduled events. Use application-level schedulers (cron, Task Scheduler) instead." }
+    },
+    "tips": [
+      "In MySQL/MariaDB, check that the event scheduler is enabled: SHOW VARIABLES LIKE 'event_scheduler';",
+      "Use events for routine maintenance like purging old data, updating statistics, or refreshing cached views.",
+      "Monitor event execution — a failing event can silently stop running without notifying you."
+    ],
+    "relatedItems": ["materialized-view", "procedure"],
+    "seeAlso": []
+  }
+]

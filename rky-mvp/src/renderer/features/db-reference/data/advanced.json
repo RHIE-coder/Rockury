@@ -1,0 +1,158 @@
+[
+  {
+    "id": "schema-namespace",
+    "category": "advanced",
+    "name": "Schema / Namespace",
+    "summary": "A logical container that organizes database objects (tables, views, functions) into groups.",
+    "description": "A schema (or namespace) is a way to organize database objects into logical groups within a single database. Think of it like folders on your computer — you can have tables with the same name in different schemas without conflicts. Schemas help separate concerns (e.g., 'auth' schema for authentication, 'billing' schema for payment logic) and control access at the group level.",
+    "syntax": {
+      "postgresql": "-- Create a schema\nCREATE SCHEMA billing;\n\n-- Create objects in the schema\nCREATE TABLE billing.invoices (\n  id SERIAL PRIMARY KEY,\n  user_id INT NOT NULL,\n  amount NUMERIC(10, 2) NOT NULL,\n  created_at TIMESTAMPTZ DEFAULT NOW()\n);\n\n-- Set the search path to include the schema\nSET search_path TO public, billing;\n\n-- Grant usage on a schema\nGRANT USAGE ON SCHEMA billing TO app_role;\nGRANT SELECT ON ALL TABLES IN SCHEMA billing TO app_role;",
+      "mysql": "-- In MySQL, 'schema' and 'database' are synonymous\nCREATE DATABASE billing;\n\n-- Create objects in the database\nCREATE TABLE billing.invoices (\n  id INT AUTO_INCREMENT PRIMARY KEY,\n  user_id INT NOT NULL,\n  amount DECIMAL(10, 2) NOT NULL,\n  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP\n);\n\n-- Access tables across databases\nSELECT u.username, i.amount\nFROM users u\nJOIN billing.invoices i ON i.user_id = u.id;",
+      "mariadb": "-- In MariaDB, 'schema' and 'database' are synonymous\nCREATE DATABASE billing;\n\n-- Create objects in the database\nCREATE TABLE billing.invoices (\n  id INT AUTO_INCREMENT PRIMARY KEY,\n  user_id INT NOT NULL,\n  amount DECIMAL(10, 2) NOT NULL,\n  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP\n);\n\n-- Access tables across databases\nSELECT u.username, i.amount\nFROM users u\nJOIN billing.invoices i ON i.user_id = u.id;",
+      "sqlite": null
+    },
+    "vendorSupport": {
+      "postgresql": { "supported": true, "level": "full" },
+      "mysql": { "supported": true, "level": "partial", "notes": "In MySQL, CREATE SCHEMA is an alias for CREATE DATABASE. True schema-within-database namespacing is not supported." },
+      "mariadb": { "supported": true, "level": "partial", "notes": "In MariaDB, CREATE SCHEMA is an alias for CREATE DATABASE." },
+      "sqlite": { "supported": false, "level": "none", "notes": "SQLite does not support schemas. Use ATTACH DATABASE for multi-database access." }
+    },
+    "tips": [
+      "In PostgreSQL, always grant USAGE on a schema before granting privileges on its objects — without USAGE, users can't see the schema.",
+      "Use search_path in PostgreSQL to avoid typing schema prefixes for commonly used schemas.",
+      "Organize large applications into schemas by domain (e.g., auth, billing, inventory) for cleaner separation."
+    ],
+    "relatedItems": ["grant", "role", "extension"],
+    "seeAlso": []
+  },
+  {
+    "id": "extension",
+    "category": "advanced",
+    "name": "Extension",
+    "summary": "A packaged add-on that adds new features, data types, or functions to the database.",
+    "description": "An extension is a plugin that extends the database with additional functionality. Extensions can add new data types (UUID, geometry), functions (cryptographic hashing, fuzzy matching), index types, and more. PostgreSQL has the richest extension ecosystem, with popular extensions like PostGIS (spatial), pg_trgm (text similarity), and pgcrypto (encryption).",
+    "syntax": {
+      "postgresql": "-- List available extensions\nSELECT * FROM pg_available_extensions;\n\n-- Install an extension\nCREATE EXTENSION IF NOT EXISTS \"uuid-ossp\";\nCREATE EXTENSION IF NOT EXISTS pg_trgm;\nCREATE EXTENSION IF NOT EXISTS pgcrypto;\n\n-- Use extension functions\nSELECT uuid_generate_v4();  -- from uuid-ossp\nSELECT gen_random_uuid();    -- built-in since PG 13\n\n-- Fuzzy text search with pg_trgm\nSELECT name, similarity(name, 'keybaord') AS sim\nFROM products\nWHERE name % 'keybaord'\nORDER BY sim DESC;\n\n-- View installed extensions\nSELECT * FROM pg_extension;",
+      "mysql": "-- MySQL uses plugins instead of extensions\n-- List installed plugins\nSHOW PLUGINS;\n\n-- Install a plugin (example: clone plugin)\nINSTALL PLUGIN clone SONAME 'mysql_clone.so';\n\n-- Common built-in features that require no plugin:\n-- UUID: SELECT UUID();\n-- SHA2: SELECT SHA2('password', 256);",
+      "mariadb": "-- MariaDB uses plugins\n-- List installed plugins\nSHOW PLUGINS;\n\n-- Install a plugin\nINSTALL SONAME 'ha_connect';\n\n-- Common built-in features:\n-- UUID: SELECT UUID();\n-- SHA2: SELECT SHA2('password', 256);",
+      "sqlite": "-- SQLite uses loadable extensions\n-- Enable extension loading\n-- .load /path/to/extension\n\n-- Common built-in extensions (compile-time):\n-- JSON1: json_extract(), json_array(), etc.\n-- FTS5: Full-text search\n-- R*Tree: Spatial indexing\n\n-- Example using JSON1\nSELECT json_extract(data, '$.name') FROM products;"
+    },
+    "vendorSupport": {
+      "postgresql": { "supported": true, "level": "full", "notes": "PostgreSQL has the richest extension ecosystem with hundreds of available extensions." },
+      "mysql": { "supported": true, "level": "partial", "notes": "MySQL uses plugins and components rather than SQL-level extensions." },
+      "mariadb": { "supported": true, "level": "partial", "notes": "MariaDB uses plugins. Some notable ones: CONNECT engine, Spider engine." },
+      "sqlite": { "supported": true, "level": "partial", "notes": "SQLite supports loadable extensions. Many common ones (JSON1, FTS5) are compiled in by default." }
+    },
+    "tips": [
+      "Popular PostgreSQL extensions: uuid-ossp (UUIDs), pg_trgm (fuzzy search), PostGIS (spatial), pgcrypto (encryption), pg_stat_statements (query stats).",
+      "In PostgreSQL, you need superuser or CREATE privilege on the database to install extensions.",
+      "Always check extension compatibility with your database version before installing in production."
+    ],
+    "relatedItems": ["schema-namespace", "gin-index", "fulltext-index"],
+    "seeAlso": []
+  },
+  {
+    "id": "fdw",
+    "category": "advanced",
+    "name": "Foreign Data Wrapper (FDW)",
+    "summary": "A framework for accessing external data sources as if they were local tables.",
+    "description": "A Foreign Data Wrapper (FDW) is a mechanism that lets you connect to external data sources (other databases, CSV files, web APIs) and query them using standard SQL as if they were local tables. FDWs implement the SQL/MED standard and are the underlying technology behind foreign tables. PostgreSQL has the most mature FDW support.",
+    "syntax": {
+      "postgresql": "-- Install the postgres_fdw extension\nCREATE EXTENSION postgres_fdw;\n\n-- Create a foreign server\nCREATE SERVER remote_db\n  FOREIGN DATA WRAPPER postgres_fdw\n  OPTIONS (host 'remote-server.example.com', port '5432', dbname 'production');\n\n-- Create user mapping\nCREATE USER MAPPING FOR current_user\n  SERVER remote_db\n  OPTIONS (user 'remote_user', password 'remote_pass');\n\n-- Import tables from the remote schema\nIMPORT FOREIGN SCHEMA public\n  FROM SERVER remote_db\n  INTO local_schema;\n\n-- Or create individual foreign tables\nCREATE FOREIGN TABLE remote_users (\n  id INT,\n  username VARCHAR(50),\n  email VARCHAR(100)\n) SERVER remote_db OPTIONS (table_name 'users');\n\n-- Query as if it's a local table\nSELECT * FROM remote_users WHERE username = 'admin';",
+      "mysql": "-- MySQL uses FEDERATED engine for remote table access\n-- The FEDERATED engine must be enabled in the config\nCREATE SERVER remote_db\n  FOREIGN DATA WRAPPER mysql\n  OPTIONS (\n    HOST 'remote-server.example.com',\n    DATABASE 'production',\n    USER 'remote_user',\n    PASSWORD 'remote_pass',\n    PORT 3306\n  );\n\nCREATE TABLE remote_users (\n  id INT,\n  username VARCHAR(50),\n  email VARCHAR(100)\n) ENGINE=FEDERATED\n  CONNECTION='remote_db/users';",
+      "mariadb": "-- MariaDB supports FEDERATED and CONNECT engines\nCREATE SERVER remote_db\n  FOREIGN DATA WRAPPER mysql\n  OPTIONS (\n    HOST 'remote-server.example.com',\n    DATABASE 'production',\n    USER 'remote_user',\n    PASSWORD 'remote_pass',\n    PORT 3306\n  );\n\nCREATE TABLE remote_users (\n  id INT,\n  username VARCHAR(50),\n  email VARCHAR(100)\n) ENGINE=FEDERATED\n  CONNECTION='remote_db/users';",
+      "sqlite": null
+    },
+    "vendorSupport": {
+      "postgresql": { "supported": true, "level": "full", "notes": "PostgreSQL has the most mature FDW ecosystem: postgres_fdw, mysql_fdw, oracle_fdw, file_fdw, redis_fdw, and many more." },
+      "mysql": { "supported": true, "level": "partial", "notes": "MySQL uses the FEDERATED engine, which is more limited than PostgreSQL's FDW framework." },
+      "mariadb": { "supported": true, "level": "partial", "notes": "MariaDB supports FEDERATED and the more powerful CONNECT storage engine for diverse data sources." },
+      "sqlite": { "supported": false, "level": "none" }
+    },
+    "tips": [
+      "Use IMPORT FOREIGN SCHEMA in PostgreSQL to automatically create foreign tables for all tables in a remote schema.",
+      "Be aware of performance — every query on a foreign table involves a network round trip to the remote server.",
+      "For read-heavy use cases, consider using materialized views to cache foreign table data locally."
+    ],
+    "relatedItems": ["foreign-table", "extension", "materialized-view"],
+    "seeAlso": []
+  },
+  {
+    "id": "tablespace",
+    "category": "advanced",
+    "name": "Tablespace",
+    "summary": "A storage location on disk where database objects are physically stored.",
+    "description": "A tablespace defines a physical location on the filesystem where the database stores tables, indexes, and other objects. By creating tablespaces on different disks or storage systems, you can control where specific data lives. This is useful for performance optimization (fast SSD for hot data, HDD for archives) or for managing storage capacity across multiple drives.",
+    "syntax": {
+      "postgresql": "-- Create a tablespace on a fast SSD\nCREATE TABLESPACE fast_storage\n  LOCATION '/mnt/ssd/pgdata';\n\n-- Create a tablespace on slower, larger storage\nCREATE TABLESPACE archive_storage\n  LOCATION '/mnt/hdd/pgdata';\n\n-- Create a table in a specific tablespace\nCREATE TABLE orders (\n  id SERIAL PRIMARY KEY,\n  user_id INT NOT NULL,\n  total NUMERIC(10, 2)\n) TABLESPACE fast_storage;\n\n-- Move an existing table to a different tablespace\nALTER TABLE orders SET TABLESPACE archive_storage;\n\n-- Create an index in a specific tablespace\nCREATE INDEX idx_orders_user ON orders(user_id) TABLESPACE fast_storage;",
+      "mysql": "-- Create a tablespace (InnoDB file-per-table)\nCREATE TABLESPACE my_tablespace\n  ADD DATAFILE 'my_tablespace.ibd'\n  ENGINE = InnoDB;\n\n-- Create a table in the tablespace\nCREATE TABLE orders (\n  id INT AUTO_INCREMENT PRIMARY KEY,\n  user_id INT NOT NULL,\n  total DECIMAL(10, 2)\n) TABLESPACE my_tablespace;",
+      "mariadb": "-- MariaDB uses InnoDB tablespaces\nCREATE TABLESPACE my_tablespace\n  ADD DATAFILE 'my_tablespace.ibd'\n  ENGINE = InnoDB;\n\n-- Create a table in the tablespace\nCREATE TABLE orders (\n  id INT AUTO_INCREMENT PRIMARY KEY,\n  user_id INT NOT NULL,\n  total DECIMAL(10, 2)\n) TABLESPACE my_tablespace;",
+      "sqlite": null
+    },
+    "vendorSupport": {
+      "postgresql": { "supported": true, "level": "full" },
+      "mysql": { "supported": true, "level": "partial", "notes": "MySQL supports general tablespaces and file-per-table tablespaces for InnoDB." },
+      "mariadb": { "supported": true, "level": "partial", "notes": "MariaDB supports InnoDB tablespaces." },
+      "sqlite": { "supported": false, "level": "none", "notes": "SQLite stores the entire database in a single file. No tablespace concept exists." }
+    },
+    "tips": [
+      "Place frequently accessed tables and indexes on fast SSD storage, and archive data on cheaper HDD storage.",
+      "In PostgreSQL, you can place indexes and tables in different tablespaces to optimize I/O patterns.",
+      "Monitor tablespace disk usage to prevent running out of space — a full tablespace will cause write failures."
+    ],
+    "relatedItems": ["table", "btree-index"],
+    "seeAlso": []
+  },
+  {
+    "id": "collation",
+    "category": "advanced",
+    "name": "Collation",
+    "summary": "Rules that determine how text is sorted and compared (e.g., case sensitivity, locale).",
+    "description": "A collation defines the rules for comparing and sorting text data. It determines whether comparisons are case-sensitive or case-insensitive, how accented characters are handled, and the sort order for different languages. For example, in German, 'ae' might sort differently than in English. Choosing the right collation is important for internationalized applications.",
+    "syntax": {
+      "postgresql": "-- Create a table with a specific collation\nCREATE TABLE products (\n  id SERIAL PRIMARY KEY,\n  name VARCHAR(100) COLLATE \"en_US.utf8\" NOT NULL,\n  name_ci VARCHAR(100) COLLATE \"en-US-x-icu\" NOT NULL  -- ICU collation\n);\n\n-- Case-insensitive collation per query\nSELECT * FROM products\nWHERE name COLLATE \"en-x-icu\" = 'keyboard';\n\n-- Create a custom collation\nCREATE COLLATION case_insensitive (\n  PROVIDER = icu,\n  LOCALE = 'und-u-ks-level2',\n  DETERMINISTIC = FALSE\n);\n\n-- List available collations\nSELECT collname, collprovider FROM pg_collation LIMIT 20;",
+      "mysql": "-- Create a table with a specific collation\nCREATE TABLE products (\n  id INT AUTO_INCREMENT PRIMARY KEY,\n  name VARCHAR(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL\n);\n\n-- Case-insensitive comparison (default with _ci collation)\nSELECT * FROM products WHERE name = 'Keyboard';  -- matches 'keyboard', 'KEYBOARD'\n\n-- Case-sensitive comparison\nSELECT * FROM products WHERE name COLLATE utf8mb4_bin = 'Keyboard';\n\n-- Show available collations\nSHOW COLLATION WHERE Charset = 'utf8mb4';",
+      "mariadb": "-- Create a table with a specific collation\nCREATE TABLE products (\n  id INT AUTO_INCREMENT PRIMARY KEY,\n  name VARCHAR(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL\n);\n\n-- Case-insensitive comparison (default with _ci collation)\nSELECT * FROM products WHERE name = 'Keyboard';  -- matches 'keyboard', 'KEYBOARD'\n\n-- Case-sensitive comparison\nSELECT * FROM products WHERE name COLLATE utf8mb4_bin = 'Keyboard';\n\n-- Show available collations\nSHOW COLLATION WHERE Charset = 'utf8mb4';",
+      "sqlite": "-- SQLite has limited collation support\n-- Built-in collations: BINARY, NOCASE, RTRIM\n\nCREATE TABLE products (\n  id INTEGER PRIMARY KEY AUTOINCREMENT,\n  name TEXT COLLATE NOCASE NOT NULL\n);\n\n-- Case-insensitive comparison with NOCASE\nSELECT * FROM products WHERE name = 'keyboard';  -- matches 'Keyboard', 'KEYBOARD'"
+    },
+    "vendorSupport": {
+      "postgresql": { "supported": true, "level": "full", "notes": "PostgreSQL supports ICU collations (since PG 10) and OS-provided collations." },
+      "mysql": { "supported": true, "level": "full" },
+      "mariadb": { "supported": true, "level": "full" },
+      "sqlite": { "supported": true, "level": "partial", "notes": "SQLite only supports BINARY, NOCASE, and RTRIM built-in collations. Custom collations require the C API." }
+    },
+    "tips": [
+      "Use utf8mb4_unicode_ci in MySQL/MariaDB for case-insensitive, accent-insensitive comparisons — it handles most languages correctly.",
+      "In PostgreSQL, use ICU collations (provider = icu) for consistent cross-platform behavior.",
+      "Collation affects index ordering — changing a column's collation may require rebuilding its indexes."
+    ],
+    "relatedItems": ["data-type", "btree-index", "extension"],
+    "seeAlso": []
+  },
+  {
+    "id": "rule",
+    "category": "advanced",
+    "name": "Rule",
+    "summary": "A mechanism that rewrites a SQL query into a different query before execution.",
+    "description": "A rule is a PostgreSQL-specific feature that intercepts a SQL command and rewrites it into one or more alternative commands before execution. Rules are used internally to implement views (a SELECT on a view is rewritten to execute the view's query). While rules can also be used to make views updatable or redirect writes, triggers are generally preferred for most use cases.",
+    "syntax": {
+      "postgresql": "-- Create a view using a rule (implicit - this is how views work internally)\nCREATE VIEW active_users AS SELECT * FROM users WHERE status = 'active';\n\n-- Create a rule to redirect INSERTs on a view\nCREATE RULE insert_active_user AS\n  ON INSERT TO active_users\n  DO INSTEAD\n    INSERT INTO users (username, email, status)\n    VALUES (NEW.username, NEW.email, 'active');\n\n-- Create a rule to log deletions\nCREATE RULE log_user_delete AS\n  ON DELETE TO users\n  DO ALSO\n    INSERT INTO deleted_users_log (user_id, deleted_at)\n    VALUES (OLD.id, NOW());\n\n-- DO INSTEAD replaces the original command\n-- DO ALSO runs in addition to the original command",
+      "mysql": null,
+      "mariadb": null,
+      "sqlite": null
+    },
+    "vendorSupport": {
+      "postgresql": { "supported": true, "level": "full" },
+      "mysql": { "supported": false, "level": "none", "notes": "MySQL does not support rules. Use triggers instead." },
+      "mariadb": { "supported": false, "level": "none", "notes": "MariaDB does not support rules. Use triggers instead." },
+      "sqlite": { "supported": false, "level": "none", "notes": "SQLite does not support rules. Use triggers instead." }
+    },
+    "tips": [
+      "Rules are a PostgreSQL-specific feature — prefer triggers for portability across database vendors.",
+      "The PostgreSQL documentation recommends using INSTEAD OF triggers rather than rules for making views updatable.",
+      "Rules operate at the query rewriting level (before planning), while triggers operate at the row execution level — this is an important distinction for complex scenarios."
+    ],
+    "relatedItems": ["regular-view", "updatable-view", "row-trigger"],
+    "seeAlso": []
+  }
+]

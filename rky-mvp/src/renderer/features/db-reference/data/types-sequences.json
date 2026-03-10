@@ -1,0 +1,184 @@
+[
+  {
+    "id": "enum-type",
+    "category": "types-sequences",
+    "name": "Enum Type",
+    "summary": "A custom data type that restricts a column to a predefined set of values.",
+    "description": "An enum type defines a fixed list of allowed values for a column, similar to a dropdown menu. For example, an order status might only allow 'pending', 'processing', 'shipped', or 'delivered'. Enums provide type safety at the database level and are more efficient than CHECK constraints with string lists because the database stores them as integers internally.",
+    "syntax": {
+      "postgresql": "-- Create an enum type\nCREATE TYPE order_status AS ENUM ('pending', 'processing', 'shipped', 'delivered', 'cancelled');\n\n-- Use it in a table\nCREATE TABLE orders (\n  id SERIAL PRIMARY KEY,\n  status order_status NOT NULL DEFAULT 'pending'\n);\n\n-- Add a new value to an existing enum\nALTER TYPE order_status ADD VALUE 'refunded' AFTER 'cancelled';",
+      "mysql": "-- ENUM is defined inline in the column definition\nCREATE TABLE orders (\n  id INT AUTO_INCREMENT PRIMARY KEY,\n  status ENUM('pending', 'processing', 'shipped', 'delivered', 'cancelled') NOT NULL DEFAULT 'pending'\n);",
+      "mariadb": "-- ENUM is defined inline in the column definition\nCREATE TABLE orders (\n  id INT AUTO_INCREMENT PRIMARY KEY,\n  status ENUM('pending', 'processing', 'shipped', 'delivered', 'cancelled') NOT NULL DEFAULT 'pending'\n);",
+      "sqlite": null
+    },
+    "vendorSupport": {
+      "postgresql": { "supported": true, "level": "full", "notes": "PostgreSQL supports standalone enum types that can be reused across multiple tables." },
+      "mysql": { "supported": true, "level": "partial", "notes": "MySQL ENUM is defined per column, not as a reusable type. Changing values requires ALTER TABLE." },
+      "mariadb": { "supported": true, "level": "partial", "notes": "MariaDB ENUM is defined per column, not as a reusable type." },
+      "sqlite": { "supported": false, "level": "none", "notes": "SQLite does not support ENUM types. Use a CHECK constraint instead: CHECK (status IN ('pending', 'shipped'))." }
+    },
+    "tips": [
+      "In PostgreSQL, enum types are reusable — define the type once and use it in multiple tables for consistency.",
+      "Avoid enums for values that change frequently — adding/removing values can be tricky and may require migrations.",
+      "In MySQL, ENUM values are stored as integers internally (1, 2, 3...), which makes storage and comparison efficient."
+    ],
+    "relatedItems": ["check", "domain-type", "composite-type"],
+    "seeAlso": []
+  },
+  {
+    "id": "composite-type",
+    "category": "types-sequences",
+    "name": "Composite Type",
+    "summary": "A custom type composed of multiple named fields, like a row structure.",
+    "description": "A composite type is a user-defined type that groups multiple fields together into a single named structure, similar to a struct in programming languages. For example, you could define an 'address' type with fields for street, city, state, and zip code. Composite types are useful for returning multiple values from functions or for organizing related fields.",
+    "syntax": {
+      "postgresql": "-- Create a composite type\nCREATE TYPE address AS (\n  street VARCHAR(200),\n  city VARCHAR(100),\n  state VARCHAR(50),\n  zip_code VARCHAR(10),\n  country VARCHAR(50)\n);\n\n-- Use in a table\nCREATE TABLE users (\n  id SERIAL PRIMARY KEY,\n  username VARCHAR(50) NOT NULL,\n  home_address address,\n  work_address address\n);\n\n-- Insert data\nINSERT INTO users (username, home_address)\nVALUES ('john', ROW('123 Main St', 'Seoul', 'Seoul', '04524', 'KR'));\n\n-- Access fields\nSELECT username, (home_address).city FROM users;",
+      "mysql": null,
+      "mariadb": null,
+      "sqlite": null
+    },
+    "vendorSupport": {
+      "postgresql": { "supported": true, "level": "full" },
+      "mysql": { "supported": false, "level": "none", "notes": "MySQL does not support composite types. Use separate columns or JSON for structured data." },
+      "mariadb": { "supported": false, "level": "none", "notes": "MariaDB does not support composite types. Use separate columns or JSON." },
+      "sqlite": { "supported": false, "level": "none", "notes": "SQLite does not support composite types. Use JSON or separate columns." }
+    },
+    "tips": [
+      "Composite types are great for function return types when you need to return multiple values.",
+      "Access composite type fields using parentheses: (column_name).field_name — the parentheses are required.",
+      "Consider using JSONB instead of composite types if the structure might change frequently."
+    ],
+    "relatedItems": ["enum-type", "domain-type", "json-column"],
+    "seeAlso": []
+  },
+  {
+    "id": "domain-type",
+    "category": "types-sequences",
+    "name": "Domain Type",
+    "summary": "A custom data type based on an existing type with added constraints.",
+    "description": "A domain is a user-defined data type that wraps an existing type and adds constraints (like NOT NULL or CHECK) to it. For example, you could create an 'email' domain based on VARCHAR that validates the format, or a 'positive_int' domain that ensures values are always greater than zero. Domains let you reuse validation logic across multiple tables.",
+    "syntax": {
+      "postgresql": "-- Create a domain for email addresses\nCREATE DOMAIN email_address AS VARCHAR(255)\n  CHECK (VALUE ~* '^[a-z0-9._%+-]+@[a-z0-9.-]+\\.[a-z]{2,}$');\n\n-- Create a domain for positive integers\nCREATE DOMAIN positive_int AS INT\n  CHECK (VALUE > 0);\n\n-- Use domains in tables\nCREATE TABLE users (\n  id SERIAL PRIMARY KEY,\n  email email_address NOT NULL,\n  age positive_int\n);\n\nCREATE TABLE products (\n  id SERIAL PRIMARY KEY,\n  contact_email email_address,\n  stock positive_int NOT NULL DEFAULT 0\n);",
+      "mysql": null,
+      "mariadb": null,
+      "sqlite": null
+    },
+    "vendorSupport": {
+      "postgresql": { "supported": true, "level": "full" },
+      "mysql": { "supported": false, "level": "none", "notes": "MySQL does not support domain types. Use CHECK constraints on individual columns instead." },
+      "mariadb": { "supported": false, "level": "none", "notes": "MariaDB does not support domain types. Use CHECK constraints instead." },
+      "sqlite": { "supported": false, "level": "none", "notes": "SQLite does not support domain types." }
+    },
+    "tips": [
+      "Use domains to enforce the same validation rule across multiple tables without repeating CHECK constraints.",
+      "Domains are ideal for common patterns like email addresses, phone numbers, URLs, or currency amounts.",
+      "Changing a domain's constraint automatically applies to all columns using that domain."
+    ],
+    "relatedItems": ["check", "enum-type", "data-type"],
+    "seeAlso": []
+  },
+  {
+    "id": "range-type",
+    "category": "types-sequences",
+    "name": "Range Type",
+    "summary": "A data type that represents a range of values (e.g., date ranges, numeric ranges).",
+    "description": "A range type stores a continuous range of values with a lower and upper bound. PostgreSQL provides built-in range types for integers (INT4RANGE), numbers (NUMRANGE), timestamps (TSRANGE, TSTZRANGE), and dates (DATERANGE). Ranges are powerful for scheduling systems, time-series data, and any domain that deals with intervals.",
+    "syntax": {
+      "postgresql": "-- Use built-in range types\nCREATE TABLE events (\n  id SERIAL PRIMARY KEY,\n  name VARCHAR(100) NOT NULL,\n  during TSTZRANGE NOT NULL\n);\n\n-- Insert a range\nINSERT INTO events (name, during)\nVALUES ('Conference', '[2025-06-01 09:00, 2025-06-03 18:00)');\n\n-- Query: find events happening on a specific date\nSELECT name FROM events\nWHERE during @> '2025-06-02 12:00'::TIMESTAMPTZ;\n\n-- Query: find overlapping events\nSELECT a.name, b.name\nFROM events a, events b\nWHERE a.id < b.id AND a.during && b.during;\n\n-- Create a custom range type\nCREATE TYPE price_range AS RANGE (SUBTYPE = NUMERIC);",
+      "mysql": null,
+      "mariadb": null,
+      "sqlite": null
+    },
+    "vendorSupport": {
+      "postgresql": { "supported": true, "level": "full" },
+      "mysql": { "supported": false, "level": "none", "notes": "MySQL does not support range types. Use two separate columns (start/end) and application logic for range operations." },
+      "mariadb": { "supported": false, "level": "none", "notes": "MariaDB does not support range types." },
+      "sqlite": { "supported": false, "level": "none", "notes": "SQLite does not support range types." }
+    },
+    "tips": [
+      "Use brackets [ ] for inclusive bounds and parentheses ( ) for exclusive bounds: '[1, 10)' includes 1 but not 10.",
+      "Combine range types with EXCLUDE constraints and GiST indexes to prevent overlapping bookings or schedules.",
+      "Range operators: @> (contains), && (overlaps), << (strictly left of), >> (strictly right of)."
+    ],
+    "relatedItems": ["exclude", "gist-index", "composite-type"],
+    "seeAlso": []
+  },
+  {
+    "id": "set-type",
+    "category": "types-sequences",
+    "name": "SET Type",
+    "summary": "A data type that stores zero or more values from a predefined list (MySQL/MariaDB only).",
+    "description": "A SET type is a MySQL/MariaDB-specific data type that allows a column to store zero or more values from a predefined list. Unlike ENUM (which allows only one value), SET allows multiple selections — similar to checkboxes. Values are stored as a compact bitmask internally, making storage efficient. SET is useful for storing tags, permissions, or feature flags.",
+    "syntax": {
+      "postgresql": null,
+      "mysql": "-- Create a table with a SET column\nCREATE TABLE users (\n  id INT AUTO_INCREMENT PRIMARY KEY,\n  username VARCHAR(50) NOT NULL,\n  permissions SET('read', 'write', 'delete', 'admin') NOT NULL DEFAULT 'read'\n);\n\n-- Insert multiple values\nINSERT INTO users (username, permissions) VALUES ('alice', 'read,write');\nINSERT INTO users (username, permissions) VALUES ('bob', 'read,write,delete,admin');\n\n-- Query: find users with 'admin' permission\nSELECT username FROM users WHERE FIND_IN_SET('admin', permissions);",
+      "mariadb": "-- Create a table with a SET column\nCREATE TABLE users (\n  id INT AUTO_INCREMENT PRIMARY KEY,\n  username VARCHAR(50) NOT NULL,\n  permissions SET('read', 'write', 'delete', 'admin') NOT NULL DEFAULT 'read'\n);\n\n-- Insert multiple values\nINSERT INTO users (username, permissions) VALUES ('alice', 'read,write');\nINSERT INTO users (username, permissions) VALUES ('bob', 'read,write,delete,admin');\n\n-- Query: find users with 'admin' permission\nSELECT username FROM users WHERE FIND_IN_SET('admin', permissions);",
+      "sqlite": null
+    },
+    "vendorSupport": {
+      "postgresql": { "supported": false, "level": "none", "notes": "PostgreSQL does not support SET types. Use array types (TEXT[]) or a junction table instead." },
+      "mysql": { "supported": true, "level": "full" },
+      "mariadb": { "supported": true, "level": "full" },
+      "sqlite": { "supported": false, "level": "none", "notes": "SQLite does not support SET types. Store as comma-separated TEXT or use a junction table." }
+    },
+    "tips": [
+      "SET is limited to 64 distinct members — for larger sets, use a junction/bridge table instead.",
+      "Use FIND_IN_SET() to query for a specific value within a SET column.",
+      "For better portability and normalization, consider using a junction table instead of SET — it's the standard relational approach."
+    ],
+    "relatedItems": ["enum-type", "array-type"],
+    "seeAlso": []
+  },
+  {
+    "id": "sequence",
+    "category": "types-sequences",
+    "name": "Sequence",
+    "summary": "A database object that generates unique sequential numbers.",
+    "description": "A sequence is a standalone database object that generates a series of unique numbers, typically used for auto-incrementing primary keys. Unlike auto-increment (which is tied to a specific column), sequences are independent objects that can be shared across multiple tables or used in custom ways. Sequences guarantee uniqueness even in concurrent environments.",
+    "syntax": {
+      "postgresql": "-- Create a sequence\nCREATE SEQUENCE order_number_seq\n  START WITH 1000\n  INCREMENT BY 1\n  NO MAXVALUE\n  CACHE 10;\n\n-- Use in a table\nCREATE TABLE orders (\n  id SERIAL PRIMARY KEY,\n  order_number INT NOT NULL DEFAULT nextval('order_number_seq')\n);\n\n-- Use directly\nSELECT nextval('order_number_seq');  -- Get next value\nSELECT currval('order_number_seq');  -- Get current value\nSELECT setval('order_number_seq', 5000);  -- Set to specific value",
+      "mysql": null,
+      "mariadb": "-- MariaDB supports sequences (since 10.3)\nCREATE SEQUENCE order_number_seq\n  START WITH 1000\n  INCREMENT BY 1\n  NOCACHE;\n\n-- Get the next value\nSELECT NEXT VALUE FOR order_number_seq;\n\n-- Use in a table\nCREATE TABLE orders (\n  id INT AUTO_INCREMENT PRIMARY KEY,\n  order_number INT NOT NULL DEFAULT NEXT VALUE FOR order_number_seq\n);",
+      "sqlite": null
+    },
+    "vendorSupport": {
+      "postgresql": { "supported": true, "level": "full" },
+      "mysql": { "supported": false, "level": "none", "notes": "MySQL does not support sequences. Use AUTO_INCREMENT or application-level sequence generation." },
+      "mariadb": { "supported": true, "level": "full", "notes": "MariaDB supports sequences since version 10.3." },
+      "sqlite": { "supported": false, "level": "none", "notes": "SQLite does not support sequences. Use AUTOINCREMENT on INTEGER PRIMARY KEY." }
+    },
+    "tips": [
+      "Use sequences when you need a single counter shared across multiple tables (e.g., a global document number).",
+      "Sequences can have gaps — if a transaction is rolled back, the sequence number is not reused.",
+      "Use CACHE to improve performance in high-concurrency environments by pre-allocating sequence numbers in memory."
+    ],
+    "relatedItems": ["auto-increment", "identity-column"],
+    "seeAlso": []
+  },
+  {
+    "id": "array-type",
+    "category": "types-sequences",
+    "name": "Array Type",
+    "summary": "A data type that stores an ordered list of values in a single column.",
+    "description": "An array type allows you to store multiple values of the same type in a single column — like a list or collection. For example, you could store a list of tags, phone numbers, or scores in one column instead of creating a separate table. Arrays are convenient for simple lists but should not replace proper relational design for complex relationships.",
+    "syntax": {
+      "postgresql": "-- Create a table with array columns\nCREATE TABLE products (\n  id SERIAL PRIMARY KEY,\n  name VARCHAR(100) NOT NULL,\n  tags TEXT[] NOT NULL DEFAULT '{}',\n  scores INT[]\n);\n\n-- Insert with array values\nINSERT INTO products (name, tags, scores)\nVALUES ('Keyboard', ARRAY['electronics', 'peripherals', 'input'], ARRAY[85, 92, 78]);\n\n-- Query: find products with a specific tag\nSELECT name FROM products WHERE 'electronics' = ANY(tags);\n\n-- Query: find products containing all specified tags\nSELECT name FROM products WHERE tags @> ARRAY['electronics', 'peripherals'];\n\n-- Access array element (1-indexed)\nSELECT name, tags[1] AS first_tag FROM products;",
+      "mysql": null,
+      "mariadb": null,
+      "sqlite": null
+    },
+    "vendorSupport": {
+      "postgresql": { "supported": true, "level": "full" },
+      "mysql": { "supported": false, "level": "none", "notes": "MySQL does not support array types. Use JSON arrays or a junction table instead." },
+      "mariadb": { "supported": false, "level": "none", "notes": "MariaDB does not support array types. Use JSON arrays or a junction table instead." },
+      "sqlite": { "supported": false, "level": "none", "notes": "SQLite does not support array types. Use JSON arrays via the JSON1 extension or a separate table." }
+    },
+    "tips": [
+      "Arrays in PostgreSQL are 1-indexed (the first element is tags[1], not tags[0]).",
+      "Create a GIN index on array columns for fast containment queries: CREATE INDEX idx_tags ON products USING GIN (tags).",
+      "Don't overuse arrays — if you need to JOIN or query individual elements frequently, a junction table is better."
+    ],
+    "relatedItems": ["json-column", "gin-index", "set-type"],
+    "seeAlso": []
+  }
+]

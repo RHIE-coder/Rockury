@@ -1,0 +1,106 @@
+[
+  {
+    "id": "regular-view",
+    "category": "views",
+    "name": "View",
+    "summary": "A virtual table defined by a saved SQL query.",
+    "description": "A view is a named SQL query that you can use like a table. It does not store data itself — every time you query a view, the database runs the underlying query. Views simplify complex queries, provide a layer of abstraction over your schema, and can restrict which columns or rows users can see. Think of a view as a saved query with a name.",
+    "syntax": {
+      "postgresql": "CREATE VIEW active_users AS\nSELECT id, username, email, created_at\nFROM users\nWHERE status = 'active';\n\n-- Use it like a table\nSELECT * FROM active_users WHERE created_at > '2025-01-01';",
+      "mysql": "CREATE VIEW active_users AS\nSELECT id, username, email, created_at\nFROM users\nWHERE status = 'active';\n\n-- Use it like a table\nSELECT * FROM active_users WHERE created_at > '2025-01-01';",
+      "mariadb": "CREATE VIEW active_users AS\nSELECT id, username, email, created_at\nFROM users\nWHERE status = 'active';\n\n-- Use it like a table\nSELECT * FROM active_users WHERE created_at > '2025-01-01';",
+      "sqlite": "CREATE VIEW active_users AS\nSELECT id, username, email, created_at\nFROM users\nWHERE status = 'active';\n\n-- Use it like a table\nSELECT * FROM active_users WHERE created_at > '2025-01-01';"
+    },
+    "vendorSupport": {
+      "postgresql": { "supported": true, "level": "full" },
+      "mysql": { "supported": true, "level": "full" },
+      "mariadb": { "supported": true, "level": "full" },
+      "sqlite": { "supported": true, "level": "full" }
+    },
+    "tips": [
+      "Views are great for simplifying complex JOIN queries that you use frequently.",
+      "Views can serve as a security layer — grant users access to a view instead of the underlying table to hide sensitive columns.",
+      "Views don't improve performance by themselves since the query runs every time — use materialized views for caching."
+    ],
+    "relatedItems": ["materialized-view", "updatable-view", "check-option"],
+    "seeAlso": []
+  },
+  {
+    "id": "materialized-view",
+    "category": "views",
+    "name": "Materialized View",
+    "summary": "A view that physically stores its query results and can be refreshed on demand.",
+    "description": "A materialized view is like a regular view, but it stores the query results on disk like a real table. This makes reads much faster because the query doesn't need to run each time. However, the data can become stale, so you need to refresh it periodically. Materialized views are ideal for expensive queries (dashboards, reports, aggregations) where slightly outdated data is acceptable.",
+    "syntax": {
+      "postgresql": "-- Create a materialized view\nCREATE MATERIALIZED VIEW order_summary AS\nSELECT\n  u.id AS user_id,\n  u.username,\n  COUNT(o.id) AS order_count,\n  SUM(o.total) AS total_spent\nFROM users u\nLEFT JOIN orders o ON o.user_id = u.id\nGROUP BY u.id, u.username;\n\n-- Create an index on it\nCREATE INDEX idx_order_summary_user ON order_summary(user_id);\n\n-- Refresh the data\nREFRESH MATERIALIZED VIEW order_summary;\n\n-- Refresh without locking reads\nREFRESH MATERIALIZED VIEW CONCURRENTLY order_summary;",
+      "mysql": null,
+      "mariadb": null,
+      "sqlite": null
+    },
+    "vendorSupport": {
+      "postgresql": { "supported": true, "level": "full" },
+      "mysql": { "supported": false, "level": "none", "notes": "MySQL does not support materialized views. Use a table with a scheduled job to simulate one." },
+      "mariadb": { "supported": false, "level": "none", "notes": "MariaDB does not support materialized views. Use a table with periodic refresh via events." },
+      "sqlite": { "supported": false, "level": "none", "notes": "SQLite does not support materialized views." }
+    },
+    "tips": [
+      "Always create indexes on materialized views for fast queries — they are physical tables and benefit from indexes.",
+      "Use REFRESH MATERIALIZED VIEW CONCURRENTLY to avoid locking reads during refresh (requires a unique index).",
+      "Schedule refreshes (e.g., every 5 minutes or hourly) based on how fresh the data needs to be."
+    ],
+    "relatedItems": ["regular-view", "btree-index"],
+    "seeAlso": []
+  },
+  {
+    "id": "updatable-view",
+    "category": "views",
+    "name": "Updatable View",
+    "summary": "A view that allows INSERT, UPDATE, and DELETE operations on the underlying table.",
+    "description": "An updatable view is a view through which you can modify the data in the underlying table. Simple views that select from a single table without aggregations or GROUP BY are often automatically updatable. For more complex views, you can define rules or INSTEAD OF triggers to handle modifications. Updatable views let you use views as a data access layer.",
+    "syntax": {
+      "postgresql": "-- Simple updatable view (automatically updatable)\nCREATE VIEW active_users AS\nSELECT id, username, email, status\nFROM users\nWHERE status = 'active';\n\n-- You can INSERT/UPDATE/DELETE through this view\nUPDATE active_users SET email = 'new@example.com' WHERE id = 1;",
+      "mysql": "-- Simple updatable view (automatically updatable)\nCREATE VIEW active_users AS\nSELECT id, username, email, status\nFROM users\nWHERE status = 'active';\n\n-- You can INSERT/UPDATE/DELETE through this view\nUPDATE active_users SET email = 'new@example.com' WHERE id = 1;",
+      "mariadb": "-- Simple updatable view (automatically updatable)\nCREATE VIEW active_users AS\nSELECT id, username, email, status\nFROM users\nWHERE status = 'active';\n\n-- You can INSERT/UPDATE/DELETE through this view\nUPDATE active_users SET email = 'new@example.com' WHERE id = 1;",
+      "sqlite": "-- SQLite views are not directly updatable\n-- Use INSTEAD OF triggers to make them updatable\nCREATE VIEW active_users AS\nSELECT id, username, email, status\nFROM users\nWHERE status = 'active';\n\nCREATE TRIGGER update_active_users\nINSTEAD OF UPDATE ON active_users\nBEGIN\n  UPDATE users SET email = NEW.email WHERE id = OLD.id;\nEND;"
+    },
+    "vendorSupport": {
+      "postgresql": { "supported": true, "level": "full" },
+      "mysql": { "supported": true, "level": "full" },
+      "mariadb": { "supported": true, "level": "full" },
+      "sqlite": { "supported": true, "level": "partial", "notes": "SQLite views are read-only by default. Use INSTEAD OF triggers to enable updates." }
+    },
+    "tips": [
+      "A view is automatically updatable when it selects from a single table, has no GROUP BY, DISTINCT, or aggregate functions.",
+      "Use WITH CHECK OPTION to prevent inserts/updates that would make the row disappear from the view.",
+      "For complex views (JOINs, aggregations), use INSTEAD OF triggers to define custom update logic."
+    ],
+    "relatedItems": ["regular-view", "check-option", "row-trigger"],
+    "seeAlso": []
+  },
+  {
+    "id": "check-option",
+    "category": "views",
+    "name": "WITH CHECK OPTION",
+    "summary": "Prevents modifications through a view that would make the row no longer visible in the view.",
+    "description": "WITH CHECK OPTION is a clause added to updatable views that validates any INSERT or UPDATE to ensure the resulting row still satisfies the view's WHERE condition. Without this option, you could insert a row through the view that the view itself would not display. For example, inserting a user with status='inactive' through an active_users view would succeed silently without CHECK OPTION.",
+    "syntax": {
+      "postgresql": "CREATE VIEW active_users AS\nSELECT id, username, email, status\nFROM users\nWHERE status = 'active'\nWITH CHECK OPTION;\n\n-- This will fail because status='inactive' violates the view condition\n-- INSERT INTO active_users (username, email, status) VALUES ('test', 'test@example.com', 'inactive');",
+      "mysql": "CREATE VIEW active_users AS\nSELECT id, username, email, status\nFROM users\nWHERE status = 'active'\nWITH CHECK OPTION;\n\n-- This will fail because status='inactive' violates the view condition\n-- INSERT INTO active_users (username, email, status) VALUES ('test', 'test@example.com', 'inactive');",
+      "mariadb": "CREATE VIEW active_users AS\nSELECT id, username, email, status\nFROM users\nWHERE status = 'active'\nWITH CHECK OPTION;\n\n-- This will fail because status='inactive' violates the view condition\n-- INSERT INTO active_users (username, email, status) VALUES ('test', 'test@example.com', 'inactive');",
+      "sqlite": null
+    },
+    "vendorSupport": {
+      "postgresql": { "supported": true, "level": "full" },
+      "mysql": { "supported": true, "level": "full" },
+      "mariadb": { "supported": true, "level": "full" },
+      "sqlite": { "supported": false, "level": "none", "notes": "SQLite does not support WITH CHECK OPTION. Implement validation in INSTEAD OF triggers." }
+    },
+    "tips": [
+      "Always add WITH CHECK OPTION to updatable views to prevent data that doesn't match the view's filter from being inserted.",
+      "Use LOCAL CHECK OPTION to only check the current view's condition, or CASCADED to check all underlying views too.",
+      "WITHOUT CHECK OPTION can lead to confusing behavior where inserted rows 'disappear' from the view immediately."
+    ],
+    "relatedItems": ["updatable-view", "regular-view"],
+    "seeAlso": []
+  }
+]

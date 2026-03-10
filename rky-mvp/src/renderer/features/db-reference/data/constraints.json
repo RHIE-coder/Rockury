@@ -1,0 +1,184 @@
+[
+  {
+    "id": "pk",
+    "category": "constraints",
+    "name": "PRIMARY KEY",
+    "summary": "Uniquely identifies each row in a table.",
+    "description": "A primary key is a column (or combination of columns) that uniquely identifies every row in a table. No two rows can have the same primary key value, and it can never be NULL. Every table should have a primary key — it is the foundation of relational database design and is essential for creating relationships between tables.",
+    "syntax": {
+      "postgresql": "-- Single column primary key\nCREATE TABLE users (\n  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),\n  username VARCHAR(50) NOT NULL\n);\n\n-- Composite primary key\nCREATE TABLE order_items (\n  order_id INT,\n  product_id INT,\n  quantity INT NOT NULL,\n  PRIMARY KEY (order_id, product_id)\n);",
+      "mysql": "-- Single column primary key\nCREATE TABLE users (\n  id INT AUTO_INCREMENT PRIMARY KEY,\n  username VARCHAR(50) NOT NULL\n);\n\n-- Composite primary key\nCREATE TABLE order_items (\n  order_id INT,\n  product_id INT,\n  quantity INT NOT NULL,\n  PRIMARY KEY (order_id, product_id)\n);",
+      "mariadb": "-- Single column primary key\nCREATE TABLE users (\n  id INT AUTO_INCREMENT PRIMARY KEY,\n  username VARCHAR(50) NOT NULL\n);\n\n-- Composite primary key\nCREATE TABLE order_items (\n  order_id INT,\n  product_id INT,\n  quantity INT NOT NULL,\n  PRIMARY KEY (order_id, product_id)\n);",
+      "sqlite": "-- Single column primary key\nCREATE TABLE users (\n  id INTEGER PRIMARY KEY AUTOINCREMENT,\n  username TEXT NOT NULL\n);\n\n-- Composite primary key\nCREATE TABLE order_items (\n  order_id INTEGER,\n  product_id INTEGER,\n  quantity INTEGER NOT NULL,\n  PRIMARY KEY (order_id, product_id)\n);"
+    },
+    "vendorSupport": {
+      "postgresql": { "supported": true, "level": "full" },
+      "mysql": { "supported": true, "level": "full" },
+      "mariadb": { "supported": true, "level": "full" },
+      "sqlite": { "supported": true, "level": "full" }
+    },
+    "tips": [
+      "Every table should have a primary key — it ensures row uniqueness and is required for foreign key relationships.",
+      "Prefer single-column surrogate keys (like auto-increment IDs or UUIDs) for simplicity in most applications.",
+      "Composite primary keys work well for junction/bridge tables that represent many-to-many relationships."
+    ],
+    "relatedItems": ["fk", "uk", "auto-increment", "identity-column"],
+    "seeAlso": []
+  },
+  {
+    "id": "fk",
+    "category": "constraints",
+    "name": "FOREIGN KEY",
+    "summary": "Links a column in one table to the primary key of another table.",
+    "description": "A foreign key is a constraint that creates a relationship between two tables. It ensures that a value in one table (the child) must match an existing value in another table (the parent). This enforces referential integrity — you cannot insert an order for a user that does not exist. Foreign keys also define what happens when the referenced row is deleted or updated.",
+    "syntax": {
+      "postgresql": "CREATE TABLE orders (\n  id SERIAL PRIMARY KEY,\n  user_id INT NOT NULL,\n  total NUMERIC(10, 2) NOT NULL,\n  CONSTRAINT fk_orders_user\n    FOREIGN KEY (user_id) REFERENCES users(id)\n    ON DELETE CASCADE\n    ON UPDATE CASCADE\n);",
+      "mysql": "CREATE TABLE orders (\n  id INT AUTO_INCREMENT PRIMARY KEY,\n  user_id INT NOT NULL,\n  total DECIMAL(10, 2) NOT NULL,\n  CONSTRAINT fk_orders_user\n    FOREIGN KEY (user_id) REFERENCES users(id)\n    ON DELETE CASCADE\n    ON UPDATE CASCADE\n) ENGINE=InnoDB;",
+      "mariadb": "CREATE TABLE orders (\n  id INT AUTO_INCREMENT PRIMARY KEY,\n  user_id INT NOT NULL,\n  total DECIMAL(10, 2) NOT NULL,\n  CONSTRAINT fk_orders_user\n    FOREIGN KEY (user_id) REFERENCES users(id)\n    ON DELETE CASCADE\n    ON UPDATE CASCADE\n) ENGINE=InnoDB;",
+      "sqlite": "-- Enable foreign key enforcement first\nPRAGMA foreign_keys = ON;\n\nCREATE TABLE orders (\n  id INTEGER PRIMARY KEY AUTOINCREMENT,\n  user_id INTEGER NOT NULL,\n  total REAL NOT NULL,\n  FOREIGN KEY (user_id) REFERENCES users(id)\n    ON DELETE CASCADE\n    ON UPDATE CASCADE\n);"
+    },
+    "vendorSupport": {
+      "postgresql": { "supported": true, "level": "full" },
+      "mysql": { "supported": true, "level": "full", "notes": "Foreign keys require the InnoDB storage engine." },
+      "mariadb": { "supported": true, "level": "full", "notes": "Foreign keys require the InnoDB storage engine." },
+      "sqlite": { "supported": true, "level": "partial", "notes": "Foreign key enforcement must be enabled per connection with PRAGMA foreign_keys = ON." }
+    },
+    "tips": [
+      "Always name your foreign key constraints (e.g., fk_orders_user) for easier debugging and migration management.",
+      "Choose ON DELETE carefully: CASCADE deletes child rows, SET NULL orphans them, RESTRICT prevents deletion.",
+      "In SQLite, foreign keys are OFF by default — always run PRAGMA foreign_keys = ON at the start of each connection."
+    ],
+    "relatedItems": ["pk", "not-null", "btree-index"],
+    "seeAlso": []
+  },
+  {
+    "id": "uk",
+    "category": "constraints",
+    "name": "UNIQUE",
+    "summary": "Ensures all values in a column (or column combination) are distinct.",
+    "description": "A UNIQUE constraint guarantees that no two rows in a table can have the same value in the specified column or set of columns. Unlike a primary key, a table can have multiple unique constraints, and unique columns can contain NULL values (with vendor-specific behavior on how NULLs are treated). Use UNIQUE for natural keys like email addresses or usernames.",
+    "syntax": {
+      "postgresql": "CREATE TABLE users (\n  id SERIAL PRIMARY KEY,\n  email VARCHAR(100) UNIQUE NOT NULL,\n  username VARCHAR(50) UNIQUE NOT NULL\n);\n\n-- Multi-column unique constraint\nALTER TABLE order_items\n  ADD CONSTRAINT uq_order_product UNIQUE (order_id, product_id);",
+      "mysql": "CREATE TABLE users (\n  id INT AUTO_INCREMENT PRIMARY KEY,\n  email VARCHAR(100) UNIQUE NOT NULL,\n  username VARCHAR(50) UNIQUE NOT NULL\n);\n\n-- Multi-column unique constraint\nALTER TABLE order_items\n  ADD CONSTRAINT uq_order_product UNIQUE (order_id, product_id);",
+      "mariadb": "CREATE TABLE users (\n  id INT AUTO_INCREMENT PRIMARY KEY,\n  email VARCHAR(100) UNIQUE NOT NULL,\n  username VARCHAR(50) UNIQUE NOT NULL\n);\n\n-- Multi-column unique constraint\nALTER TABLE order_items\n  ADD CONSTRAINT uq_order_product UNIQUE (order_id, product_id);",
+      "sqlite": "CREATE TABLE users (\n  id INTEGER PRIMARY KEY AUTOINCREMENT,\n  email TEXT UNIQUE NOT NULL,\n  username TEXT UNIQUE NOT NULL\n);\n\n-- Multi-column unique constraint\nCREATE UNIQUE INDEX uq_order_product ON order_items(order_id, product_id);"
+    },
+    "vendorSupport": {
+      "postgresql": { "supported": true, "level": "full" },
+      "mysql": { "supported": true, "level": "full" },
+      "mariadb": { "supported": true, "level": "full" },
+      "sqlite": { "supported": true, "level": "full" }
+    },
+    "tips": [
+      "Use UNIQUE on natural identifiers like email, username, or phone number to prevent duplicates.",
+      "In PostgreSQL, multiple NULLs are allowed in a UNIQUE column. In other databases, behavior may vary.",
+      "A UNIQUE constraint automatically creates an index, so you don't need to create a separate index on the same columns."
+    ],
+    "relatedItems": ["pk", "btree-index", "not-null"],
+    "seeAlso": []
+  },
+  {
+    "id": "check",
+    "category": "constraints",
+    "name": "CHECK",
+    "summary": "Validates that column values satisfy a given condition.",
+    "description": "A CHECK constraint enforces a rule on the data that can be stored in a column. For example, you can require that a price is always positive, an age is within a valid range, or a status is one of a predefined set of values. If an INSERT or UPDATE violates the check condition, the database rejects the operation.",
+    "syntax": {
+      "postgresql": "CREATE TABLE products (\n  id SERIAL PRIMARY KEY,\n  name VARCHAR(100) NOT NULL,\n  price NUMERIC(10, 2) NOT NULL,\n  quantity INT NOT NULL,\n  status VARCHAR(20) NOT NULL,\n  CONSTRAINT chk_price_positive CHECK (price > 0),\n  CONSTRAINT chk_quantity_non_negative CHECK (quantity >= 0),\n  CONSTRAINT chk_valid_status CHECK (status IN ('active', 'discontinued', 'draft'))\n);",
+      "mysql": "CREATE TABLE products (\n  id INT AUTO_INCREMENT PRIMARY KEY,\n  name VARCHAR(100) NOT NULL,\n  price DECIMAL(10, 2) NOT NULL,\n  quantity INT NOT NULL,\n  status VARCHAR(20) NOT NULL,\n  CONSTRAINT chk_price_positive CHECK (price > 0),\n  CONSTRAINT chk_quantity_non_negative CHECK (quantity >= 0),\n  CONSTRAINT chk_valid_status CHECK (status IN ('active', 'discontinued', 'draft'))\n);",
+      "mariadb": "CREATE TABLE products (\n  id INT AUTO_INCREMENT PRIMARY KEY,\n  name VARCHAR(100) NOT NULL,\n  price DECIMAL(10, 2) NOT NULL,\n  quantity INT NOT NULL,\n  status VARCHAR(20) NOT NULL,\n  CONSTRAINT chk_price_positive CHECK (price > 0),\n  CONSTRAINT chk_quantity_non_negative CHECK (quantity >= 0),\n  CONSTRAINT chk_valid_status CHECK (status IN ('active', 'discontinued', 'draft'))\n);",
+      "sqlite": "CREATE TABLE products (\n  id INTEGER PRIMARY KEY AUTOINCREMENT,\n  name TEXT NOT NULL,\n  price REAL NOT NULL CHECK (price > 0),\n  quantity INTEGER NOT NULL CHECK (quantity >= 0),\n  status TEXT NOT NULL CHECK (status IN ('active', 'discontinued', 'draft'))\n);"
+    },
+    "vendorSupport": {
+      "postgresql": { "supported": true, "level": "full" },
+      "mysql": { "supported": true, "level": "full", "notes": "CHECK constraints are enforced starting from MySQL 8.0.16. Earlier versions parse but ignore them." },
+      "mariadb": { "supported": true, "level": "full", "notes": "CHECK constraints are enforced starting from MariaDB 10.2.1." },
+      "sqlite": { "supported": true, "level": "full" }
+    },
+    "tips": [
+      "Use CHECK constraints to enforce business rules at the database level, not just in your application code.",
+      "Name your CHECK constraints descriptively (e.g., chk_price_positive) so error messages are easy to understand.",
+      "If you need complex validation (e.g., cross-table checks), consider using triggers instead."
+    ],
+    "relatedItems": ["not-null", "enum-type", "domain-type"],
+    "seeAlso": []
+  },
+  {
+    "id": "not-null",
+    "category": "constraints",
+    "name": "NOT NULL",
+    "summary": "Prevents a column from accepting NULL values.",
+    "description": "A NOT NULL constraint ensures that a column must always have a value — it cannot be left empty (NULL). This is one of the most commonly used constraints and is essential for columns that require meaningful data, such as names, emails, or foreign key references. Without NOT NULL, a column can contain NULL, which represents the absence of a value.",
+    "syntax": {
+      "postgresql": "CREATE TABLE users (\n  id SERIAL PRIMARY KEY,\n  username VARCHAR(50) NOT NULL,\n  email VARCHAR(100) NOT NULL,\n  bio TEXT  -- nullable, bio is optional\n);",
+      "mysql": "CREATE TABLE users (\n  id INT AUTO_INCREMENT PRIMARY KEY,\n  username VARCHAR(50) NOT NULL,\n  email VARCHAR(100) NOT NULL,\n  bio TEXT  -- nullable, bio is optional\n);",
+      "mariadb": "CREATE TABLE users (\n  id INT AUTO_INCREMENT PRIMARY KEY,\n  username VARCHAR(50) NOT NULL,\n  email VARCHAR(100) NOT NULL,\n  bio TEXT  -- nullable, bio is optional\n);",
+      "sqlite": "CREATE TABLE users (\n  id INTEGER PRIMARY KEY AUTOINCREMENT,\n  username TEXT NOT NULL,\n  email TEXT NOT NULL,\n  bio TEXT  -- nullable, bio is optional\n);"
+    },
+    "vendorSupport": {
+      "postgresql": { "supported": true, "level": "full" },
+      "mysql": { "supported": true, "level": "full" },
+      "mariadb": { "supported": true, "level": "full" },
+      "sqlite": { "supported": true, "level": "full" }
+    },
+    "tips": [
+      "Default to NOT NULL for all columns, and only allow NULL when the absence of a value is meaningful.",
+      "Columns used in JOIN conditions (especially foreign keys) should almost always be NOT NULL.",
+      "Remember that NULL is not the same as an empty string or zero — it means 'unknown' or 'not applicable'."
+    ],
+    "relatedItems": ["default-value", "check", "column"],
+    "seeAlso": []
+  },
+  {
+    "id": "exclude",
+    "category": "constraints",
+    "name": "EXCLUDE",
+    "summary": "Prevents overlapping or conflicting values in rows using operator-based comparison.",
+    "description": "An EXCLUDE constraint is an advanced PostgreSQL-only feature that prevents any two rows from having conflicting values based on specified operators. The most common use case is preventing overlapping date/time ranges — for example, ensuring no two room bookings overlap. It is more flexible than UNIQUE because it can use operators other than equality.",
+    "syntax": {
+      "postgresql": "-- Prevent overlapping date ranges for the same room\nCREATE TABLE bookings (\n  id SERIAL PRIMARY KEY,\n  room_id INT NOT NULL,\n  during TSTZRANGE NOT NULL,\n  CONSTRAINT excl_no_overlap\n    EXCLUDE USING GIST (room_id WITH =, during WITH &&)\n);",
+      "mysql": null,
+      "mariadb": null,
+      "sqlite": null
+    },
+    "vendorSupport": {
+      "postgresql": { "supported": true, "level": "full" },
+      "mysql": { "supported": false, "level": "none", "notes": "MySQL does not support EXCLUDE constraints. Use triggers or application logic for overlap prevention." },
+      "mariadb": { "supported": false, "level": "none", "notes": "MariaDB does not support EXCLUDE constraints. Use triggers or application logic for overlap prevention." },
+      "sqlite": { "supported": false, "level": "none", "notes": "SQLite does not support EXCLUDE constraints." }
+    },
+    "tips": [
+      "EXCLUDE constraints require a GiST index, so make sure the btree_gist extension is installed for non-range types.",
+      "The most common use is preventing time range overlaps — perfect for scheduling systems.",
+      "For databases that don't support EXCLUDE, implement overlap checks in triggers or application code."
+    ],
+    "relatedItems": ["check", "gist-index", "range-type"],
+    "seeAlso": []
+  },
+  {
+    "id": "default-constraint",
+    "category": "constraints",
+    "name": "DEFAULT Constraint",
+    "summary": "Assigns a default value to a column when none is specified during INSERT.",
+    "description": "A DEFAULT constraint specifies a value that is automatically used when a row is inserted without providing a value for that column. Unlike other constraints that restrict data, DEFAULT provides data. Defaults can be constant values (like 0, 'active', or FALSE) or dynamic expressions (like CURRENT_TIMESTAMP or UUID generators).",
+    "syntax": {
+      "postgresql": "CREATE TABLE orders (\n  id SERIAL PRIMARY KEY,\n  status VARCHAR(20) DEFAULT 'pending' NOT NULL,\n  created_at TIMESTAMPTZ DEFAULT NOW() NOT NULL,\n  notes TEXT DEFAULT ''\n);\n\n-- Modify default on existing column\nALTER TABLE orders ALTER COLUMN status SET DEFAULT 'new';",
+      "mysql": "CREATE TABLE orders (\n  id INT AUTO_INCREMENT PRIMARY KEY,\n  status VARCHAR(20) DEFAULT 'pending' NOT NULL,\n  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,\n  notes TEXT\n);\n\n-- Modify default on existing column\nALTER TABLE orders ALTER COLUMN status SET DEFAULT 'new';",
+      "mariadb": "CREATE TABLE orders (\n  id INT AUTO_INCREMENT PRIMARY KEY,\n  status VARCHAR(20) DEFAULT 'pending' NOT NULL,\n  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,\n  notes TEXT\n);\n\n-- Modify default on existing column\nALTER TABLE orders ALTER COLUMN status SET DEFAULT 'new';",
+      "sqlite": "CREATE TABLE orders (\n  id INTEGER PRIMARY KEY AUTOINCREMENT,\n  status TEXT DEFAULT 'pending' NOT NULL,\n  created_at TEXT DEFAULT CURRENT_TIMESTAMP NOT NULL,\n  notes TEXT DEFAULT ''\n);"
+    },
+    "vendorSupport": {
+      "postgresql": { "supported": true, "level": "full" },
+      "mysql": { "supported": true, "level": "full" },
+      "mariadb": { "supported": true, "level": "full" },
+      "sqlite": { "supported": true, "level": "full" }
+    },
+    "tips": [
+      "Combine DEFAULT with NOT NULL to guarantee a column always has a value, even if omitted during INSERT.",
+      "Use CURRENT_TIMESTAMP as default for created_at columns so the database records when a row was created.",
+      "Remember that DEFAULT only applies to INSERT — UPDATE operations must specify a value explicitly."
+    ],
+    "relatedItems": ["default-value", "not-null", "column"],
+    "seeAlso": []
+  }
+]

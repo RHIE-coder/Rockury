@@ -19,6 +19,7 @@ import { ExplorerPage } from '@/pages/db-explorer';
 import { QueryCollectionPage } from '@/pages/db-query-collection';
 import { SeedCapturePage } from '@/pages/db-seed-capture';
 import { ValidationRunPage } from '@/pages/db-validation-run';
+import { DbReferencePage } from '@/pages/db-reference';
 import { PlaceholderPage } from '@/pages/placeholder';
 import { NotFoundPage } from '@/pages/not-found';
 
@@ -57,6 +58,7 @@ export function AppRouter() {
             <Route path="query-collection" element={<QueryCollectionPage />} />
             <Route path="seed" element={<SeedCapturePage />} />
             <Route path="validation-run" element={<ValidationRunPage />} />
+            <Route path="reference" element={<DbReferencePage />} />
           </Route>
         </Route>
 

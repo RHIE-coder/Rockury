@@ -1,0 +1,132 @@
+[
+  {
+    "id": "range-partition",
+    "category": "partitioning",
+    "name": "Range Partitioning",
+    "summary": "Divides a table into partitions based on a range of values (e.g., date ranges).",
+    "description": "Range partitioning splits a table into smaller partitions where each partition holds rows within a specific range of values. The most common use case is partitioning by date — for example, one partition per month or year. This dramatically improves query performance on large tables because the database only scans relevant partitions instead of the entire table.",
+    "syntax": {
+      "postgresql": "-- Create a range-partitioned table by date\nCREATE TABLE orders (\n  id SERIAL,\n  user_id INT NOT NULL,\n  total NUMERIC(10, 2) NOT NULL,\n  created_at TIMESTAMPTZ NOT NULL\n) PARTITION BY RANGE (created_at);\n\n-- Create partitions\nCREATE TABLE orders_2025_q1 PARTITION OF orders\n  FOR VALUES FROM ('2025-01-01') TO ('2025-04-01');\n\nCREATE TABLE orders_2025_q2 PARTITION OF orders\n  FOR VALUES FROM ('2025-04-01') TO ('2025-07-01');\n\nCREATE TABLE orders_2025_q3 PARTITION OF orders\n  FOR VALUES FROM ('2025-07-01') TO ('2025-10-01');\n\nCREATE TABLE orders_2025_q4 PARTITION OF orders\n  FOR VALUES FROM ('2025-10-01') TO ('2026-01-01');",
+      "mysql": "-- Create a range-partitioned table by year\nCREATE TABLE orders (\n  id INT AUTO_INCREMENT,\n  user_id INT NOT NULL,\n  total DECIMAL(10, 2) NOT NULL,\n  created_at DATETIME NOT NULL,\n  PRIMARY KEY (id, created_at)\n) PARTITION BY RANGE (YEAR(created_at)) (\n  PARTITION p2023 VALUES LESS THAN (2024),\n  PARTITION p2024 VALUES LESS THAN (2025),\n  PARTITION p2025 VALUES LESS THAN (2026),\n  PARTITION p_future VALUES LESS THAN MAXVALUE\n);",
+      "mariadb": "-- Create a range-partitioned table by year\nCREATE TABLE orders (\n  id INT AUTO_INCREMENT,\n  user_id INT NOT NULL,\n  total DECIMAL(10, 2) NOT NULL,\n  created_at DATETIME NOT NULL,\n  PRIMARY KEY (id, created_at)\n) PARTITION BY RANGE (YEAR(created_at)) (\n  PARTITION p2023 VALUES LESS THAN (2024),\n  PARTITION p2024 VALUES LESS THAN (2025),\n  PARTITION p2025 VALUES LESS THAN (2026),\n  PARTITION p_future VALUES LESS THAN MAXVALUE\n);",
+      "sqlite": null
+    },
+    "vendorSupport": {
+      "postgresql": { "supported": true, "level": "full" },
+      "mysql": { "supported": true, "level": "full" },
+      "mariadb": { "supported": true, "level": "full" },
+      "sqlite": { "supported": false, "level": "none", "notes": "SQLite does not support table partitioning." }
+    },
+    "tips": [
+      "Always include the partition key in your WHERE clause — otherwise the database must scan all partitions.",
+      "In MySQL/MariaDB, the partition key must be part of the PRIMARY KEY or any UNIQUE index.",
+      "Create new partitions in advance (e.g., next quarter) to avoid insert failures when data falls outside existing ranges."
+    ],
+    "relatedItems": ["list-partition", "hash-partition", "declarative-partition"],
+    "seeAlso": []
+  },
+  {
+    "id": "list-partition",
+    "category": "partitioning",
+    "name": "List Partitioning",
+    "summary": "Divides a table into partitions based on a list of specific values.",
+    "description": "List partitioning splits a table into partitions where each partition holds rows matching specific discrete values. This is ideal for columns with a known, finite set of values like country codes, status values, or categories. Each value is assigned to exactly one partition, and rows are routed automatically based on the partition key.",
+    "syntax": {
+      "postgresql": "-- Create a list-partitioned table by region\nCREATE TABLE orders (\n  id SERIAL,\n  user_id INT NOT NULL,\n  total NUMERIC(10, 2) NOT NULL,\n  region VARCHAR(20) NOT NULL\n) PARTITION BY LIST (region);\n\nCREATE TABLE orders_asia PARTITION OF orders\n  FOR VALUES IN ('KR', 'JP', 'CN', 'SG');\n\nCREATE TABLE orders_europe PARTITION OF orders\n  FOR VALUES IN ('DE', 'FR', 'UK', 'NL');\n\nCREATE TABLE orders_americas PARTITION OF orders\n  FOR VALUES IN ('US', 'CA', 'BR', 'MX');\n\n-- Default partition for unmatched values\nCREATE TABLE orders_other PARTITION OF orders DEFAULT;",
+      "mysql": "-- Create a list-partitioned table by region_id\nCREATE TABLE orders (\n  id INT AUTO_INCREMENT,\n  user_id INT NOT NULL,\n  total DECIMAL(10, 2) NOT NULL,\n  region_id INT NOT NULL,\n  PRIMARY KEY (id, region_id)\n) PARTITION BY LIST (region_id) (\n  PARTITION p_asia VALUES IN (1, 2, 3, 4),\n  PARTITION p_europe VALUES IN (5, 6, 7, 8),\n  PARTITION p_americas VALUES IN (9, 10, 11, 12)\n);",
+      "mariadb": "-- Create a list-partitioned table by region_id\nCREATE TABLE orders (\n  id INT AUTO_INCREMENT,\n  user_id INT NOT NULL,\n  total DECIMAL(10, 2) NOT NULL,\n  region_id INT NOT NULL,\n  PRIMARY KEY (id, region_id)\n) PARTITION BY LIST (region_id) (\n  PARTITION p_asia VALUES IN (1, 2, 3, 4),\n  PARTITION p_europe VALUES IN (5, 6, 7, 8),\n  PARTITION p_americas VALUES IN (9, 10, 11, 12)\n);",
+      "sqlite": null
+    },
+    "vendorSupport": {
+      "postgresql": { "supported": true, "level": "full" },
+      "mysql": { "supported": true, "level": "partial", "notes": "MySQL list partitioning only supports integer expressions, not string values directly." },
+      "mariadb": { "supported": true, "level": "partial", "notes": "MariaDB list partitioning only supports integer expressions." },
+      "sqlite": { "supported": false, "level": "none" }
+    },
+    "tips": [
+      "Always create a DEFAULT partition (PostgreSQL) to catch rows that don't match any defined list — otherwise inserts will fail.",
+      "List partitioning works best when the number of distinct values is small and stable (e.g., regions, categories).",
+      "In MySQL/MariaDB, use integer mappings for list partitions since string-based list partitioning is not supported."
+    ],
+    "relatedItems": ["range-partition", "hash-partition", "declarative-partition"],
+    "seeAlso": []
+  },
+  {
+    "id": "hash-partition",
+    "category": "partitioning",
+    "name": "Hash Partitioning",
+    "summary": "Distributes rows evenly across partitions using a hash function.",
+    "description": "Hash partitioning divides rows across partitions by applying a hash function to the partition key. This distributes data evenly regardless of the actual values, which is useful when there is no natural range or list to partition by. Hash partitioning is ideal for spreading workload evenly and avoiding hotspots in tables with high write volumes.",
+    "syntax": {
+      "postgresql": "-- Create a hash-partitioned table\nCREATE TABLE orders (\n  id SERIAL,\n  user_id INT NOT NULL,\n  total NUMERIC(10, 2) NOT NULL,\n  created_at TIMESTAMPTZ NOT NULL\n) PARTITION BY HASH (id);\n\n-- Create 4 hash partitions\nCREATE TABLE orders_p0 PARTITION OF orders FOR VALUES WITH (MODULUS 4, REMAINDER 0);\nCREATE TABLE orders_p1 PARTITION OF orders FOR VALUES WITH (MODULUS 4, REMAINDER 1);\nCREATE TABLE orders_p2 PARTITION OF orders FOR VALUES WITH (MODULUS 4, REMAINDER 2);\nCREATE TABLE orders_p3 PARTITION OF orders FOR VALUES WITH (MODULUS 4, REMAINDER 3);",
+      "mysql": "-- Create a hash-partitioned table with 4 partitions\nCREATE TABLE orders (\n  id INT AUTO_INCREMENT,\n  user_id INT NOT NULL,\n  total DECIMAL(10, 2) NOT NULL,\n  created_at DATETIME NOT NULL,\n  PRIMARY KEY (id)\n) PARTITION BY HASH (id)\n  PARTITIONS 4;",
+      "mariadb": "-- Create a hash-partitioned table with 4 partitions\nCREATE TABLE orders (\n  id INT AUTO_INCREMENT,\n  user_id INT NOT NULL,\n  total DECIMAL(10, 2) NOT NULL,\n  created_at DATETIME NOT NULL,\n  PRIMARY KEY (id)\n) PARTITION BY HASH (id)\n  PARTITIONS 4;",
+      "sqlite": null
+    },
+    "vendorSupport": {
+      "postgresql": { "supported": true, "level": "full" },
+      "mysql": { "supported": true, "level": "full" },
+      "mariadb": { "supported": true, "level": "full" },
+      "sqlite": { "supported": false, "level": "none" }
+    },
+    "tips": [
+      "Choose the number of partitions as a power of 2 (4, 8, 16) for the most even distribution.",
+      "Hash partitioning does not support partition pruning for range queries — only equality lookups on the hash key benefit.",
+      "Use hash partitioning when data has no natural range or grouping and you simply want to spread load evenly."
+    ],
+    "relatedItems": ["range-partition", "list-partition", "declarative-partition"],
+    "seeAlso": []
+  },
+  {
+    "id": "sub-partition",
+    "category": "partitioning",
+    "name": "Sub-Partitioning",
+    "summary": "Divides partitions further into smaller sub-partitions using a second partitioning strategy.",
+    "description": "Sub-partitioning (also called composite partitioning) applies a second level of partitioning within each partition. For example, you could range-partition by year and then hash-partition each year's data for even distribution. Sub-partitioning is useful for very large tables where a single level of partitioning is not granular enough.",
+    "syntax": {
+      "postgresql": "-- Range partition by year, then list sub-partition by region\nCREATE TABLE orders (\n  id SERIAL,\n  user_id INT NOT NULL,\n  region VARCHAR(20) NOT NULL,\n  created_at TIMESTAMPTZ NOT NULL\n) PARTITION BY RANGE (created_at);\n\n-- Create a partition for 2025, sub-partitioned by region\nCREATE TABLE orders_2025 PARTITION OF orders\n  FOR VALUES FROM ('2025-01-01') TO ('2026-01-01')\n  PARTITION BY LIST (region);\n\nCREATE TABLE orders_2025_asia PARTITION OF orders_2025\n  FOR VALUES IN ('KR', 'JP', 'CN');\n\nCREATE TABLE orders_2025_europe PARTITION OF orders_2025\n  FOR VALUES IN ('DE', 'FR', 'UK');",
+      "mysql": "-- Range partition by year, hash sub-partition\nCREATE TABLE orders (\n  id INT AUTO_INCREMENT,\n  user_id INT NOT NULL,\n  total DECIMAL(10, 2) NOT NULL,\n  created_at DATETIME NOT NULL,\n  PRIMARY KEY (id, created_at)\n) PARTITION BY RANGE (YEAR(created_at))\n  SUBPARTITION BY HASH (id)\n  SUBPARTITIONS 4 (\n    PARTITION p2024 VALUES LESS THAN (2025),\n    PARTITION p2025 VALUES LESS THAN (2026),\n    PARTITION p_future VALUES LESS THAN MAXVALUE\n  );",
+      "mariadb": "-- Range partition by year, hash sub-partition\nCREATE TABLE orders (\n  id INT AUTO_INCREMENT,\n  user_id INT NOT NULL,\n  total DECIMAL(10, 2) NOT NULL,\n  created_at DATETIME NOT NULL,\n  PRIMARY KEY (id, created_at)\n) PARTITION BY RANGE (YEAR(created_at))\n  SUBPARTITION BY HASH (id)\n  SUBPARTITIONS 4 (\n    PARTITION p2024 VALUES LESS THAN (2025),\n    PARTITION p2025 VALUES LESS THAN (2026),\n    PARTITION p_future VALUES LESS THAN MAXVALUE\n  );",
+      "sqlite": null
+    },
+    "vendorSupport": {
+      "postgresql": { "supported": true, "level": "full", "notes": "PostgreSQL supports multi-level partitioning by creating partitions that are themselves partitioned." },
+      "mysql": { "supported": true, "level": "partial", "notes": "MySQL supports sub-partitioning with HASH or KEY only as the sub-partition strategy." },
+      "mariadb": { "supported": true, "level": "partial", "notes": "MariaDB supports sub-partitioning with HASH or KEY only as the sub-partition strategy." },
+      "sqlite": { "supported": false, "level": "none" }
+    },
+    "tips": [
+      "Use sub-partitioning only when a single level of partitioning creates partitions that are still too large.",
+      "In MySQL/MariaDB, the sub-partition strategy must be HASH or KEY — you cannot use RANGE or LIST for sub-partitions.",
+      "Too many sub-partitions can lead to management complexity — keep the total number of partitions manageable."
+    ],
+    "relatedItems": ["range-partition", "list-partition", "hash-partition"],
+    "seeAlso": []
+  },
+  {
+    "id": "declarative-partition",
+    "category": "partitioning",
+    "name": "Declarative Partitioning",
+    "summary": "A modern syntax for defining partitioned tables declaratively in the CREATE TABLE statement.",
+    "description": "Declarative partitioning is the modern, built-in approach to partitioning where you define the partitioning strategy directly in the CREATE TABLE statement. The database automatically routes rows to the correct partition based on the partition key. This replaced the older inheritance-based partitioning (PostgreSQL) and is now the recommended approach across all databases that support partitioning.",
+    "syntax": {
+      "postgresql": "-- Declarative partitioning (PostgreSQL 10+)\nCREATE TABLE orders (\n  id SERIAL,\n  user_id INT NOT NULL,\n  total NUMERIC(10, 2) NOT NULL,\n  created_at TIMESTAMPTZ NOT NULL\n) PARTITION BY RANGE (created_at);\n\n-- Partitions are managed declaratively\nCREATE TABLE orders_2025_q1 PARTITION OF orders\n  FOR VALUES FROM ('2025-01-01') TO ('2025-04-01');\n\n-- Attach an existing table as a partition\nALTER TABLE orders ATTACH PARTITION orders_archive\n  FOR VALUES FROM ('2020-01-01') TO ('2025-01-01');\n\n-- Detach a partition\nALTER TABLE orders DETACH PARTITION orders_2025_q1;",
+      "mysql": "-- Declarative partitioning in MySQL\nCREATE TABLE orders (\n  id INT AUTO_INCREMENT,\n  user_id INT NOT NULL,\n  total DECIMAL(10, 2) NOT NULL,\n  created_at DATETIME NOT NULL,\n  PRIMARY KEY (id, created_at)\n) PARTITION BY RANGE (YEAR(created_at)) (\n  PARTITION p2024 VALUES LESS THAN (2025),\n  PARTITION p2025 VALUES LESS THAN (2026),\n  PARTITION p_future VALUES LESS THAN MAXVALUE\n);\n\n-- Add a new partition\nALTER TABLE orders ADD PARTITION (PARTITION p2026 VALUES LESS THAN (2027));\n\n-- Drop a partition (deletes its data)\nALTER TABLE orders DROP PARTITION p2024;",
+      "mariadb": "-- Declarative partitioning in MariaDB\nCREATE TABLE orders (\n  id INT AUTO_INCREMENT,\n  user_id INT NOT NULL,\n  total DECIMAL(10, 2) NOT NULL,\n  created_at DATETIME NOT NULL,\n  PRIMARY KEY (id, created_at)\n) PARTITION BY RANGE (YEAR(created_at)) (\n  PARTITION p2024 VALUES LESS THAN (2025),\n  PARTITION p2025 VALUES LESS THAN (2026),\n  PARTITION p_future VALUES LESS THAN MAXVALUE\n);\n\n-- Add a new partition\nALTER TABLE orders ADD PARTITION (PARTITION p2026 VALUES LESS THAN (2027));\n\n-- Drop a partition (deletes its data)\nALTER TABLE orders DROP PARTITION p2024;",
+      "sqlite": null
+    },
+    "vendorSupport": {
+      "postgresql": { "supported": true, "level": "full", "notes": "Declarative partitioning was introduced in PostgreSQL 10 and has been enhanced in every subsequent version." },
+      "mysql": { "supported": true, "level": "full" },
+      "mariadb": { "supported": true, "level": "full" },
+      "sqlite": { "supported": false, "level": "none" }
+    },
+    "tips": [
+      "PostgreSQL's DETACH PARTITION is great for archiving — detach old partitions and move them to cheaper storage.",
+      "Always plan your partition key carefully — changing the partition strategy later requires recreating the table.",
+      "Partition pruning (skipping irrelevant partitions) only works if the WHERE clause includes the partition key."
+    ],
+    "relatedItems": ["range-partition", "list-partition", "hash-partition", "sub-partition"],
+    "seeAlso": []
+  }
+]

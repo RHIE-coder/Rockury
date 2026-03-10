@@ -1,0 +1,132 @@
+[
+  {
+    "id": "function",
+    "category": "routines",
+    "name": "Function",
+    "summary": "A reusable block of code that takes inputs and returns a value.",
+    "description": "A database function is a named block of code stored in the database that accepts parameters, performs computations, and returns a result. Functions can be used inside SQL queries (SELECT, WHERE, etc.) just like built-in functions. They are ideal for encapsulating business logic, complex calculations, or data transformations that you need to reuse across multiple queries.",
+    "syntax": {
+      "postgresql": "-- Create a function that calculates order total with tax\nCREATE FUNCTION calculate_total(subtotal NUMERIC, tax_rate NUMERIC DEFAULT 0.1)\nRETURNS NUMERIC\nLANGUAGE plpgsql\nAS $$\nBEGIN\n  RETURN subtotal + (subtotal * tax_rate);\nEND;\n$$;\n\n-- Use in a query\nSELECT order_id, calculate_total(subtotal) AS total FROM orders;",
+      "mysql": "-- Create a function that calculates order total with tax\nDELIMITER //\nCREATE FUNCTION calculate_total(subtotal DECIMAL(10,2), tax_rate DECIMAL(3,2))\nRETURNS DECIMAL(10,2)\nDETERMINISTIC\nBEGIN\n  RETURN subtotal + (subtotal * tax_rate);\nEND //\nDELIMITER ;\n\n-- Use in a query\nSELECT order_id, calculate_total(subtotal, 0.1) AS total FROM orders;",
+      "mariadb": "-- Create a function that calculates order total with tax\nDELIMITER //\nCREATE FUNCTION calculate_total(subtotal DECIMAL(10,2), tax_rate DECIMAL(3,2))\nRETURNS DECIMAL(10,2)\nDETERMINISTIC\nBEGIN\n  RETURN subtotal + (subtotal * tax_rate);\nEND //\nDELIMITER ;\n\n-- Use in a query\nSELECT order_id, calculate_total(subtotal, 0.1) AS total FROM orders;",
+      "sqlite": null
+    },
+    "vendorSupport": {
+      "postgresql": { "supported": true, "level": "full" },
+      "mysql": { "supported": true, "level": "full" },
+      "mariadb": { "supported": true, "level": "full" },
+      "sqlite": { "supported": false, "level": "none", "notes": "SQLite does not support user-defined functions in SQL. Functions can only be added via the C API or application bindings." }
+    },
+    "tips": [
+      "Mark functions as IMMUTABLE (PostgreSQL) or DETERMINISTIC (MySQL) when they always return the same output for the same input — this allows caching and optimization.",
+      "Keep functions focused on a single task. If a function does too much, split it into smaller functions.",
+      "Functions run inside the database, so they are great for reducing data transfer between the application and database."
+    ],
+    "relatedItems": ["procedure", "language", "parameter-modes"],
+    "seeAlso": []
+  },
+  {
+    "id": "procedure",
+    "category": "routines",
+    "name": "Procedure",
+    "summary": "A reusable block of code that performs actions but does not return a value directly.",
+    "description": "A stored procedure is similar to a function, but it is designed to perform actions (INSERT, UPDATE, DELETE, transaction control) rather than return a value. Procedures are called using CALL and cannot be used inside a SELECT query. They are ideal for encapsulating multi-step operations like transferring funds between accounts or processing batch updates.",
+    "syntax": {
+      "postgresql": "-- Create a procedure to transfer funds between users\nCREATE PROCEDURE transfer_funds(\n  sender_id INT,\n  receiver_id INT,\n  amount NUMERIC\n)\nLANGUAGE plpgsql\nAS $$\nBEGIN\n  UPDATE accounts SET balance = balance - amount WHERE user_id = sender_id;\n  UPDATE accounts SET balance = balance + amount WHERE user_id = receiver_id;\n  COMMIT;\nEND;\n$$;\n\n-- Call the procedure\nCALL transfer_funds(1, 2, 100.00);",
+      "mysql": "-- Create a procedure to transfer funds between users\nDELIMITER //\nCREATE PROCEDURE transfer_funds(\n  IN sender_id INT,\n  IN receiver_id INT,\n  IN amount DECIMAL(10,2)\n)\nBEGIN\n  START TRANSACTION;\n  UPDATE accounts SET balance = balance - amount WHERE user_id = sender_id;\n  UPDATE accounts SET balance = balance + amount WHERE user_id = receiver_id;\n  COMMIT;\nEND //\nDELIMITER ;\n\n-- Call the procedure\nCALL transfer_funds(1, 2, 100.00);",
+      "mariadb": "-- Create a procedure to transfer funds between users\nDELIMITER //\nCREATE PROCEDURE transfer_funds(\n  IN sender_id INT,\n  IN receiver_id INT,\n  IN amount DECIMAL(10,2)\n)\nBEGIN\n  START TRANSACTION;\n  UPDATE accounts SET balance = balance - amount WHERE user_id = sender_id;\n  UPDATE accounts SET balance = balance + amount WHERE user_id = receiver_id;\n  COMMIT;\nEND //\nDELIMITER ;\n\n-- Call the procedure\nCALL transfer_funds(1, 2, 100.00);",
+      "sqlite": null
+    },
+    "vendorSupport": {
+      "postgresql": { "supported": true, "level": "full", "notes": "Procedures were added in PostgreSQL 11. They support transaction control (COMMIT/ROLLBACK) inside the body." },
+      "mysql": { "supported": true, "level": "full" },
+      "mariadb": { "supported": true, "level": "full" },
+      "sqlite": { "supported": false, "level": "none", "notes": "SQLite does not support stored procedures." }
+    },
+    "tips": [
+      "Use procedures (not functions) when you need transaction control (COMMIT/ROLLBACK) inside the routine.",
+      "Procedures are called with CALL, not inside SELECT — they are meant for side effects, not value computation.",
+      "In MySQL/MariaDB, use DELIMITER to change the statement terminator when creating procedures with semicolons inside."
+    ],
+    "relatedItems": ["function", "language", "parameter-modes"],
+    "seeAlso": []
+  },
+  {
+    "id": "aggregate-function",
+    "category": "routines",
+    "name": "Aggregate Function",
+    "summary": "A custom function that processes multiple rows and returns a single result.",
+    "description": "A user-defined aggregate function processes a set of rows (like built-in SUM, AVG, or COUNT) and returns a single value. You define how the function initializes its state, processes each row, and produces the final result. Custom aggregates are useful when built-in aggregate functions don't cover your specific calculation needs.",
+    "syntax": {
+      "postgresql": "-- Create a custom aggregate that concatenates strings with a separator\nCREATE FUNCTION concat_agg_sfunc(state TEXT, value TEXT)\nRETURNS TEXT\nLANGUAGE plpgsql\nAS $$\nBEGIN\n  IF state IS NULL THEN\n    RETURN value;\n  END IF;\n  RETURN state || ', ' || value;\nEND;\n$$;\n\nCREATE AGGREGATE group_concat(TEXT) (\n  SFUNC = concat_agg_sfunc,\n  STYPE = TEXT\n);\n\n-- Usage\nSELECT category, group_concat(name) AS product_names\nFROM products\nGROUP BY category;",
+      "mysql": "-- MySQL does not support CREATE AGGREGATE\n-- But has built-in GROUP_CONCAT\nSELECT category, GROUP_CONCAT(name SEPARATOR ', ') AS product_names\nFROM products\nGROUP BY category;",
+      "mariadb": "-- MariaDB does not support CREATE AGGREGATE\n-- But has built-in GROUP_CONCAT\nSELECT category, GROUP_CONCAT(name SEPARATOR ', ') AS product_names\nFROM products\nGROUP BY category;",
+      "sqlite": null
+    },
+    "vendorSupport": {
+      "postgresql": { "supported": true, "level": "full" },
+      "mysql": { "supported": false, "level": "none", "notes": "MySQL does not support user-defined aggregate functions in SQL. Use built-in aggregates or UDFs via C plugins." },
+      "mariadb": { "supported": false, "level": "none", "notes": "MariaDB does not support user-defined aggregate functions in SQL." },
+      "sqlite": { "supported": false, "level": "none", "notes": "SQLite supports custom aggregates only through its C API or application-level bindings." }
+    },
+    "tips": [
+      "Before creating a custom aggregate, check if a built-in aggregate or window function already does what you need.",
+      "Custom aggregates in PostgreSQL require defining a state transition function (SFUNC) and a state type (STYPE).",
+      "You can optionally define a FINALFUNC to transform the accumulated state into the final result."
+    ],
+    "relatedItems": ["function"],
+    "seeAlso": []
+  },
+  {
+    "id": "language",
+    "category": "routines",
+    "name": "Procedural Language",
+    "summary": "The programming language used to write function and procedure bodies.",
+    "description": "When creating functions or procedures, you specify the language that the routine body is written in. Each database supports different languages. PostgreSQL is the most flexible, supporting SQL, PL/pgSQL, PL/Python, PL/Perl, and more. MySQL and MariaDB support SQL-based procedural language. The choice of language affects what you can do inside the routine.",
+    "syntax": {
+      "postgresql": "-- SQL language (simple, no procedural logic)\nCREATE FUNCTION get_user_email(uid INT)\nRETURNS VARCHAR\nLANGUAGE SQL\nAS $$\n  SELECT email FROM users WHERE id = uid;\n$$;\n\n-- PL/pgSQL language (procedural logic with variables, loops, IF/ELSE)\nCREATE FUNCTION get_user_status(uid INT)\nRETURNS VARCHAR\nLANGUAGE plpgsql\nAS $$\nDECLARE\n  user_status VARCHAR;\nBEGIN\n  SELECT status INTO user_status FROM users WHERE id = uid;\n  IF user_status IS NULL THEN\n    RETURN 'unknown';\n  END IF;\n  RETURN user_status;\nEND;\n$$;\n\n-- PL/Python (requires extension)\n-- CREATE EXTENSION plpython3u;\n-- CREATE FUNCTION parse_json(data TEXT) RETURNS TEXT\n-- LANGUAGE plpython3u AS $$ ... $$;",
+      "mysql": "-- MySQL only supports SQL-based procedural language\nDELIMITER //\nCREATE FUNCTION get_user_status(uid INT)\nRETURNS VARCHAR(20)\nDETERMINISTIC\nBEGIN\n  DECLARE user_status VARCHAR(20);\n  SELECT status INTO user_status FROM users WHERE id = uid;\n  IF user_status IS NULL THEN\n    RETURN 'unknown';\n  END IF;\n  RETURN user_status;\nEND //\nDELIMITER ;",
+      "mariadb": "-- MariaDB supports SQL-based procedural language\nDELIMITER //\nCREATE FUNCTION get_user_status(uid INT)\nRETURNS VARCHAR(20)\nDETERMINISTIC\nBEGIN\n  DECLARE user_status VARCHAR(20);\n  SELECT status INTO user_status FROM users WHERE id = uid;\n  IF user_status IS NULL THEN\n    RETURN 'unknown';\n  END IF;\n  RETURN user_status;\nEND //\nDELIMITER ;",
+      "sqlite": null
+    },
+    "vendorSupport": {
+      "postgresql": { "supported": true, "level": "full", "notes": "PostgreSQL supports SQL, PL/pgSQL, PL/Python, PL/Perl, PL/Tcl, and more via extensions." },
+      "mysql": { "supported": true, "level": "partial", "notes": "MySQL only supports its own SQL-based procedural language." },
+      "mariadb": { "supported": true, "level": "partial", "notes": "MariaDB supports SQL-based procedural language and experimental PL/SQL compatibility." },
+      "sqlite": { "supported": false, "level": "none" }
+    },
+    "tips": [
+      "Use SQL language for simple single-query functions — it's the fastest and most portable option.",
+      "Use PL/pgSQL (PostgreSQL) when you need variables, loops, IF/ELSE, or exception handling.",
+      "PL/Python in PostgreSQL is powerful but runs as an 'untrusted' language — it has full system access, so use it carefully."
+    ],
+    "relatedItems": ["function", "procedure"],
+    "seeAlso": []
+  },
+  {
+    "id": "parameter-modes",
+    "category": "routines",
+    "name": "Parameter Modes",
+    "summary": "Defines whether a function/procedure parameter is for input, output, or both.",
+    "description": "Parameter modes specify how data flows in and out of a function or procedure. IN parameters pass data into the routine (the default). OUT parameters return data from the routine. INOUT parameters do both — they accept input and can be modified to return a new value. Understanding parameter modes is important for procedures that need to return multiple values.",
+    "syntax": {
+      "postgresql": "-- IN parameter (default) - input only\n-- OUT parameter - output only\n-- INOUT parameter - input and output\nCREATE PROCEDURE get_order_stats(\n  IN p_user_id INT,\n  OUT p_order_count INT,\n  OUT p_total_spent NUMERIC\n)\nLANGUAGE plpgsql\nAS $$\nBEGIN\n  SELECT COUNT(*), COALESCE(SUM(total), 0)\n  INTO p_order_count, p_total_spent\n  FROM orders\n  WHERE user_id = p_user_id;\nEND;\n$$;\n\n-- Call with OUT parameters\nCALL get_order_stats(1, NULL, NULL);",
+      "mysql": "-- IN parameter - input only\n-- OUT parameter - output only\n-- INOUT parameter - input and output\nDELIMITER //\nCREATE PROCEDURE get_order_stats(\n  IN p_user_id INT,\n  OUT p_order_count INT,\n  OUT p_total_spent DECIMAL(10,2)\n)\nBEGIN\n  SELECT COUNT(*), COALESCE(SUM(total), 0)\n  INTO p_order_count, p_total_spent\n  FROM orders\n  WHERE user_id = p_user_id;\nEND //\nDELIMITER ;\n\n-- Call with OUT parameters\nCALL get_order_stats(1, @count, @total);\nSELECT @count, @total;",
+      "mariadb": "-- IN parameter - input only\n-- OUT parameter - output only\n-- INOUT parameter - input and output\nDELIMITER //\nCREATE PROCEDURE get_order_stats(\n  IN p_user_id INT,\n  OUT p_order_count INT,\n  OUT p_total_spent DECIMAL(10,2)\n)\nBEGIN\n  SELECT COUNT(*), COALESCE(SUM(total), 0)\n  INTO p_order_count, p_total_spent\n  FROM orders\n  WHERE user_id = p_user_id;\nEND //\nDELIMITER ;\n\n-- Call with OUT parameters\nCALL get_order_stats(1, @count, @total);\nSELECT @count, @total;",
+      "sqlite": null
+    },
+    "vendorSupport": {
+      "postgresql": { "supported": true, "level": "full" },
+      "mysql": { "supported": true, "level": "full" },
+      "mariadb": { "supported": true, "level": "full" },
+      "sqlite": { "supported": false, "level": "none" }
+    },
+    "tips": [
+      "Use OUT parameters in procedures when you need to return multiple values — functions can only return a single value.",
+      "In MySQL/MariaDB, OUT parameter values are accessed via session variables (e.g., @count) after calling the procedure.",
+      "Prefer IN parameters as the default — use OUT or INOUT only when you specifically need to return data from a procedure."
+    ],
+    "relatedItems": ["function", "procedure"],
+    "seeAlso": []
+  }
+]

@@ -1,0 +1,288 @@
+[
+  {
+    "id": "btree-index",
+    "category": "indexes",
+    "name": "B-Tree Index",
+    "summary": "The default and most versatile index type, optimized for equality and range queries.",
+    "description": "A B-Tree (balanced tree) index is the default index type in virtually all relational databases. It organizes data in a sorted tree structure, making it efficient for equality comparisons (=), range queries (<, >, BETWEEN), and sorting (ORDER BY). If you create an index without specifying a type, it will almost always be a B-Tree.",
+    "syntax": {
+      "postgresql": "-- Create a B-Tree index (default)\nCREATE INDEX idx_users_email ON users(email);\n\n-- Explicitly specify B-Tree\nCREATE INDEX idx_orders_created ON orders USING BTREE (created_at);",
+      "mysql": "-- Create a B-Tree index (default)\nCREATE INDEX idx_users_email ON users(email);\n\n-- Explicitly specify B-Tree\nCREATE INDEX idx_orders_created ON orders(created_at) USING BTREE;",
+      "mariadb": "-- Create a B-Tree index (default)\nCREATE INDEX idx_users_email ON users(email);\n\n-- Explicitly specify B-Tree\nCREATE INDEX idx_orders_created ON orders(created_at) USING BTREE;",
+      "sqlite": "-- SQLite uses B-Tree by default (only type available)\nCREATE INDEX idx_users_email ON users(email);"
+    },
+    "vendorSupport": {
+      "postgresql": { "supported": true, "level": "full" },
+      "mysql": { "supported": true, "level": "full" },
+      "mariadb": { "supported": true, "level": "full" },
+      "sqlite": { "supported": true, "level": "full" }
+    },
+    "tips": [
+      "B-Tree indexes work best for columns used in WHERE clauses, JOIN conditions, and ORDER BY clauses.",
+      "Multi-column B-Tree indexes follow the leftmost prefix rule — an index on (a, b, c) can be used for queries on (a), (a, b), or (a, b, c), but not (b) alone.",
+      "Don't create too many indexes — each index slows down INSERT, UPDATE, and DELETE operations."
+    ],
+    "relatedItems": ["hash-index", "partial-index", "covering-index"],
+    "seeAlso": []
+  },
+  {
+    "id": "hash-index",
+    "category": "indexes",
+    "name": "Hash Index",
+    "summary": "An index optimized for exact equality lookups only.",
+    "description": "A hash index uses a hash function to map values to buckets, making exact equality comparisons (=) very fast. However, it cannot be used for range queries, sorting, or pattern matching. Hash indexes are less commonly used than B-Tree indexes because B-Tree handles equality comparisons well too, while also supporting ranges.",
+    "syntax": {
+      "postgresql": "-- Create a hash index\nCREATE INDEX idx_users_username_hash ON users USING HASH (username);",
+      "mysql": "-- Hash indexes are only available in MEMORY tables\nCREATE TABLE session_cache (\n  session_id VARCHAR(64) PRIMARY KEY,\n  user_id INT NOT NULL,\n  INDEX idx_user_hash (user_id) USING HASH\n) ENGINE=MEMORY;",
+      "mariadb": "-- Hash indexes are only available in MEMORY/Aria tables\nCREATE TABLE session_cache (\n  session_id VARCHAR(64) PRIMARY KEY,\n  user_id INT NOT NULL,\n  INDEX idx_user_hash (user_id) USING HASH\n) ENGINE=MEMORY;",
+      "sqlite": null
+    },
+    "vendorSupport": {
+      "postgresql": { "supported": true, "level": "full", "notes": "Hash indexes are WAL-logged and crash-safe since PostgreSQL 10." },
+      "mysql": { "supported": true, "level": "partial", "notes": "Hash indexes are only available for MEMORY and NDB storage engines, not InnoDB." },
+      "mariadb": { "supported": true, "level": "partial", "notes": "Hash indexes are only available for MEMORY and Aria storage engines." },
+      "sqlite": { "supported": false, "level": "none", "notes": "SQLite only supports B-Tree indexes." }
+    },
+    "tips": [
+      "Only use hash indexes when you exclusively do equality lookups (=) and never need range scans or ORDER BY.",
+      "In PostgreSQL 10+, hash indexes are safe to use in production — they are WAL-logged and replicated.",
+      "For most use cases, a B-Tree index performs nearly as well for equality and also supports range queries."
+    ],
+    "relatedItems": ["btree-index"],
+    "seeAlso": []
+  },
+  {
+    "id": "gin-index",
+    "category": "indexes",
+    "name": "GIN Index",
+    "summary": "An index designed for composite values like arrays, JSONB, and full-text search.",
+    "description": "A GIN (Generalized Inverted Index) is a specialized index for searching within composite or multi-valued data. It is ideal for JSONB columns, arrays, full-text search vectors, and other data types where a single row can contain multiple searchable values. GIN indexes are fast for read-heavy lookups but slower to update than B-Tree indexes.",
+    "syntax": {
+      "postgresql": "-- GIN index on JSONB column\nCREATE INDEX idx_products_attrs ON products USING GIN (attributes);\n\n-- GIN index for full-text search\nCREATE INDEX idx_products_search ON products USING GIN (to_tsvector('english', name || ' ' || description));\n\n-- GIN index on array column\nCREATE INDEX idx_products_tags ON products USING GIN (tags);",
+      "mysql": null,
+      "mariadb": null,
+      "sqlite": null
+    },
+    "vendorSupport": {
+      "postgresql": { "supported": true, "level": "full" },
+      "mysql": { "supported": false, "level": "none", "notes": "MySQL does not have GIN indexes. Use FULLTEXT indexes for text search and generated columns with B-Tree for JSON." },
+      "mariadb": { "supported": false, "level": "none", "notes": "MariaDB does not have GIN indexes. Use FULLTEXT indexes for text search." },
+      "sqlite": { "supported": false, "level": "none", "notes": "SQLite does not support GIN indexes. Use the FTS5 extension for full-text search." }
+    },
+    "tips": [
+      "GIN indexes are perfect for JSONB containment queries (@>, ?, ?|, ?& operators) in PostgreSQL.",
+      "Use jsonb_path_ops operator class for GIN indexes when you only need @> containment queries — it's smaller and faster.",
+      "GIN indexes are slower to build and update than B-Tree, so they work best on read-heavy tables."
+    ],
+    "relatedItems": ["json-column", "fulltext-index", "gist-index"],
+    "seeAlso": []
+  },
+  {
+    "id": "gist-index",
+    "category": "indexes",
+    "name": "GiST Index",
+    "summary": "A versatile index for geometric, range, and proximity queries.",
+    "description": "A GiST (Generalized Search Tree) index is a flexible index framework that supports geometric data, range types, full-text search, and custom data types. It excels at queries involving containment, overlap, and nearest-neighbor searches. GiST indexes are essential for spatial/geographic data and are also used by EXCLUDE constraints.",
+    "syntax": {
+      "postgresql": "-- GiST index for range overlap queries\nCREATE INDEX idx_bookings_during ON bookings USING GIST (during);\n\n-- GiST index for geometric data\nCREATE INDEX idx_locations_point ON locations USING GIST (coordinates);\n\n-- GiST index for full-text search\nCREATE INDEX idx_products_fts ON products USING GIST (to_tsvector('english', name));",
+      "mysql": null,
+      "mariadb": null,
+      "sqlite": null
+    },
+    "vendorSupport": {
+      "postgresql": { "supported": true, "level": "full" },
+      "mysql": { "supported": false, "level": "none", "notes": "MySQL does not support GiST indexes. Use SPATIAL indexes (R-Tree) for geometric data." },
+      "mariadb": { "supported": false, "level": "none", "notes": "MariaDB does not support GiST indexes. Use SPATIAL indexes for geometric data." },
+      "sqlite": { "supported": false, "level": "none", "notes": "SQLite does not support GiST indexes. Use the R*Tree extension for spatial data." }
+    },
+    "tips": [
+      "Use GiST for range type queries (TSRANGE, INT4RANGE) — it supports overlap (&&) and containment (@>) operators.",
+      "GiST is required for EXCLUDE constraints that prevent overlapping ranges (e.g., booking systems).",
+      "For full-text search, GIN is generally faster for lookups, but GiST is faster to update and uses less space."
+    ],
+    "relatedItems": ["gin-index", "spatial-index", "exclude", "range-type"],
+    "seeAlso": []
+  },
+  {
+    "id": "sp-gist-index",
+    "category": "indexes",
+    "name": "SP-GiST Index",
+    "summary": "A space-partitioned index for data with natural clustering, like IP addresses or phone numbers.",
+    "description": "SP-GiST (Space-Partitioned Generalized Search Tree) is a PostgreSQL index type optimized for data that can be divided into non-overlapping partitions, such as IP addresses, phone numbers, or geometric points. It uses structures like radix trees and quadtrees internally, making it particularly efficient for data with natural hierarchical clustering.",
+    "syntax": {
+      "postgresql": "-- SP-GiST index on inet (IP address) column\nCREATE INDEX idx_access_log_ip ON access_log USING SPGIST (client_ip);\n\n-- SP-GiST index on text for prefix searches\nCREATE INDEX idx_users_phone ON users USING SPGIST (phone);",
+      "mysql": null,
+      "mariadb": null,
+      "sqlite": null
+    },
+    "vendorSupport": {
+      "postgresql": { "supported": true, "level": "full" },
+      "mysql": { "supported": false, "level": "none" },
+      "mariadb": { "supported": false, "level": "none" },
+      "sqlite": { "supported": false, "level": "none" }
+    },
+    "tips": [
+      "SP-GiST works best when data has natural clustering or hierarchical structure (e.g., IP addresses, geographic coordinates).",
+      "For IP address lookups and subnet matching, SP-GiST on inet columns is significantly faster than B-Tree.",
+      "This is an advanced index type — for most use cases, B-Tree or GiST will be sufficient."
+    ],
+    "relatedItems": ["gist-index", "btree-index"],
+    "seeAlso": []
+  },
+  {
+    "id": "brin-index",
+    "category": "indexes",
+    "name": "BRIN Index",
+    "summary": "A compact index for large tables where data is naturally ordered (e.g., time-series data).",
+    "description": "A BRIN (Block Range INdex) index stores summary information about ranges of physical table blocks rather than indexing every row. It is extremely small and efficient for very large tables where the column values are naturally correlated with the physical row order — such as timestamps in append-only log tables. BRIN indexes can be hundreds of times smaller than B-Tree indexes.",
+    "syntax": {
+      "postgresql": "-- BRIN index on a timestamp column (ideal for time-series data)\nCREATE INDEX idx_events_created ON events USING BRIN (created_at);\n\n-- BRIN with custom pages_per_range\nCREATE INDEX idx_logs_timestamp ON access_logs USING BRIN (logged_at) WITH (pages_per_range = 32);",
+      "mysql": null,
+      "mariadb": null,
+      "sqlite": null
+    },
+    "vendorSupport": {
+      "postgresql": { "supported": true, "level": "full" },
+      "mysql": { "supported": false, "level": "none", "notes": "MySQL does not support BRIN indexes. Consider partitioning for similar benefits on large tables." },
+      "mariadb": { "supported": false, "level": "none", "notes": "MariaDB does not support BRIN indexes." },
+      "sqlite": { "supported": false, "level": "none" }
+    },
+    "tips": [
+      "BRIN indexes are ideal for large, append-only tables (like logs or events) where rows are naturally ordered by time.",
+      "A BRIN index can be 1000x smaller than a B-Tree index on the same column, dramatically reducing storage.",
+      "BRIN is not effective if the column values are randomly distributed — the data must be physically ordered."
+    ],
+    "relatedItems": ["btree-index", "range-partition"],
+    "seeAlso": []
+  },
+  {
+    "id": "fulltext-index",
+    "category": "indexes",
+    "name": "Full-Text Index",
+    "summary": "An index optimized for natural language text search across large text columns.",
+    "description": "A full-text index enables fast searching of natural language text within text columns. Instead of exact matching (LIKE '%word%'), full-text search understands word boundaries, stemming (matching 'running' when searching for 'run'), and relevance ranking. It is essential for implementing search features in applications.",
+    "syntax": {
+      "postgresql": "-- Create a tsvector column and GIN index for full-text search\nALTER TABLE products ADD COLUMN search_vector TSVECTOR;\n\nUPDATE products SET search_vector = to_tsvector('english', name || ' ' || COALESCE(description, ''));\n\nCREATE INDEX idx_products_fts ON products USING GIN (search_vector);\n\n-- Query\nSELECT name FROM products\nWHERE search_vector @@ to_tsquery('english', 'wireless & keyboard');",
+      "mysql": "-- Create a fulltext index\nALTER TABLE products ADD FULLTEXT INDEX idx_products_fts (name, description);\n\n-- Query using natural language mode\nSELECT name FROM products\nWHERE MATCH(name, description) AGAINST ('wireless keyboard' IN NATURAL LANGUAGE MODE);",
+      "mariadb": "-- Create a fulltext index\nALTER TABLE products ADD FULLTEXT INDEX idx_products_fts (name, description);\n\n-- Query using natural language mode\nSELECT name FROM products\nWHERE MATCH(name, description) AGAINST ('wireless keyboard' IN NATURAL LANGUAGE MODE);",
+      "sqlite": "-- Create a FTS5 virtual table\nCREATE VIRTUAL TABLE products_fts USING fts5(\n  name,\n  description,\n  content=products,\n  content_rowid=id\n);\n\n-- Query\nSELECT name FROM products_fts WHERE products_fts MATCH 'wireless keyboard';"
+    },
+    "vendorSupport": {
+      "postgresql": { "supported": true, "level": "full", "notes": "PostgreSQL uses tsvector/tsquery with GIN or GiST indexes for full-text search." },
+      "mysql": { "supported": true, "level": "full" },
+      "mariadb": { "supported": true, "level": "full" },
+      "sqlite": { "supported": true, "level": "full", "notes": "SQLite uses FTS5 virtual tables for full-text search." }
+    },
+    "tips": [
+      "Full-text search is vastly faster than LIKE '%keyword%' for searching large text columns.",
+      "In PostgreSQL, use GIN indexes for read-heavy full-text search and GiST for write-heavy workloads.",
+      "MySQL/MariaDB FULLTEXT indexes support natural language mode, boolean mode, and query expansion."
+    ],
+    "relatedItems": ["gin-index", "gist-index"],
+    "seeAlso": []
+  },
+  {
+    "id": "spatial-index",
+    "category": "indexes",
+    "name": "Spatial Index",
+    "summary": "An index for efficiently querying geometric and geographic data.",
+    "description": "A spatial index is designed for geographic or geometric data, enabling fast queries like 'find all restaurants within 5 km' or 'find all shapes that overlap this area'. It uses tree-based structures (R-Tree or GiST) to partition spatial data into regions. Spatial indexes are essential for location-based applications and GIS systems.",
+    "syntax": {
+      "postgresql": "-- Using PostGIS extension\nCREATE EXTENSION IF NOT EXISTS postgis;\n\nCREATE TABLE locations (\n  id SERIAL PRIMARY KEY,\n  name VARCHAR(100) NOT NULL,\n  geom GEOMETRY(Point, 4326) NOT NULL\n);\n\nCREATE INDEX idx_locations_geom ON locations USING GIST (geom);\n\n-- Find locations within 1km of a point\nSELECT name FROM locations\nWHERE ST_DWithin(geom, ST_SetSRID(ST_MakePoint(127.0, 37.5), 4326), 1000);",
+      "mysql": "CREATE TABLE locations (\n  id INT AUTO_INCREMENT PRIMARY KEY,\n  name VARCHAR(100) NOT NULL,\n  coordinates POINT NOT NULL SRID 4326,\n  SPATIAL INDEX idx_locations_coords (coordinates)\n);\n\n-- Find locations within a bounding box\nSELECT name FROM locations\nWHERE MBRContains(\n  ST_GeomFromText('POLYGON((126.9 37.4, 127.1 37.4, 127.1 37.6, 126.9 37.6, 126.9 37.4))'),\n  coordinates\n);",
+      "mariadb": "CREATE TABLE locations (\n  id INT AUTO_INCREMENT PRIMARY KEY,\n  name VARCHAR(100) NOT NULL,\n  coordinates POINT NOT NULL,\n  SPATIAL INDEX idx_locations_coords (coordinates)\n);\n\n-- Find locations within a bounding box\nSELECT name FROM locations\nWHERE MBRContains(\n  ST_GeomFromText('POLYGON((126.9 37.4, 127.1 37.4, 127.1 37.6, 126.9 37.6, 126.9 37.4))'),\n  coordinates\n);",
+      "sqlite": "-- Using R*Tree extension\nCREATE VIRTUAL TABLE locations_idx USING rtree(\n  id,\n  min_lat, max_lat,\n  min_lon, max_lon\n);"
+    },
+    "vendorSupport": {
+      "postgresql": { "supported": true, "level": "full", "notes": "PostgreSQL uses GiST indexes with the PostGIS extension for advanced spatial features." },
+      "mysql": { "supported": true, "level": "full" },
+      "mariadb": { "supported": true, "level": "full" },
+      "sqlite": { "supported": true, "level": "partial", "notes": "SQLite uses the R*Tree extension for basic spatial indexing. It lacks advanced GIS functions." }
+    },
+    "tips": [
+      "Always specify the SRID (Spatial Reference System ID) — use 4326 for GPS/WGS84 coordinates (latitude/longitude).",
+      "In PostgreSQL, install the PostGIS extension for full spatial support including distance calculations and geometry operations.",
+      "Spatial indexes only accelerate spatial predicates (ST_Contains, ST_DWithin, etc.), not regular column comparisons."
+    ],
+    "relatedItems": ["gist-index", "extension"],
+    "seeAlso": []
+  },
+  {
+    "id": "partial-index",
+    "category": "indexes",
+    "name": "Partial Index",
+    "summary": "An index that only covers rows matching a specified condition.",
+    "description": "A partial index (also called a filtered index) only indexes rows that satisfy a WHERE condition. This makes the index smaller and faster because it skips rows you never need to search. For example, if you only query active users, a partial index on status = 'active' avoids indexing inactive users entirely.",
+    "syntax": {
+      "postgresql": "-- Index only active users\nCREATE INDEX idx_users_active_email ON users(email)\n  WHERE status = 'active';\n\n-- Index only unpaid orders\nCREATE INDEX idx_orders_unpaid ON orders(created_at)\n  WHERE is_paid = FALSE;",
+      "mysql": null,
+      "mariadb": null,
+      "sqlite": "-- SQLite supports partial indexes\nCREATE INDEX idx_users_active_email ON users(email)\n  WHERE status = 'active';\n\nCREATE INDEX idx_orders_unpaid ON orders(created_at)\n  WHERE is_paid = 0;"
+    },
+    "vendorSupport": {
+      "postgresql": { "supported": true, "level": "full" },
+      "mysql": { "supported": false, "level": "none", "notes": "MySQL does not support partial indexes. Use generated columns with regular indexes as a workaround." },
+      "mariadb": { "supported": false, "level": "none", "notes": "MariaDB does not support partial indexes." },
+      "sqlite": { "supported": true, "level": "full" }
+    },
+    "tips": [
+      "Partial indexes are great for tables with a 'status' column where you mostly query a specific status (e.g., 'active', 'pending').",
+      "The WHERE clause in your query must match (or be a subset of) the partial index condition for the optimizer to use it.",
+      "A partial UNIQUE index can enforce uniqueness only for a subset of rows (e.g., only one active email per user)."
+    ],
+    "relatedItems": ["btree-index", "expression-index"],
+    "seeAlso": []
+  },
+  {
+    "id": "expression-index",
+    "category": "indexes",
+    "name": "Expression Index",
+    "summary": "An index built on the result of an expression or function, not just a column.",
+    "description": "An expression index (also called a functional index) indexes the result of a function or expression rather than raw column values. This is useful when your queries filter or sort by computed values, such as LOWER(email) for case-insensitive searches or EXTRACT(YEAR FROM created_at) for year-based queries.",
+    "syntax": {
+      "postgresql": "-- Case-insensitive email lookup\nCREATE INDEX idx_users_email_lower ON users(LOWER(email));\n\n-- Index on year extracted from timestamp\nCREATE INDEX idx_orders_year ON orders(EXTRACT(YEAR FROM created_at));\n\n-- Query that uses the index\nSELECT * FROM users WHERE LOWER(email) = 'john@example.com';",
+      "mysql": "-- Expression index (MySQL 8.0+)\nCREATE INDEX idx_users_email_lower ON users((LOWER(email)));\n\n-- Index on year extracted from date\nCREATE INDEX idx_orders_year ON orders((YEAR(created_at)));\n\n-- Query that uses the index\nSELECT * FROM users WHERE LOWER(email) = 'john@example.com';",
+      "mariadb": "-- Expression index (MariaDB 10.2+)\nCREATE INDEX idx_users_email_lower ON users((LOWER(email)));\n\n-- Index on year extracted from date\nCREATE INDEX idx_orders_year ON orders((YEAR(created_at)));\n\n-- Query that uses the index\nSELECT * FROM users WHERE LOWER(email) = 'john@example.com';",
+      "sqlite": "-- Expression index\nCREATE INDEX idx_users_email_lower ON users(LOWER(email));\n\n-- Query that uses the index\nSELECT * FROM users WHERE LOWER(email) = 'john@example.com';"
+    },
+    "vendorSupport": {
+      "postgresql": { "supported": true, "level": "full" },
+      "mysql": { "supported": true, "level": "full", "notes": "MySQL 8.0+ supports functional indexes. The expression must be enclosed in double parentheses." },
+      "mariadb": { "supported": true, "level": "full", "notes": "MariaDB 10.2+ supports expression indexes via virtual columns." },
+      "sqlite": { "supported": true, "level": "full" }
+    },
+    "tips": [
+      "Your query must use the exact same expression as the index for the optimizer to pick it up.",
+      "Use LOWER() expression indexes for case-insensitive lookups instead of using ILIKE or COLLATE in every query.",
+      "Expression indexes are especially useful for JSONB key extraction in PostgreSQL (e.g., indexing (data->>'email'))."
+    ],
+    "relatedItems": ["btree-index", "partial-index", "generated-column"],
+    "seeAlso": []
+  },
+  {
+    "id": "covering-index",
+    "category": "indexes",
+    "name": "Covering Index",
+    "summary": "An index that includes extra columns so queries can be answered from the index alone.",
+    "description": "A covering index includes all the columns needed by a query, so the database can return results directly from the index without reading the actual table data (called an 'index-only scan'). This can dramatically speed up queries because reading from a compact index is much faster than accessing the full table rows.",
+    "syntax": {
+      "postgresql": "-- Covering index using INCLUDE clause\nCREATE INDEX idx_orders_user_covering ON orders(user_id)\n  INCLUDE (status, total, created_at);\n\n-- The query below can be answered using the index alone\n-- SELECT status, total, created_at FROM orders WHERE user_id = 42;",
+      "mysql": "-- Covering index (multi-column index that covers the query)\nCREATE INDEX idx_orders_user_covering ON orders(user_id, status, total, created_at);\n\n-- The query below can be answered using the index alone\n-- SELECT status, total, created_at FROM orders WHERE user_id = 42;",
+      "mariadb": "-- Covering index (multi-column index that covers the query)\nCREATE INDEX idx_orders_user_covering ON orders(user_id, status, total, created_at);\n\n-- The query below can be answered using the index alone\n-- SELECT status, total, created_at FROM orders WHERE user_id = 42;",
+      "sqlite": "-- Covering index (multi-column index)\nCREATE INDEX idx_orders_user_covering ON orders(user_id, status, total, created_at);\n\n-- SQLite automatically uses covering indexes when possible"
+    },
+    "vendorSupport": {
+      "postgresql": { "supported": true, "level": "full", "notes": "PostgreSQL 11+ supports INCLUDE clause to add non-key columns to an index." },
+      "mysql": { "supported": true, "level": "partial", "notes": "MySQL does not support INCLUDE clause. Create a multi-column index that includes all needed columns." },
+      "mariadb": { "supported": true, "level": "partial", "notes": "MariaDB does not support INCLUDE clause. Create a multi-column index that includes all needed columns." },
+      "sqlite": { "supported": true, "level": "partial", "notes": "SQLite does not support INCLUDE clause but automatically performs covering index scans on multi-column indexes." }
+    },
+    "tips": [
+      "Use EXPLAIN to check if your query performs an 'Index Only Scan' — that confirms the covering index is working.",
+      "PostgreSQL's INCLUDE clause is better than a multi-column index because included columns don't affect index ordering.",
+      "Don't over-include columns — wider indexes consume more storage and slow down write operations."
+    ],
+    "relatedItems": ["btree-index", "partial-index"],
+    "seeAlso": []
+  }
+]
