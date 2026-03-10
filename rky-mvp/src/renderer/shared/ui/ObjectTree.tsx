@@ -12,6 +12,16 @@ import {
   Type,
   List,
   Plus,
+  Layers,
+  Shield,
+  Lock,
+  Key,
+  Puzzle,
+  FolderOpen,
+  Globe,
+  HardDrive,
+  Languages,
+  CircleDot,
 } from 'lucide-react';
 import type { TSchemaObjectType, TDbType, ISchemaObjects } from '~/shared/types/db';
 import { DIALECT_INFO, SCHEMA_OBJECT_CATEGORIES } from '~/shared/types/db';
@@ -37,6 +47,16 @@ const OBJECT_ICONS: Record<TSchemaObjectType, React.ElementType> = {
   type: Type,
   sequence: Hash,
   index: List,
+  partition: Layers,
+  role: Shield,
+  policy: Lock,
+  grant: Key,
+  extension: Puzzle,
+  schema: FolderOpen,
+  foreign_table: Globe,
+  tablespace: HardDrive,
+  collation: Languages,
+  domain: CircleDot,
 };
 
 const TYPE_LABELS: Record<TSchemaObjectType, string> = {
@@ -50,6 +70,16 @@ const TYPE_LABELS: Record<TSchemaObjectType, string> = {
   type: 'Types',
   sequence: 'Sequences',
   index: 'Indexes',
+  partition: 'Partitions',
+  role: 'Roles',
+  policy: 'Policies',
+  grant: 'Grants',
+  extension: 'Extensions',
+  schema: 'Schemas',
+  foreign_table: 'Foreign Tables',
+  tablespace: 'Tablespaces',
+  collation: 'Collations',
+  domain: 'Domains',
 };
 
 function getObjectNames(objects: Partial<ISchemaObjects>, type: TSchemaObjectType): string[] {
@@ -74,6 +104,26 @@ function getObjectNames(objects: Partial<ISchemaObjects>, type: TSchemaObjectTyp
       return (objects.sequences ?? []).map((s) => s.name);
     case 'index':
       return (objects.indexes ?? []).map((i) => i.name);
+    case 'partition':
+      return (objects.partitions ?? []).map((p) => p.name);
+    case 'role':
+      return (objects.roles ?? []).map((r) => r.name);
+    case 'policy':
+      return (objects.policies ?? []).map((p) => p.name);
+    case 'grant':
+      return (objects.grants ?? []).map((g) => `${g.grantee} → ${g.objectName}`);
+    case 'extension':
+      return (objects.extensions ?? []).map((e) => e.name);
+    case 'schema':
+      return (objects.schemas ?? []).map((s) => s.name);
+    case 'foreign_table':
+      return (objects.foreignTables ?? []).map((f) => f.name);
+    case 'tablespace':
+      return (objects.tablespaces ?? []).map((t) => t.name);
+    case 'collation':
+      return (objects.collations ?? []).map((c) => c.name);
+    case 'domain':
+      return (objects.types ?? []).filter((t) => t.type === 'domain').map((t) => t.name);
     default:
       return [];
   }
