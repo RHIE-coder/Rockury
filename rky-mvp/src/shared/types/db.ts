@@ -306,6 +306,8 @@ export interface IColumn {
   dataType: string;
   keyTypes: TKeyType[];
   isAutoIncrement?: boolean;
+  isGenerated?: boolean;
+  generationExpression?: string;
   defaultValue: string | null;
   nullable: boolean;
   comment: string;
@@ -338,6 +340,9 @@ export interface ITable {
   constraints: IConstraint[];
   engine?: string;
   charset?: string;
+  isView?: boolean;
+  isMaterialized?: boolean;
+  viewDefinition?: string;
 }
 
 // ─── Diagram ───
@@ -395,9 +400,11 @@ export interface IDiagramFilter {
   showDataTypes: boolean;
   showKeyIcons: boolean;
   showNullable: boolean;
+  showDefaults: boolean;
   showComments: boolean;
   showConstraints: boolean;
   showEdgePolicies: boolean;
+  showViews: boolean;
   preset: TFilterPreset;
   // Edge constraint filters (show edges matching these actions)
   edgeOnDelete: Record<string, boolean>;

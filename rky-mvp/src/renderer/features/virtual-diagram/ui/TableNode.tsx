@@ -38,6 +38,21 @@ function SingleKeyIcon({ keyType }: { keyType: string }) {
   }
 }
 
+function ColumnBadges({ column }: { column: IColumn }) {
+  const hasCheck = column.constraints.some((c) => c.type === 'CHECK');
+  if (!hasCheck && !column.isGenerated) return null;
+  return (
+    <span className="flex shrink-0 items-center gap-0.5">
+      {hasCheck && (
+        <span className="rounded bg-orange-500/20 px-1 py-0.5 text-[8px] font-bold leading-none text-orange-600 dark:text-orange-400" title="Check Constraint">CK</span>
+      )}
+      {column.isGenerated && (
+        <span className="rounded bg-cyan-500/20 px-1 py-0.5 text-[8px] font-bold leading-none text-cyan-600 dark:text-cyan-400" title={`Generated: ${column.generationExpression ?? ''}`}>GEN</span>
+      )}
+    </span>
+  );
+}
+
 function KeyIcons({ keyTypes }: { keyTypes: string[] }) {
   if (!keyTypes || keyTypes.length === 0) {
     return <span className="inline-block w-4 shrink-0" />;
@@ -164,9 +179,12 @@ function TableNodeComponent({ data }: NodeProps) {
           ? 'ring-2 ring-yellow-400/50 border-yellow-400'
           : 'border-border';
 
+  const isView = table.isView ?? false;
+  const isMaterialized = table.isMaterialized ?? false;
+
   return (
     <div
-      className={`min-w-[200px] rounded-lg border bg-card shadow-sm transition-all duration-300 ${borderClasses}`}
+      className={`min-w-[200px] rounded-lg border bg-card shadow-sm transition-all duration-300 ${borderClasses} ${isView ? 'border-dashed' : ''}`}
       style={simVars}
     >
       {/* Target handle for incoming FK edges */}
@@ -179,11 +197,15 @@ function TableNodeComponent({ data }: NodeProps) {
       {/* Header */}
       <div
         className={`rounded-t-lg px-3 py-1.5 ${
-          compareAction && compareAction !== 'unchanged' && COMPARE_HEADER_BG[compareAction]
-            ? `${COMPARE_HEADER_BG[compareAction]} text-white`
-            : color ? '' : 'bg-primary text-primary-foreground'
+          isView
+            ? isMaterialized
+              ? 'bg-teal-600 text-white'
+              : 'bg-indigo-600 text-white'
+            : compareAction && compareAction !== 'unchanged' && COMPARE_HEADER_BG[compareAction]
+              ? `${COMPARE_HEADER_BG[compareAction]} text-white`
+              : color ? '' : 'bg-primary text-primary-foreground'
         }`}
-        style={!compareAction || compareAction === 'unchanged' ? (color ? { backgroundColor: color, color: '#fff' } : undefined) : undefined}
+        style={!isView && (!compareAction || compareAction === 'unchanged') ? (color ? { backgroundColor: color, color: '#fff' } : undefined) : undefined}
         onDoubleClick={handleHeaderDoubleClick}
       >
         <div className="flex items-center gap-1">
@@ -201,6 +223,11 @@ function TableNodeComponent({ data }: NodeProps) {
               <p className="text-sm font-semibold truncate" title={table.name}>{table.name}</p>
             )}
           </div>
+          {isView && (
+            <span className="shrink-0 rounded bg-white/20 px-1 py-0.5 text-[8px] font-bold leading-none tracking-wider">
+              {isMaterialized ? 'MVIEW' : 'VIEW'}
+            </span>
+          )}
           {compareAction && compareAction !== 'unchanged' && (
             <span className="shrink-0 rounded bg-white/20 px-1 py-0.5 text-[8px] font-bold leading-none tracking-wider">
               {COMPARE_BADGE[compareAction]}
@@ -244,8 +271,14 @@ function TableNodeComponent({ data }: NodeProps) {
               {filter.showKeyIcons && <KeyIcons keyTypes={column.keyTypes} />}
               {filter.showNullable && <NullableIcon nullable={column.nullable} />}
               <span className="flex-1 truncate font-medium" title={column.name}>{column.name}</span>
+              {filter.showKeyIcons && <ColumnBadges column={column} />}
               {filter.showDataTypes && (
                 <span className="shrink-0 text-muted-foreground">{column.dataType}</span>
+              )}
+              {filter.showDefaults && column.defaultValue != null && (
+                <span className="shrink-0 max-w-[80px] truncate text-[10px] text-emerald-600 dark:text-emerald-400" title={`DEFAULT ${column.defaultValue}`}>
+                  ={column.defaultValue}
+                </span>
               )}
               {filter.showComments && column.comment && (
                 <span className="max-w-[60px] shrink-0 truncate text-[10px] text-muted-foreground" title={column.comment}>

@@ -118,8 +118,10 @@ export function schemaToNodes(
     }
   }
 
-  // Filter out hidden tables, then sync keyTypes from constraints
-  const visibleTables = deduped.filter((t) => !hiddenSet.has(t.id)).map(syncKeyTypesFromConstraints);
+  // Filter out hidden tables (and views when showViews is off), then sync keyTypes from constraints
+  const visibleTables = deduped
+    .filter((t) => !hiddenSet.has(t.id) && (filter.showViews || !t.isView))
+    .map(syncKeyTypesFromConstraints);
 
   const nodes: Node[] = visibleTables.map((table, index) => {
     const col = index % COLUMNS_PER_ROW;

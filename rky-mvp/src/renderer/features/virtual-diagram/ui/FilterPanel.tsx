@@ -15,9 +15,11 @@ const FILTER_OPTIONS: { key: keyof Omit<IDiagramFilter, 'preset' | 'edgeOnDelete
   { key: 'showDataTypes', label: 'Data Types' },
   { key: 'showKeyIcons', label: 'Key Icons' },
   { key: 'showNullable', label: 'Nullable' },
+  { key: 'showDefaults', label: 'Default Values' },
   { key: 'showComments', label: 'Comments' },
   { key: 'showConstraints', label: 'Constraints' },
   { key: 'showEdgePolicies', label: 'Edge Policies (D/U)' },
+  { key: 'showViews', label: 'Views' },
 ];
 
 const EDGE_ACTIONS = ['CASCADE', 'SET NULL', 'RESTRICT', 'NO ACTION'] as const;
