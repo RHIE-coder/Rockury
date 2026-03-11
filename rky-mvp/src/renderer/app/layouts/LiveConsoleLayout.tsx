@@ -8,7 +8,6 @@ import {
   Library,
   Sprout,
   ShieldCheck,
-  BookOpen,
 } from 'lucide-react';
 import { ROUTES } from '@/shared/config/constants';
 import { ViewTabs } from '@/widgets/db-view-tabs';
@@ -23,7 +22,6 @@ const tabs: IViewTabItem[] = [
   { id: 'query-collection', label: 'Query Collection', icon: Library, path: ROUTES.DB.LIVE_CONSOLE.QUERY_COLLECTION },
   { id: 'seed', label: 'Seed', icon: Sprout, path: ROUTES.DB.LIVE_CONSOLE.SEED },
   { id: 'validation-run', label: 'Validation Run', icon: ShieldCheck, path: ROUTES.DB.LIVE_CONSOLE.VALIDATION_RUN },
-  { id: 'reference', label: 'Reference', icon: BookOpen, path: ROUTES.DB.LIVE_CONSOLE.REFERENCE },
 ];
 
 export function LiveConsoleLayout() {

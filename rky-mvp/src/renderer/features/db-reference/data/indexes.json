@@ -4,7 +4,9 @@
     "category": "indexes",
     "name": "B-Tree Index",
     "summary": "The default and most versatile index type, optimized for equality and range queries.",
+    "summaryKo": "가장 기본적이고 범용적인 인덱스 타입으로, 등호(=) 비교와 범위 검색에 최적화되어 있습니다.",
     "description": "A B-Tree (balanced tree) index is the default index type in virtually all relational databases. It organizes data in a sorted tree structure, making it efficient for equality comparisons (=), range queries (<, >, BETWEEN), and sorting (ORDER BY). If you create an index without specifying a type, it will almost always be a B-Tree.",
+    "descriptionKo": "B-Tree(균형 트리) 인덱스는 거의 모든 관계형 데이터베이스에서 기본으로 사용되는 인덱스 타입입니다. 데이터를 정렬된 트리 구조로 구성하여 등호 비교(=), 범위 검색(<, >, BETWEEN), 정렬(ORDER BY)에 효율적입니다. 인덱스를 만들 때 타입을 지정하지 않으면 거의 항상 B-Tree가 됩니다.",
     "syntax": {
       "postgresql": "-- Create a B-Tree index (default)\nCREATE INDEX idx_users_email ON users(email);\n\n-- Explicitly specify B-Tree\nCREATE INDEX idx_orders_created ON orders USING BTREE (created_at);",
       "mysql": "-- Create a B-Tree index (default)\nCREATE INDEX idx_users_email ON users(email);\n\n-- Explicitly specify B-Tree\nCREATE INDEX idx_orders_created ON orders(created_at) USING BTREE;",
@@ -22,6 +24,11 @@
       "Multi-column B-Tree indexes follow the leftmost prefix rule — an index on (a, b, c) can be used for queries on (a), (a, b), or (a, b, c), but not (b) alone.",
       "Don't create too many indexes — each index slows down INSERT, UPDATE, and DELETE operations."
     ],
+    "tipsKo": [
+      "B-Tree 인덱스는 WHERE 절, JOIN 조건, ORDER BY 절에 사용되는 컬럼에 가장 효과적입니다.",
+      "다중 컬럼 B-Tree 인덱스는 왼쪽 접두사 규칙을 따릅니다. (a, b, c)에 대한 인덱스는 (a), (a, b), (a, b, c) 쿼리에 사용할 수 있지만, (b)만 단독으로는 사용할 수 없습니다.",
+      "인덱스를 너무 많이 만들지 마세요. 인덱스가 많을수록 INSERT, UPDATE, DELETE 작업이 느려집니다."
+    ],
     "relatedItems": ["hash-index", "partial-index", "covering-index"],
     "seeAlso": []
   },
@@ -30,7 +37,9 @@
     "category": "indexes",
     "name": "Hash Index",
     "summary": "An index optimized for exact equality lookups only.",
+    "summaryKo": "정확한 등호(=) 검색에만 최적화된 인덱스입니다.",
     "description": "A hash index uses a hash function to map values to buckets, making exact equality comparisons (=) very fast. However, it cannot be used for range queries, sorting, or pattern matching. Hash indexes are less commonly used than B-Tree indexes because B-Tree handles equality comparisons well too, while also supporting ranges.",
+    "descriptionKo": "Hash 인덱스는 해시 함수를 사용하여 값을 버킷에 매핑하므로, 정확한 등호 비교(=)가 매우 빠릅니다. 하지만 범위 검색, 정렬, 패턴 매칭에는 사용할 수 없습니다. B-Tree가 등호 비교도 잘 처리하면서 범위 검색까지 지원하기 때문에, Hash 인덱스는 B-Tree보다 덜 사용됩니다.",
     "syntax": {
       "postgresql": "-- Create a hash index\nCREATE INDEX idx_users_username_hash ON users USING HASH (username);",
       "mysql": "-- Hash indexes are only available in MEMORY tables\nCREATE TABLE session_cache (\n  session_id VARCHAR(64) PRIMARY KEY,\n  user_id INT NOT NULL,\n  INDEX idx_user_hash (user_id) USING HASH\n) ENGINE=MEMORY;",
@@ -38,15 +47,20 @@
       "sqlite": null
     },
     "vendorSupport": {
-      "postgresql": { "supported": true, "level": "full", "notes": "Hash indexes are WAL-logged and crash-safe since PostgreSQL 10." },
-      "mysql": { "supported": true, "level": "partial", "notes": "Hash indexes are only available for MEMORY and NDB storage engines, not InnoDB." },
-      "mariadb": { "supported": true, "level": "partial", "notes": "Hash indexes are only available for MEMORY and Aria storage engines." },
-      "sqlite": { "supported": false, "level": "none", "notes": "SQLite only supports B-Tree indexes." }
+      "postgresql": { "supported": true, "level": "full", "notes": "Hash indexes are WAL-logged and crash-safe since PostgreSQL 10.", "notesKo": "Hash 인덱스는 PostgreSQL 10부터 WAL 로깅과 장애 복구를 지원합니다." },
+      "mysql": { "supported": true, "level": "partial", "notes": "Hash indexes are only available for MEMORY and NDB storage engines, not InnoDB.", "notesKo": "Hash 인덱스는 MEMORY와 NDB 스토리지 엔진에서만 사용할 수 있으며, InnoDB에서는 사용할 수 없습니다." },
+      "mariadb": { "supported": true, "level": "partial", "notes": "Hash indexes are only available for MEMORY and Aria storage engines.", "notesKo": "Hash 인덱스는 MEMORY와 Aria 스토리지 엔진에서만 사용할 수 있습니다." },
+      "sqlite": { "supported": false, "level": "none", "notes": "SQLite only supports B-Tree indexes.", "notesKo": "SQLite는 B-Tree 인덱스만 지원합니다." }
     },
     "tips": [
       "Only use hash indexes when you exclusively do equality lookups (=) and never need range scans or ORDER BY.",
       "In PostgreSQL 10+, hash indexes are safe to use in production — they are WAL-logged and replicated.",
       "For most use cases, a B-Tree index performs nearly as well for equality and also supports range queries."
+    ],
+    "tipsKo": [
+      "등호 검색(=)만 사용하고 범위 검색이나 ORDER BY가 전혀 필요 없을 때만 Hash 인덱스를 사용하세요.",
+      "PostgreSQL 10 이상에서는 Hash 인덱스가 WAL 로깅과 복제를 지원하므로 운영 환경에서도 안전하게 사용할 수 있습니다.",
+      "대부분의 경우 B-Tree 인덱스가 등호 검색에서도 거의 비슷한 성능을 내면서 범위 검색까지 지원합니다."
     ],
     "relatedItems": ["btree-index"],
     "seeAlso": []
@@ -56,7 +70,9 @@
     "category": "indexes",
     "name": "GIN Index",
     "summary": "An index designed for composite values like arrays, JSONB, and full-text search.",
+    "summaryKo": "배열, JSONB, 전문 검색 등 복합 값을 위해 설계된 인덱스입니다.",
     "description": "A GIN (Generalized Inverted Index) is a specialized index for searching within composite or multi-valued data. It is ideal for JSONB columns, arrays, full-text search vectors, and other data types where a single row can contain multiple searchable values. GIN indexes are fast for read-heavy lookups but slower to update than B-Tree indexes.",
+    "descriptionKo": "GIN(Generalized Inverted Index)은 복합 값이나 다중 값 데이터를 검색하기 위한 특수 인덱스입니다. JSONB 컬럼, 배열, 전문 검색 벡터 등 하나의 행에 여러 검색 가능한 값이 포함된 데이터 타입에 적합합니다. GIN 인덱스는 읽기 위주의 조회에서는 빠르지만, B-Tree 인덱스보다 업데이트가 느립니다.",
     "syntax": {
       "postgresql": "-- GIN index on JSONB column\nCREATE INDEX idx_products_attrs ON products USING GIN (attributes);\n\n-- GIN index for full-text search\nCREATE INDEX idx_products_search ON products USING GIN (to_tsvector('english', name || ' ' || description));\n\n-- GIN index on array column\nCREATE INDEX idx_products_tags ON products USING GIN (tags);",
       "mysql": null,
@@ -65,14 +81,19 @@
     },
     "vendorSupport": {
       "postgresql": { "supported": true, "level": "full" },
-      "mysql": { "supported": false, "level": "none", "notes": "MySQL does not have GIN indexes. Use FULLTEXT indexes for text search and generated columns with B-Tree for JSON." },
-      "mariadb": { "supported": false, "level": "none", "notes": "MariaDB does not have GIN indexes. Use FULLTEXT indexes for text search." },
-      "sqlite": { "supported": false, "level": "none", "notes": "SQLite does not support GIN indexes. Use the FTS5 extension for full-text search." }
+      "mysql": { "supported": false, "level": "none", "notes": "MySQL does not have GIN indexes. Use FULLTEXT indexes for text search and generated columns with B-Tree for JSON.", "notesKo": "MySQL은 GIN 인덱스를 지원하지 않습니다. 텍스트 검색에는 FULLTEXT 인덱스를, JSON에는 생성 컬럼과 B-Tree를 사용하세요." },
+      "mariadb": { "supported": false, "level": "none", "notes": "MariaDB does not have GIN indexes. Use FULLTEXT indexes for text search.", "notesKo": "MariaDB는 GIN 인덱스를 지원하지 않습니다. 텍스트 검색에는 FULLTEXT 인덱스를 사용하세요." },
+      "sqlite": { "supported": false, "level": "none", "notes": "SQLite does not support GIN indexes. Use the FTS5 extension for full-text search.", "notesKo": "SQLite는 GIN 인덱스를 지원하지 않습니다. 전문 검색에는 FTS5 확장을 사용하세요." }
     },
     "tips": [
       "GIN indexes are perfect for JSONB containment queries (@>, ?, ?|, ?& operators) in PostgreSQL.",
       "Use jsonb_path_ops operator class for GIN indexes when you only need @> containment queries — it's smaller and faster.",
       "GIN indexes are slower to build and update than B-Tree, so they work best on read-heavy tables."
+    ],
+    "tipsKo": [
+      "GIN 인덱스는 PostgreSQL에서 JSONB 포함 검색(@>, ?, ?|, ?& 연산자)에 완벽하게 적합합니다.",
+      "@> 포함 검색만 필요한 경우 jsonb_path_ops 연산자 클래스를 사용하면 인덱스가 더 작고 빠릅니다.",
+      "GIN 인덱스는 B-Tree보다 생성과 업데이트가 느리므로, 읽기가 많은 테이블에 가장 적합합니다."
     ],
     "relatedItems": ["json-column", "fulltext-index", "gist-index"],
     "seeAlso": []
@@ -82,7 +103,9 @@
     "category": "indexes",
     "name": "GiST Index",
     "summary": "A versatile index for geometric, range, and proximity queries.",
+    "summaryKo": "기하학적 데이터, 범위, 근접 검색을 위한 다용도 인덱스입니다.",
     "description": "A GiST (Generalized Search Tree) index is a flexible index framework that supports geometric data, range types, full-text search, and custom data types. It excels at queries involving containment, overlap, and nearest-neighbor searches. GiST indexes are essential for spatial/geographic data and are also used by EXCLUDE constraints.",
+    "descriptionKo": "GiST(Generalized Search Tree) 인덱스는 기하학적 데이터, 범위 타입, 전문 검색, 사용자 정의 데이터 타입을 지원하는 유연한 인덱스 프레임워크입니다. 포함, 겹침, 최근접 이웃 검색에 뛰어나며, 공간/지리 데이터에 필수적이고 EXCLUDE 제약 조건에서도 사용됩니다.",
     "syntax": {
       "postgresql": "-- GiST index for range overlap queries\nCREATE INDEX idx_bookings_during ON bookings USING GIST (during);\n\n-- GiST index for geometric data\nCREATE INDEX idx_locations_point ON locations USING GIST (coordinates);\n\n-- GiST index for full-text search\nCREATE INDEX idx_products_fts ON products USING GIST (to_tsvector('english', name));",
       "mysql": null,
@@ -91,14 +114,19 @@
     },
     "vendorSupport": {
       "postgresql": { "supported": true, "level": "full" },
-      "mysql": { "supported": false, "level": "none", "notes": "MySQL does not support GiST indexes. Use SPATIAL indexes (R-Tree) for geometric data." },
-      "mariadb": { "supported": false, "level": "none", "notes": "MariaDB does not support GiST indexes. Use SPATIAL indexes for geometric data." },
-      "sqlite": { "supported": false, "level": "none", "notes": "SQLite does not support GiST indexes. Use the R*Tree extension for spatial data." }
+      "mysql": { "supported": false, "level": "none", "notes": "MySQL does not support GiST indexes. Use SPATIAL indexes (R-Tree) for geometric data.", "notesKo": "MySQL은 GiST 인덱스를 지원하지 않습니다. 기하학적 데이터에는 SPATIAL 인덱스(R-Tree)를 사용하세요." },
+      "mariadb": { "supported": false, "level": "none", "notes": "MariaDB does not support GiST indexes. Use SPATIAL indexes for geometric data.", "notesKo": "MariaDB는 GiST 인덱스를 지원하지 않습니다. 기하학적 데이터에는 SPATIAL 인덱스를 사용하세요." },
+      "sqlite": { "supported": false, "level": "none", "notes": "SQLite does not support GiST indexes. Use the R*Tree extension for spatial data.", "notesKo": "SQLite는 GiST 인덱스를 지원하지 않습니다. 공간 데이터에는 R*Tree 확장을 사용하세요." }
     },
     "tips": [
       "Use GiST for range type queries (TSRANGE, INT4RANGE) — it supports overlap (&&) and containment (@>) operators.",
       "GiST is required for EXCLUDE constraints that prevent overlapping ranges (e.g., booking systems).",
       "For full-text search, GIN is generally faster for lookups, but GiST is faster to update and uses less space."
+    ],
+    "tipsKo": [
+      "범위 타입 쿼리(TSRANGE, INT4RANGE)에는 GiST를 사용하세요. 겹침(&&)과 포함(@>) 연산자를 지원합니다.",
+      "GiST는 범위 겹침을 방지하는 EXCLUDE 제약 조건(예: 예약 시스템)에 필수입니다.",
+      "전문 검색에서 GIN이 일반적으로 조회는 더 빠르지만, GiST는 업데이트가 더 빠르고 공간을 적게 사용합니다."
     ],
     "relatedItems": ["gin-index", "spatial-index", "exclude", "range-type"],
     "seeAlso": []
@@ -108,7 +136,9 @@
     "category": "indexes",
     "name": "SP-GiST Index",
     "summary": "A space-partitioned index for data with natural clustering, like IP addresses or phone numbers.",
+    "summaryKo": "IP 주소나 전화번호처럼 자연스러운 군집 구조를 가진 데이터를 위한 공간 분할 인덱스입니다.",
     "description": "SP-GiST (Space-Partitioned Generalized Search Tree) is a PostgreSQL index type optimized for data that can be divided into non-overlapping partitions, such as IP addresses, phone numbers, or geometric points. It uses structures like radix trees and quadtrees internally, making it particularly efficient for data with natural hierarchical clustering.",
+    "descriptionKo": "SP-GiST(Space-Partitioned Generalized Search Tree)는 IP 주소, 전화번호, 기하학적 좌표처럼 겹치지 않는 파티션으로 나눌 수 있는 데이터에 최적화된 PostgreSQL 인덱스 타입입니다. 내부적으로 기수 트리(radix tree)나 쿼드트리(quadtree) 구조를 사용하여, 자연스러운 계층적 군집 구조를 가진 데이터에 특히 효율적입니다.",
     "syntax": {
       "postgresql": "-- SP-GiST index on inet (IP address) column\nCREATE INDEX idx_access_log_ip ON access_log USING SPGIST (client_ip);\n\n-- SP-GiST index on text for prefix searches\nCREATE INDEX idx_users_phone ON users USING SPGIST (phone);",
       "mysql": null,
@@ -126,6 +156,11 @@
       "For IP address lookups and subnet matching, SP-GiST on inet columns is significantly faster than B-Tree.",
       "This is an advanced index type — for most use cases, B-Tree or GiST will be sufficient."
     ],
+    "tipsKo": [
+      "SP-GiST는 데이터가 자연스러운 군집이나 계층 구조를 가질 때 가장 효과적입니다(예: IP 주소, 지리 좌표).",
+      "IP 주소 조회와 서브넷 매칭에서 inet 컬럼에 SP-GiST를 사용하면 B-Tree보다 훨씬 빠릅니다.",
+      "SP-GiST는 고급 인덱스 타입입니다. 대부분의 경우에는 B-Tree나 GiST로 충분합니다."
+    ],
     "relatedItems": ["gist-index", "btree-index"],
     "seeAlso": []
   },
@@ -134,7 +169,9 @@
     "category": "indexes",
     "name": "BRIN Index",
     "summary": "A compact index for large tables where data is naturally ordered (e.g., time-series data).",
+    "summaryKo": "데이터가 자연스럽게 정렬된 대용량 테이블(예: 시계열 데이터)을 위한 경량 인덱스입니다.",
     "description": "A BRIN (Block Range INdex) index stores summary information about ranges of physical table blocks rather than indexing every row. It is extremely small and efficient for very large tables where the column values are naturally correlated with the physical row order — such as timestamps in append-only log tables. BRIN indexes can be hundreds of times smaller than B-Tree indexes.",
+    "descriptionKo": "BRIN(Block Range INdex) 인덱스는 모든 행을 인덱싱하는 대신 물리적 테이블 블록 범위의 요약 정보를 저장합니다. 컬럼 값이 물리적 행 순서와 자연스럽게 일치하는 대용량 테이블(예: 추가 전용 로그 테이블의 타임스탬프)에 매우 작고 효율적입니다. BRIN 인덱스는 B-Tree 인덱스보다 수백 배 작을 수 있습니다.",
     "syntax": {
       "postgresql": "-- BRIN index on a timestamp column (ideal for time-series data)\nCREATE INDEX idx_events_created ON events USING BRIN (created_at);\n\n-- BRIN with custom pages_per_range\nCREATE INDEX idx_logs_timestamp ON access_logs USING BRIN (logged_at) WITH (pages_per_range = 32);",
       "mysql": null,
@@ -143,14 +180,19 @@
     },
     "vendorSupport": {
       "postgresql": { "supported": true, "level": "full" },
-      "mysql": { "supported": false, "level": "none", "notes": "MySQL does not support BRIN indexes. Consider partitioning for similar benefits on large tables." },
-      "mariadb": { "supported": false, "level": "none", "notes": "MariaDB does not support BRIN indexes." },
+      "mysql": { "supported": false, "level": "none", "notes": "MySQL does not support BRIN indexes. Consider partitioning for similar benefits on large tables.", "notesKo": "MySQL은 BRIN 인덱스를 지원하지 않습니다. 대용량 테이블에서 비슷한 효과를 얻으려면 파티셔닝을 고려하세요." },
+      "mariadb": { "supported": false, "level": "none", "notes": "MariaDB does not support BRIN indexes.", "notesKo": "MariaDB는 BRIN 인덱스를 지원하지 않습니다." },
       "sqlite": { "supported": false, "level": "none" }
     },
     "tips": [
       "BRIN indexes are ideal for large, append-only tables (like logs or events) where rows are naturally ordered by time.",
       "A BRIN index can be 1000x smaller than a B-Tree index on the same column, dramatically reducing storage.",
       "BRIN is not effective if the column values are randomly distributed — the data must be physically ordered."
+    ],
+    "tipsKo": [
+      "BRIN 인덱스는 행이 시간순으로 자연스럽게 정렬된 대용량 추가 전용 테이블(로그, 이벤트 등)에 이상적입니다.",
+      "BRIN 인덱스는 같은 컬럼의 B-Tree 인덱스보다 1000배 작을 수 있어 저장 공간을 크게 줄여줍니다.",
+      "컬럼 값이 무작위로 분포되어 있으면 BRIN은 효과적이지 않습니다. 데이터가 물리적으로 정렬되어 있어야 합니다."
     ],
     "relatedItems": ["btree-index", "range-partition"],
     "seeAlso": []
@@ -160,7 +202,9 @@
     "category": "indexes",
     "name": "Full-Text Index",
     "summary": "An index optimized for natural language text search across large text columns.",
+    "summaryKo": "대용량 텍스트 컬럼에서 자연어 텍스트 검색에 최적화된 인덱스입니다.",
     "description": "A full-text index enables fast searching of natural language text within text columns. Instead of exact matching (LIKE '%word%'), full-text search understands word boundaries, stemming (matching 'running' when searching for 'run'), and relevance ranking. It is essential for implementing search features in applications.",
+    "descriptionKo": "전문(Full-Text) 인덱스는 텍스트 컬럼 내에서 자연어 텍스트를 빠르게 검색할 수 있게 해줍니다. 단순 문자열 매칭(LIKE '%word%')과 달리, 전문 검색은 단어 경계, 어간 처리('run'을 검색할 때 'running'도 매칭), 관련성 순위를 이해합니다. 애플리케이션에서 검색 기능을 구현할 때 필수적입니다.",
     "syntax": {
       "postgresql": "-- Create a tsvector column and GIN index for full-text search\nALTER TABLE products ADD COLUMN search_vector TSVECTOR;\n\nUPDATE products SET search_vector = to_tsvector('english', name || ' ' || COALESCE(description, ''));\n\nCREATE INDEX idx_products_fts ON products USING GIN (search_vector);\n\n-- Query\nSELECT name FROM products\nWHERE search_vector @@ to_tsquery('english', 'wireless & keyboard');",
       "mysql": "-- Create a fulltext index\nALTER TABLE products ADD FULLTEXT INDEX idx_products_fts (name, description);\n\n-- Query using natural language mode\nSELECT name FROM products\nWHERE MATCH(name, description) AGAINST ('wireless keyboard' IN NATURAL LANGUAGE MODE);",
@@ -168,15 +212,20 @@
       "sqlite": "-- Create a FTS5 virtual table\nCREATE VIRTUAL TABLE products_fts USING fts5(\n  name,\n  description,\n  content=products,\n  content_rowid=id\n);\n\n-- Query\nSELECT name FROM products_fts WHERE products_fts MATCH 'wireless keyboard';"
     },
     "vendorSupport": {
-      "postgresql": { "supported": true, "level": "full", "notes": "PostgreSQL uses tsvector/tsquery with GIN or GiST indexes for full-text search." },
+      "postgresql": { "supported": true, "level": "full", "notes": "PostgreSQL uses tsvector/tsquery with GIN or GiST indexes for full-text search.", "notesKo": "PostgreSQL은 전문 검색을 위해 tsvector/tsquery를 GIN 또는 GiST 인덱스와 함께 사용합니다." },
       "mysql": { "supported": true, "level": "full" },
       "mariadb": { "supported": true, "level": "full" },
-      "sqlite": { "supported": true, "level": "full", "notes": "SQLite uses FTS5 virtual tables for full-text search." }
+      "sqlite": { "supported": true, "level": "full", "notes": "SQLite uses FTS5 virtual tables for full-text search.", "notesKo": "SQLite는 전문 검색을 위해 FTS5 가상 테이블을 사용합니다." }
     },
     "tips": [
       "Full-text search is vastly faster than LIKE '%keyword%' for searching large text columns.",
       "In PostgreSQL, use GIN indexes for read-heavy full-text search and GiST for write-heavy workloads.",
       "MySQL/MariaDB FULLTEXT indexes support natural language mode, boolean mode, and query expansion."
+    ],
+    "tipsKo": [
+      "전문 검색은 대용량 텍스트 컬럼을 검색할 때 LIKE '%keyword%'보다 훨씬 빠릅니다.",
+      "PostgreSQL에서는 읽기가 많은 전문 검색에는 GIN 인덱스를, 쓰기가 많은 환경에는 GiST를 사용하세요.",
+      "MySQL/MariaDB의 FULLTEXT 인덱스는 자연어 모드, 불리언 모드, 쿼리 확장을 지원합니다."
     ],
     "relatedItems": ["gin-index", "gist-index"],
     "seeAlso": []
@@ -186,7 +235,9 @@
     "category": "indexes",
     "name": "Spatial Index",
     "summary": "An index for efficiently querying geometric and geographic data.",
+    "summaryKo": "기하학적 데이터와 지리 데이터를 효율적으로 검색하기 위한 인덱스입니다.",
     "description": "A spatial index is designed for geographic or geometric data, enabling fast queries like 'find all restaurants within 5 km' or 'find all shapes that overlap this area'. It uses tree-based structures (R-Tree or GiST) to partition spatial data into regions. Spatial indexes are essential for location-based applications and GIS systems.",
+    "descriptionKo": "공간 인덱스는 지리 또는 기하학적 데이터를 위해 설계되어, '5km 이내의 모든 식당 찾기'나 '이 영역과 겹치는 모든 도형 찾기' 같은 빠른 쿼리를 가능하게 합니다. R-Tree 또는 GiST 같은 트리 기반 구조를 사용하여 공간 데이터를 영역별로 분할합니다. 위치 기반 애플리케이션과 GIS 시스템에 필수적입니다.",
     "syntax": {
       "postgresql": "-- Using PostGIS extension\nCREATE EXTENSION IF NOT EXISTS postgis;\n\nCREATE TABLE locations (\n  id SERIAL PRIMARY KEY,\n  name VARCHAR(100) NOT NULL,\n  geom GEOMETRY(Point, 4326) NOT NULL\n);\n\nCREATE INDEX idx_locations_geom ON locations USING GIST (geom);\n\n-- Find locations within 1km of a point\nSELECT name FROM locations\nWHERE ST_DWithin(geom, ST_SetSRID(ST_MakePoint(127.0, 37.5), 4326), 1000);",
       "mysql": "CREATE TABLE locations (\n  id INT AUTO_INCREMENT PRIMARY KEY,\n  name VARCHAR(100) NOT NULL,\n  coordinates POINT NOT NULL SRID 4326,\n  SPATIAL INDEX idx_locations_coords (coordinates)\n);\n\n-- Find locations within a bounding box\nSELECT name FROM locations\nWHERE MBRContains(\n  ST_GeomFromText('POLYGON((126.9 37.4, 127.1 37.4, 127.1 37.6, 126.9 37.6, 126.9 37.4))'),\n  coordinates\n);",
@@ -194,15 +245,20 @@
       "sqlite": "-- Using R*Tree extension\nCREATE VIRTUAL TABLE locations_idx USING rtree(\n  id,\n  min_lat, max_lat,\n  min_lon, max_lon\n);"
     },
     "vendorSupport": {
-      "postgresql": { "supported": true, "level": "full", "notes": "PostgreSQL uses GiST indexes with the PostGIS extension for advanced spatial features." },
+      "postgresql": { "supported": true, "level": "full", "notes": "PostgreSQL uses GiST indexes with the PostGIS extension for advanced spatial features.", "notesKo": "PostgreSQL은 고급 공간 기능을 위해 PostGIS 확장과 함께 GiST 인덱스를 사용합니다." },
       "mysql": { "supported": true, "level": "full" },
       "mariadb": { "supported": true, "level": "full" },
-      "sqlite": { "supported": true, "level": "partial", "notes": "SQLite uses the R*Tree extension for basic spatial indexing. It lacks advanced GIS functions." }
+      "sqlite": { "supported": true, "level": "partial", "notes": "SQLite uses the R*Tree extension for basic spatial indexing. It lacks advanced GIS functions.", "notesKo": "SQLite는 기본적인 공간 인덱싱을 위해 R*Tree 확장을 사용합니다. 고급 GIS 함수는 지원하지 않습니다." }
     },
     "tips": [
       "Always specify the SRID (Spatial Reference System ID) — use 4326 for GPS/WGS84 coordinates (latitude/longitude).",
       "In PostgreSQL, install the PostGIS extension for full spatial support including distance calculations and geometry operations.",
       "Spatial indexes only accelerate spatial predicates (ST_Contains, ST_DWithin, etc.), not regular column comparisons."
+    ],
+    "tipsKo": [
+      "항상 SRID(Spatial Reference System ID)를 지정하세요. GPS/WGS84 좌표(위도/경도)에는 4326을 사용합니다.",
+      "PostgreSQL에서는 거리 계산과 기하학적 연산을 포함한 완전한 공간 지원을 위해 PostGIS 확장을 설치하세요.",
+      "공간 인덱스는 공간 조건(ST_Contains, ST_DWithin 등)만 가속화하며, 일반 컬럼 비교에는 적용되지 않습니다."
     ],
     "relatedItems": ["gist-index", "extension"],
     "seeAlso": []
@@ -212,7 +268,9 @@
     "category": "indexes",
     "name": "Partial Index",
     "summary": "An index that only covers rows matching a specified condition.",
+    "summaryKo": "지정된 조건에 맞는 행만 포함하는 인덱스입니다.",
     "description": "A partial index (also called a filtered index) only indexes rows that satisfy a WHERE condition. This makes the index smaller and faster because it skips rows you never need to search. For example, if you only query active users, a partial index on status = 'active' avoids indexing inactive users entirely.",
+    "descriptionKo": "부분 인덱스(필터링된 인덱스라고도 함)는 WHERE 조건을 만족하는 행만 인덱싱합니다. 검색할 필요가 없는 행을 건너뛰기 때문에 인덱스가 더 작고 빠릅니다. 예를 들어 활성 사용자만 조회한다면, status = 'active' 조건의 부분 인덱스를 만들면 비활성 사용자를 인덱싱하지 않습니다.",
     "syntax": {
       "postgresql": "-- Index only active users\nCREATE INDEX idx_users_active_email ON users(email)\n  WHERE status = 'active';\n\n-- Index only unpaid orders\nCREATE INDEX idx_orders_unpaid ON orders(created_at)\n  WHERE is_paid = FALSE;",
       "mysql": null,
@@ -221,14 +279,19 @@
     },
     "vendorSupport": {
       "postgresql": { "supported": true, "level": "full" },
-      "mysql": { "supported": false, "level": "none", "notes": "MySQL does not support partial indexes. Use generated columns with regular indexes as a workaround." },
-      "mariadb": { "supported": false, "level": "none", "notes": "MariaDB does not support partial indexes." },
+      "mysql": { "supported": false, "level": "none", "notes": "MySQL does not support partial indexes. Use generated columns with regular indexes as a workaround.", "notesKo": "MySQL은 부분 인덱스를 지원하지 않습니다. 대안으로 생성 컬럼과 일반 인덱스를 사용할 수 있습니다." },
+      "mariadb": { "supported": false, "level": "none", "notes": "MariaDB does not support partial indexes.", "notesKo": "MariaDB는 부분 인덱스를 지원하지 않습니다." },
       "sqlite": { "supported": true, "level": "full" }
     },
     "tips": [
       "Partial indexes are great for tables with a 'status' column where you mostly query a specific status (e.g., 'active', 'pending').",
       "The WHERE clause in your query must match (or be a subset of) the partial index condition for the optimizer to use it.",
       "A partial UNIQUE index can enforce uniqueness only for a subset of rows (e.g., only one active email per user)."
+    ],
+    "tipsKo": [
+      "부분 인덱스는 'status' 컬럼이 있는 테이블에서 특정 상태(예: 'active', 'pending')만 주로 조회할 때 효과적입니다.",
+      "쿼리의 WHERE 절이 부분 인덱스 조건과 일치하거나 그 부분집합이어야 옵티마이저가 인덱스를 사용합니다.",
+      "부분 UNIQUE 인덱스를 사용하면 일부 행에만 유일성을 적용할 수 있습니다(예: 사용자당 활성 이메일 하나만 허용)."
     ],
     "relatedItems": ["btree-index", "expression-index"],
     "seeAlso": []
@@ -238,7 +301,9 @@
     "category": "indexes",
     "name": "Expression Index",
     "summary": "An index built on the result of an expression or function, not just a column.",
+    "summaryKo": "컬럼 값이 아닌 수식이나 함수의 결과를 기반으로 만든 인덱스입니다.",
     "description": "An expression index (also called a functional index) indexes the result of a function or expression rather than raw column values. This is useful when your queries filter or sort by computed values, such as LOWER(email) for case-insensitive searches or EXTRACT(YEAR FROM created_at) for year-based queries.",
+    "descriptionKo": "수식 인덱스(함수 인덱스라고도 함)는 원래 컬럼 값이 아닌 함수나 수식의 결과를 인덱싱합니다. 대소문자를 구분하지 않는 검색을 위한 LOWER(email)이나 연도별 조회를 위한 EXTRACT(YEAR FROM created_at)처럼, 계산된 값으로 필터링하거나 정렬할 때 유용합니다.",
     "syntax": {
       "postgresql": "-- Case-insensitive email lookup\nCREATE INDEX idx_users_email_lower ON users(LOWER(email));\n\n-- Index on year extracted from timestamp\nCREATE INDEX idx_orders_year ON orders(EXTRACT(YEAR FROM created_at));\n\n-- Query that uses the index\nSELECT * FROM users WHERE LOWER(email) = 'john@example.com';",
       "mysql": "-- Expression index (MySQL 8.0+)\nCREATE INDEX idx_users_email_lower ON users((LOWER(email)));\n\n-- Index on year extracted from date\nCREATE INDEX idx_orders_year ON orders((YEAR(created_at)));\n\n-- Query that uses the index\nSELECT * FROM users WHERE LOWER(email) = 'john@example.com';",
@@ -247,14 +312,19 @@
     },
     "vendorSupport": {
       "postgresql": { "supported": true, "level": "full" },
-      "mysql": { "supported": true, "level": "full", "notes": "MySQL 8.0+ supports functional indexes. The expression must be enclosed in double parentheses." },
-      "mariadb": { "supported": true, "level": "full", "notes": "MariaDB 10.2+ supports expression indexes via virtual columns." },
+      "mysql": { "supported": true, "level": "full", "notes": "MySQL 8.0+ supports functional indexes. The expression must be enclosed in double parentheses.", "notesKo": "MySQL 8.0 이상에서 함수 인덱스를 지원합니다. 수식은 이중 괄호로 감싸야 합니다." },
+      "mariadb": { "supported": true, "level": "full", "notes": "MariaDB 10.2+ supports expression indexes via virtual columns.", "notesKo": "MariaDB 10.2 이상에서 가상 컬럼을 통해 수식 인덱스를 지원합니다." },
       "sqlite": { "supported": true, "level": "full" }
     },
     "tips": [
       "Your query must use the exact same expression as the index for the optimizer to pick it up.",
       "Use LOWER() expression indexes for case-insensitive lookups instead of using ILIKE or COLLATE in every query.",
       "Expression indexes are especially useful for JSONB key extraction in PostgreSQL (e.g., indexing (data->>'email'))."
+    ],
+    "tipsKo": [
+      "옵티마이저가 인덱스를 사용하려면 쿼리에서 인덱스와 정확히 같은 수식을 사용해야 합니다.",
+      "대소문자를 구분하지 않는 검색에는 매번 ILIKE나 COLLATE를 쓰는 대신 LOWER() 수식 인덱스를 사용하세요.",
+      "수식 인덱스는 PostgreSQL에서 JSONB 키 추출(예: (data->>'email') 인덱싱)에 특히 유용합니다."
     ],
     "relatedItems": ["btree-index", "partial-index", "generated-column"],
     "seeAlso": []
@@ -264,7 +334,9 @@
     "category": "indexes",
     "name": "Covering Index",
     "summary": "An index that includes extra columns so queries can be answered from the index alone.",
+    "summaryKo": "추가 컬럼을 포함하여 인덱스만으로 쿼리 결과를 반환할 수 있는 인덱스입니다.",
     "description": "A covering index includes all the columns needed by a query, so the database can return results directly from the index without reading the actual table data (called an 'index-only scan'). This can dramatically speed up queries because reading from a compact index is much faster than accessing the full table rows.",
+    "descriptionKo": "커버링 인덱스는 쿼리에 필요한 모든 컬럼을 포함하므로, 데이터베이스가 실제 테이블 데이터를 읽지 않고 인덱스에서 직접 결과를 반환할 수 있습니다(이를 'index-only scan'이라 합니다). 작은 인덱스에서 읽는 것이 전체 테이블 행에 접근하는 것보다 훨씬 빠르기 때문에, 쿼리 속도를 크게 향상시킬 수 있습니다.",
     "syntax": {
       "postgresql": "-- Covering index using INCLUDE clause\nCREATE INDEX idx_orders_user_covering ON orders(user_id)\n  INCLUDE (status, total, created_at);\n\n-- The query below can be answered using the index alone\n-- SELECT status, total, created_at FROM orders WHERE user_id = 42;",
       "mysql": "-- Covering index (multi-column index that covers the query)\nCREATE INDEX idx_orders_user_covering ON orders(user_id, status, total, created_at);\n\n-- The query below can be answered using the index alone\n-- SELECT status, total, created_at FROM orders WHERE user_id = 42;",
@@ -272,15 +344,20 @@
       "sqlite": "-- Covering index (multi-column index)\nCREATE INDEX idx_orders_user_covering ON orders(user_id, status, total, created_at);\n\n-- SQLite automatically uses covering indexes when possible"
     },
     "vendorSupport": {
-      "postgresql": { "supported": true, "level": "full", "notes": "PostgreSQL 11+ supports INCLUDE clause to add non-key columns to an index." },
-      "mysql": { "supported": true, "level": "partial", "notes": "MySQL does not support INCLUDE clause. Create a multi-column index that includes all needed columns." },
-      "mariadb": { "supported": true, "level": "partial", "notes": "MariaDB does not support INCLUDE clause. Create a multi-column index that includes all needed columns." },
-      "sqlite": { "supported": true, "level": "partial", "notes": "SQLite does not support INCLUDE clause but automatically performs covering index scans on multi-column indexes." }
+      "postgresql": { "supported": true, "level": "full", "notes": "PostgreSQL 11+ supports INCLUDE clause to add non-key columns to an index.", "notesKo": "PostgreSQL 11 이상에서 INCLUDE 절을 사용하여 인덱스에 비키 컬럼을 추가할 수 있습니다." },
+      "mysql": { "supported": true, "level": "partial", "notes": "MySQL does not support INCLUDE clause. Create a multi-column index that includes all needed columns.", "notesKo": "MySQL은 INCLUDE 절을 지원하지 않습니다. 필요한 모든 컬럼을 포함하는 다중 컬럼 인덱스를 만드세요." },
+      "mariadb": { "supported": true, "level": "partial", "notes": "MariaDB does not support INCLUDE clause. Create a multi-column index that includes all needed columns.", "notesKo": "MariaDB는 INCLUDE 절을 지원하지 않습니다. 필요한 모든 컬럼을 포함하는 다중 컬럼 인덱스를 만드세요." },
+      "sqlite": { "supported": true, "level": "partial", "notes": "SQLite does not support INCLUDE clause but automatically performs covering index scans on multi-column indexes.", "notesKo": "SQLite는 INCLUDE 절을 지원하지 않지만, 다중 컬럼 인덱스에서 자동으로 커버링 인덱스 스캔을 수행합니다." }
     },
     "tips": [
       "Use EXPLAIN to check if your query performs an 'Index Only Scan' — that confirms the covering index is working.",
       "PostgreSQL's INCLUDE clause is better than a multi-column index because included columns don't affect index ordering.",
       "Don't over-include columns — wider indexes consume more storage and slow down write operations."
+    ],
+    "tipsKo": [
+      "EXPLAIN을 사용하여 쿼리가 'Index Only Scan'을 수행하는지 확인하세요. 이것이 확인되면 커버링 인덱스가 제대로 작동하는 것입니다.",
+      "PostgreSQL의 INCLUDE 절은 다중 컬럼 인덱스보다 좋습니다. 포함된 컬럼이 인덱스 정렬 순서에 영향을 주지 않기 때문입니다.",
+      "컬럼을 너무 많이 포함하지 마세요. 인덱스가 넓어지면 저장 공간을 더 많이 차지하고 쓰기 작업이 느려집니다."
     ],
     "relatedItems": ["btree-index", "partial-index"],
     "seeAlso": []

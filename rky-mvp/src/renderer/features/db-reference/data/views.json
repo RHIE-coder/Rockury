@@ -4,7 +4,9 @@
     "category": "views",
     "name": "View",
     "summary": "A virtual table defined by a saved SQL query.",
+    "summaryKo": "저장된 SQL 쿼리로 정의되는 가상 테이블입니다.",
     "description": "A view is a named SQL query that you can use like a table. It does not store data itself — every time you query a view, the database runs the underlying query. Views simplify complex queries, provide a layer of abstraction over your schema, and can restrict which columns or rows users can see. Think of a view as a saved query with a name.",
+    "descriptionKo": "View는 이름이 붙은 SQL 쿼리로, 테이블처럼 사용할 수 있습니다. View 자체에는 데이터가 저장되지 않으며, View를 조회할 때마다 데이터베이스가 내부 쿼리를 실행합니다. View를 사용하면 복잡한 쿼리를 단순화하고, 스키마 위에 추상화 계층을 제공하며, 사용자가 볼 수 있는 컬럼이나 행을 제한할 수 있습니다. View는 이름이 붙은 저장된 쿼리라고 생각하면 됩니다.",
     "syntax": {
       "postgresql": "CREATE VIEW active_users AS\nSELECT id, username, email, created_at\nFROM users\nWHERE status = 'active';\n\n-- Use it like a table\nSELECT * FROM active_users WHERE created_at > '2025-01-01';",
       "mysql": "CREATE VIEW active_users AS\nSELECT id, username, email, created_at\nFROM users\nWHERE status = 'active';\n\n-- Use it like a table\nSELECT * FROM active_users WHERE created_at > '2025-01-01';",
@@ -22,6 +24,11 @@
       "Views can serve as a security layer — grant users access to a view instead of the underlying table to hide sensitive columns.",
       "Views don't improve performance by themselves since the query runs every time — use materialized views for caching."
     ],
+    "tipsKo": [
+      "View는 자주 사용하는 복잡한 JOIN 쿼리를 단순화하는 데 아주 유용합니다.",
+      "View는 보안 계층 역할을 할 수 있습니다 — 민감한 컬럼을 숨기려면 원본 테이블 대신 View에 접근 권한을 부여하세요.",
+      "View는 매번 쿼리가 실행되기 때문에 그 자체로 성능이 향상되지는 않습니다 — 캐싱이 필요하면 Materialized View를 사용하세요."
+    ],
     "relatedItems": ["materialized-view", "updatable-view", "check-option"],
     "seeAlso": []
   },
@@ -30,7 +37,9 @@
     "category": "views",
     "name": "Materialized View",
     "summary": "A view that physically stores its query results and can be refreshed on demand.",
+    "summaryKo": "쿼리 결과를 실제로 저장하고, 필요할 때 새로고침할 수 있는 View입니다.",
     "description": "A materialized view is like a regular view, but it stores the query results on disk like a real table. This makes reads much faster because the query doesn't need to run each time. However, the data can become stale, so you need to refresh it periodically. Materialized views are ideal for expensive queries (dashboards, reports, aggregations) where slightly outdated data is acceptable.",
+    "descriptionKo": "Materialized View는 일반 View와 비슷하지만, 쿼리 결과를 실제 테이블처럼 디스크에 저장합니다. 덕분에 매번 쿼리를 실행할 필요가 없어서 조회 속도가 훨씬 빠릅니다. 다만 저장된 데이터가 오래될 수 있으므로 주기적으로 새로고침해야 합니다. Materialized View는 대시보드, 리포트, 집계처럼 비용이 큰 쿼리에서 약간의 데이터 지연이 허용될 때 이상적입니다.",
     "syntax": {
       "postgresql": "-- Create a materialized view\nCREATE MATERIALIZED VIEW order_summary AS\nSELECT\n  u.id AS user_id,\n  u.username,\n  COUNT(o.id) AS order_count,\n  SUM(o.total) AS total_spent\nFROM users u\nLEFT JOIN orders o ON o.user_id = u.id\nGROUP BY u.id, u.username;\n\n-- Create an index on it\nCREATE INDEX idx_order_summary_user ON order_summary(user_id);\n\n-- Refresh the data\nREFRESH MATERIALIZED VIEW order_summary;\n\n-- Refresh without locking reads\nREFRESH MATERIALIZED VIEW CONCURRENTLY order_summary;",
       "mysql": null,
@@ -39,14 +48,19 @@
     },
     "vendorSupport": {
       "postgresql": { "supported": true, "level": "full" },
-      "mysql": { "supported": false, "level": "none", "notes": "MySQL does not support materialized views. Use a table with a scheduled job to simulate one." },
-      "mariadb": { "supported": false, "level": "none", "notes": "MariaDB does not support materialized views. Use a table with periodic refresh via events." },
-      "sqlite": { "supported": false, "level": "none", "notes": "SQLite does not support materialized views." }
+      "mysql": { "supported": false, "level": "none", "notes": "MySQL does not support materialized views. Use a table with a scheduled job to simulate one.", "notesKo": "MySQL은 Materialized View를 지원하지 않습니다. 테이블과 스케줄링 작업을 조합하여 유사하게 구현할 수 있습니다." },
+      "mariadb": { "supported": false, "level": "none", "notes": "MariaDB does not support materialized views. Use a table with periodic refresh via events.", "notesKo": "MariaDB는 Materialized View를 지원하지 않습니다. 테이블과 이벤트를 이용한 주기적 새로고침으로 유사하게 구현할 수 있습니다." },
+      "sqlite": { "supported": false, "level": "none", "notes": "SQLite does not support materialized views.", "notesKo": "SQLite는 Materialized View를 지원하지 않습니다." }
     },
     "tips": [
       "Always create indexes on materialized views for fast queries — they are physical tables and benefit from indexes.",
       "Use REFRESH MATERIALIZED VIEW CONCURRENTLY to avoid locking reads during refresh (requires a unique index).",
       "Schedule refreshes (e.g., every 5 minutes or hourly) based on how fresh the data needs to be."
+    ],
+    "tipsKo": [
+      "Materialized View에는 항상 인덱스를 생성하세요 — 실제 테이블이므로 인덱스의 이점을 그대로 누릴 수 있습니다.",
+      "새로고침 중에도 조회가 차단되지 않도록 REFRESH MATERIALIZED VIEW CONCURRENTLY를 사용하세요 (UNIQUE 인덱스가 필요합니다).",
+      "데이터의 최신성 요구 수준에 따라 새로고침 주기를 설정하세요 (예: 5분마다, 1시간마다)."
     ],
     "relatedItems": ["regular-view", "btree-index"],
     "seeAlso": []
@@ -56,7 +70,9 @@
     "category": "views",
     "name": "Updatable View",
     "summary": "A view that allows INSERT, UPDATE, and DELETE operations on the underlying table.",
+    "summaryKo": "원본 테이블에 대해 INSERT, UPDATE, DELETE 작업을 수행할 수 있는 View입니다.",
     "description": "An updatable view is a view through which you can modify the data in the underlying table. Simple views that select from a single table without aggregations or GROUP BY are often automatically updatable. For more complex views, you can define rules or INSTEAD OF triggers to handle modifications. Updatable views let you use views as a data access layer.",
+    "descriptionKo": "Updatable View는 View를 통해 원본 테이블의 데이터를 수정할 수 있는 View입니다. 집계 함수나 GROUP BY 없이 단일 테이블에서 SELECT하는 간단한 View는 대부분 자동으로 수정 가능합니다. 더 복잡한 View의 경우 규칙(Rule)이나 INSTEAD OF 트리거를 정의하여 수정 동작을 처리할 수 있습니다. Updatable View를 사용하면 View를 데이터 접근 계층으로 활용할 수 있습니다.",
     "syntax": {
       "postgresql": "-- Simple updatable view (automatically updatable)\nCREATE VIEW active_users AS\nSELECT id, username, email, status\nFROM users\nWHERE status = 'active';\n\n-- You can INSERT/UPDATE/DELETE through this view\nUPDATE active_users SET email = 'new@example.com' WHERE id = 1;",
       "mysql": "-- Simple updatable view (automatically updatable)\nCREATE VIEW active_users AS\nSELECT id, username, email, status\nFROM users\nWHERE status = 'active';\n\n-- You can INSERT/UPDATE/DELETE through this view\nUPDATE active_users SET email = 'new@example.com' WHERE id = 1;",
@@ -67,12 +83,17 @@
       "postgresql": { "supported": true, "level": "full" },
       "mysql": { "supported": true, "level": "full" },
       "mariadb": { "supported": true, "level": "full" },
-      "sqlite": { "supported": true, "level": "partial", "notes": "SQLite views are read-only by default. Use INSTEAD OF triggers to enable updates." }
+      "sqlite": { "supported": true, "level": "partial", "notes": "SQLite views are read-only by default. Use INSTEAD OF triggers to enable updates.", "notesKo": "SQLite의 View는 기본적으로 읽기 전용입니다. INSTEAD OF 트리거를 사용하면 수정이 가능합니다." }
     },
     "tips": [
       "A view is automatically updatable when it selects from a single table, has no GROUP BY, DISTINCT, or aggregate functions.",
       "Use WITH CHECK OPTION to prevent inserts/updates that would make the row disappear from the view.",
       "For complex views (JOINs, aggregations), use INSTEAD OF triggers to define custom update logic."
+    ],
+    "tipsKo": [
+      "단일 테이블에서 SELECT하며 GROUP BY, DISTINCT, 집계 함수가 없는 View는 자동으로 수정 가능합니다.",
+      "WITH CHECK OPTION을 사용하면 View에서 행이 사라지게 만드는 INSERT/UPDATE를 방지할 수 있습니다.",
+      "복잡한 View (JOIN, 집계 등)에서는 INSTEAD OF 트리거를 사용하여 커스텀 수정 로직을 정의하세요."
     ],
     "relatedItems": ["regular-view", "check-option", "row-trigger"],
     "seeAlso": []
@@ -82,7 +103,9 @@
     "category": "views",
     "name": "WITH CHECK OPTION",
     "summary": "Prevents modifications through a view that would make the row no longer visible in the view.",
+    "summaryKo": "View를 통한 수정 시, 해당 행이 View에서 더 이상 보이지 않게 되는 변경을 방지합니다.",
     "description": "WITH CHECK OPTION is a clause added to updatable views that validates any INSERT or UPDATE to ensure the resulting row still satisfies the view's WHERE condition. Without this option, you could insert a row through the view that the view itself would not display. For example, inserting a user with status='inactive' through an active_users view would succeed silently without CHECK OPTION.",
+    "descriptionKo": "WITH CHECK OPTION은 Updatable View에 추가하는 절로, INSERT나 UPDATE 결과가 View의 WHERE 조건을 여전히 만족하는지 검증합니다. 이 옵션이 없으면 View를 통해 데이터를 삽입했는데 정작 그 View에서는 보이지 않는 상황이 발생할 수 있습니다. 예를 들어, active_users View를 통해 status='inactive'인 사용자를 삽입하면 CHECK OPTION이 없을 경우 오류 없이 성공하지만, 해당 행은 View에 나타나지 않습니다.",
     "syntax": {
       "postgresql": "CREATE VIEW active_users AS\nSELECT id, username, email, status\nFROM users\nWHERE status = 'active'\nWITH CHECK OPTION;\n\n-- This will fail because status='inactive' violates the view condition\n-- INSERT INTO active_users (username, email, status) VALUES ('test', 'test@example.com', 'inactive');",
       "mysql": "CREATE VIEW active_users AS\nSELECT id, username, email, status\nFROM users\nWHERE status = 'active'\nWITH CHECK OPTION;\n\n-- This will fail because status='inactive' violates the view condition\n-- INSERT INTO active_users (username, email, status) VALUES ('test', 'test@example.com', 'inactive');",
@@ -93,12 +116,17 @@
       "postgresql": { "supported": true, "level": "full" },
       "mysql": { "supported": true, "level": "full" },
       "mariadb": { "supported": true, "level": "full" },
-      "sqlite": { "supported": false, "level": "none", "notes": "SQLite does not support WITH CHECK OPTION. Implement validation in INSTEAD OF triggers." }
+      "sqlite": { "supported": false, "level": "none", "notes": "SQLite does not support WITH CHECK OPTION. Implement validation in INSTEAD OF triggers.", "notesKo": "SQLite는 WITH CHECK OPTION을 지원하지 않습니다. INSTEAD OF 트리거에서 유효성 검사를 구현하세요." }
     },
     "tips": [
       "Always add WITH CHECK OPTION to updatable views to prevent data that doesn't match the view's filter from being inserted.",
       "Use LOCAL CHECK OPTION to only check the current view's condition, or CASCADED to check all underlying views too.",
       "WITHOUT CHECK OPTION can lead to confusing behavior where inserted rows 'disappear' from the view immediately."
+    ],
+    "tipsKo": [
+      "Updatable View에는 항상 WITH CHECK OPTION을 추가하여 View의 필터 조건에 맞지 않는 데이터가 삽입되는 것을 방지하세요.",
+      "LOCAL CHECK OPTION은 현재 View의 조건만 검사하고, CASCADED는 기반이 되는 모든 View의 조건까지 함께 검사합니다.",
+      "CHECK OPTION이 없으면 삽입한 행이 View에서 바로 '사라지는' 혼란스러운 상황이 발생할 수 있습니다."
     ],
     "relatedItems": ["updatable-view", "regular-view"],
     "seeAlso": []

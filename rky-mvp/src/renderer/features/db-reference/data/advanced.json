@@ -4,7 +4,9 @@
     "category": "advanced",
     "name": "Schema / Namespace",
     "summary": "A logical container that organizes database objects (tables, views, functions) into groups.",
+    "summaryKo": "테이블, 뷰, 함수 같은 데이터베이스 객체를 그룹으로 정리해주는 논리적 컨테이너입니다.",
     "description": "A schema (or namespace) is a way to organize database objects into logical groups within a single database. Think of it like folders on your computer — you can have tables with the same name in different schemas without conflicts. Schemas help separate concerns (e.g., 'auth' schema for authentication, 'billing' schema for payment logic) and control access at the group level.",
+    "descriptionKo": "Schema(또는 Namespace)는 하나의 데이터베이스 안에서 객체들을 논리적 그룹으로 정리하는 방법입니다. 컴퓨터의 폴더와 비슷하다고 생각하면 됩니다. 서로 다른 Schema에 같은 이름의 테이블이 있어도 충돌하지 않습니다. Schema를 사용하면 관심사를 분리할 수 있고(예: 인증용 'auth' Schema, 결제용 'billing' Schema), 그룹 단위로 접근 권한을 제어할 수 있습니다.",
     "syntax": {
       "postgresql": "-- Create a schema\nCREATE SCHEMA billing;\n\n-- Create objects in the schema\nCREATE TABLE billing.invoices (\n  id SERIAL PRIMARY KEY,\n  user_id INT NOT NULL,\n  amount NUMERIC(10, 2) NOT NULL,\n  created_at TIMESTAMPTZ DEFAULT NOW()\n);\n\n-- Set the search path to include the schema\nSET search_path TO public, billing;\n\n-- Grant usage on a schema\nGRANT USAGE ON SCHEMA billing TO app_role;\nGRANT SELECT ON ALL TABLES IN SCHEMA billing TO app_role;",
       "mysql": "-- In MySQL, 'schema' and 'database' are synonymous\nCREATE DATABASE billing;\n\n-- Create objects in the database\nCREATE TABLE billing.invoices (\n  id INT AUTO_INCREMENT PRIMARY KEY,\n  user_id INT NOT NULL,\n  amount DECIMAL(10, 2) NOT NULL,\n  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP\n);\n\n-- Access tables across databases\nSELECT u.username, i.amount\nFROM users u\nJOIN billing.invoices i ON i.user_id = u.id;",
@@ -13,14 +15,19 @@
     },
     "vendorSupport": {
       "postgresql": { "supported": true, "level": "full" },
-      "mysql": { "supported": true, "level": "partial", "notes": "In MySQL, CREATE SCHEMA is an alias for CREATE DATABASE. True schema-within-database namespacing is not supported." },
-      "mariadb": { "supported": true, "level": "partial", "notes": "In MariaDB, CREATE SCHEMA is an alias for CREATE DATABASE." },
-      "sqlite": { "supported": false, "level": "none", "notes": "SQLite does not support schemas. Use ATTACH DATABASE for multi-database access." }
+      "mysql": { "supported": true, "level": "partial", "notes": "In MySQL, CREATE SCHEMA is an alias for CREATE DATABASE. True schema-within-database namespacing is not supported.", "notesKo": "MySQL에서 CREATE SCHEMA는 CREATE DATABASE의 별칭입니다. 데이터베이스 안에서 진정한 Schema 분리는 지원되지 않습니다." },
+      "mariadb": { "supported": true, "level": "partial", "notes": "In MariaDB, CREATE SCHEMA is an alias for CREATE DATABASE.", "notesKo": "MariaDB에서 CREATE SCHEMA는 CREATE DATABASE의 별칭입니다." },
+      "sqlite": { "supported": false, "level": "none", "notes": "SQLite does not support schemas. Use ATTACH DATABASE for multi-database access.", "notesKo": "SQLite는 Schema를 지원하지 않습니다. 여러 데이터베이스에 접근하려면 ATTACH DATABASE를 사용하세요." }
     },
     "tips": [
       "In PostgreSQL, always grant USAGE on a schema before granting privileges on its objects — without USAGE, users can't see the schema.",
       "Use search_path in PostgreSQL to avoid typing schema prefixes for commonly used schemas.",
       "Organize large applications into schemas by domain (e.g., auth, billing, inventory) for cleaner separation."
+    ],
+    "tipsKo": [
+      "PostgreSQL에서는 Schema의 객체에 권한을 부여하기 전에 반드시 USAGE 권한을 먼저 부여해야 합니다. USAGE가 없으면 사용자가 해당 Schema를 볼 수 없습니다.",
+      "PostgreSQL에서 search_path를 설정하면 자주 쓰는 Schema의 접두어를 매번 입력하지 않아도 됩니다.",
+      "큰 애플리케이션은 도메인별로 Schema를 나누면(예: auth, billing, inventory) 더 깔끔하게 분리할 수 있습니다."
     ],
     "relatedItems": ["grant", "role", "extension"],
     "seeAlso": []
@@ -30,7 +37,9 @@
     "category": "advanced",
     "name": "Extension",
     "summary": "A packaged add-on that adds new features, data types, or functions to the database.",
+    "summaryKo": "데이터베이스에 새로운 기능, 데이터 타입, 함수를 추가하는 패키지형 확장 모듈입니다.",
     "description": "An extension is a plugin that extends the database with additional functionality. Extensions can add new data types (UUID, geometry), functions (cryptographic hashing, fuzzy matching), index types, and more. PostgreSQL has the richest extension ecosystem, with popular extensions like PostGIS (spatial), pg_trgm (text similarity), and pgcrypto (encryption).",
+    "descriptionKo": "Extension은 데이터베이스에 추가 기능을 더해주는 플러그인입니다. 새로운 데이터 타입(UUID, 공간 데이터), 함수(암호화 해시, 유사 검색), 인덱스 유형 등을 추가할 수 있습니다. PostgreSQL이 가장 풍부한 Extension 생태계를 가지고 있으며, PostGIS(공간 데이터), pg_trgm(텍스트 유사도), pgcrypto(암호화) 등이 대표적입니다.",
     "syntax": {
       "postgresql": "-- List available extensions\nSELECT * FROM pg_available_extensions;\n\n-- Install an extension\nCREATE EXTENSION IF NOT EXISTS \"uuid-ossp\";\nCREATE EXTENSION IF NOT EXISTS pg_trgm;\nCREATE EXTENSION IF NOT EXISTS pgcrypto;\n\n-- Use extension functions\nSELECT uuid_generate_v4();  -- from uuid-ossp\nSELECT gen_random_uuid();    -- built-in since PG 13\n\n-- Fuzzy text search with pg_trgm\nSELECT name, similarity(name, 'keybaord') AS sim\nFROM products\nWHERE name % 'keybaord'\nORDER BY sim DESC;\n\n-- View installed extensions\nSELECT * FROM pg_extension;",
       "mysql": "-- MySQL uses plugins instead of extensions\n-- List installed plugins\nSHOW PLUGINS;\n\n-- Install a plugin (example: clone plugin)\nINSTALL PLUGIN clone SONAME 'mysql_clone.so';\n\n-- Common built-in features that require no plugin:\n-- UUID: SELECT UUID();\n-- SHA2: SELECT SHA2('password', 256);",
@@ -38,15 +47,20 @@
       "sqlite": "-- SQLite uses loadable extensions\n-- Enable extension loading\n-- .load /path/to/extension\n\n-- Common built-in extensions (compile-time):\n-- JSON1: json_extract(), json_array(), etc.\n-- FTS5: Full-text search\n-- R*Tree: Spatial indexing\n\n-- Example using JSON1\nSELECT json_extract(data, '$.name') FROM products;"
     },
     "vendorSupport": {
-      "postgresql": { "supported": true, "level": "full", "notes": "PostgreSQL has the richest extension ecosystem with hundreds of available extensions." },
-      "mysql": { "supported": true, "level": "partial", "notes": "MySQL uses plugins and components rather than SQL-level extensions." },
-      "mariadb": { "supported": true, "level": "partial", "notes": "MariaDB uses plugins. Some notable ones: CONNECT engine, Spider engine." },
-      "sqlite": { "supported": true, "level": "partial", "notes": "SQLite supports loadable extensions. Many common ones (JSON1, FTS5) are compiled in by default." }
+      "postgresql": { "supported": true, "level": "full", "notes": "PostgreSQL has the richest extension ecosystem with hundreds of available extensions.", "notesKo": "PostgreSQL은 수백 개의 Extension을 갖춘 가장 풍부한 확장 생태계를 보유하고 있습니다." },
+      "mysql": { "supported": true, "level": "partial", "notes": "MySQL uses plugins and components rather than SQL-level extensions.", "notesKo": "MySQL은 SQL 수준의 Extension 대신 플러그인과 컴포넌트 방식을 사용합니다." },
+      "mariadb": { "supported": true, "level": "partial", "notes": "MariaDB uses plugins. Some notable ones: CONNECT engine, Spider engine.", "notesKo": "MariaDB는 플러그인 방식을 사용합니다. 대표적으로 CONNECT 엔진, Spider 엔진 등이 있습니다." },
+      "sqlite": { "supported": true, "level": "partial", "notes": "SQLite supports loadable extensions. Many common ones (JSON1, FTS5) are compiled in by default.", "notesKo": "SQLite는 로드 가능한 Extension을 지원합니다. JSON1, FTS5 같은 주요 Extension은 기본적으로 내장되어 있습니다." }
     },
     "tips": [
       "Popular PostgreSQL extensions: uuid-ossp (UUIDs), pg_trgm (fuzzy search), PostGIS (spatial), pgcrypto (encryption), pg_stat_statements (query stats).",
       "In PostgreSQL, you need superuser or CREATE privilege on the database to install extensions.",
       "Always check extension compatibility with your database version before installing in production."
+    ],
+    "tipsKo": [
+      "인기 있는 PostgreSQL Extension: uuid-ossp(UUID 생성), pg_trgm(유사 검색), PostGIS(공간 데이터), pgcrypto(암호화), pg_stat_statements(쿼리 통계).",
+      "PostgreSQL에서 Extension을 설치하려면 superuser 권한이나 데이터베이스에 대한 CREATE 권한이 필요합니다.",
+      "운영 환경에 설치하기 전에 반드시 Extension이 사용 중인 데이터베이스 버전과 호환되는지 확인하세요."
     ],
     "relatedItems": ["schema-namespace", "gin-index", "fulltext-index"],
     "seeAlso": []
@@ -56,7 +70,9 @@
     "category": "advanced",
     "name": "Foreign Data Wrapper (FDW)",
     "summary": "A framework for accessing external data sources as if they were local tables.",
+    "summaryKo": "외부 데이터 소스를 마치 로컬 테이블처럼 접근할 수 있게 해주는 프레임워크입니다.",
     "description": "A Foreign Data Wrapper (FDW) is a mechanism that lets you connect to external data sources (other databases, CSV files, web APIs) and query them using standard SQL as if they were local tables. FDWs implement the SQL/MED standard and are the underlying technology behind foreign tables. PostgreSQL has the most mature FDW support.",
+    "descriptionKo": "Foreign Data Wrapper(FDW)는 외부 데이터 소스(다른 데이터베이스, CSV 파일, 웹 API 등)에 연결해서 표준 SQL로 마치 로컬 테이블처럼 조회할 수 있게 해주는 기능입니다. FDW는 SQL/MED 표준을 구현하며, Foreign Table의 기반 기술입니다. PostgreSQL이 가장 성숙한 FDW 지원을 제공합니다.",
     "syntax": {
       "postgresql": "-- Install the postgres_fdw extension\nCREATE EXTENSION postgres_fdw;\n\n-- Create a foreign server\nCREATE SERVER remote_db\n  FOREIGN DATA WRAPPER postgres_fdw\n  OPTIONS (host 'remote-server.example.com', port '5432', dbname 'production');\n\n-- Create user mapping\nCREATE USER MAPPING FOR current_user\n  SERVER remote_db\n  OPTIONS (user 'remote_user', password 'remote_pass');\n\n-- Import tables from the remote schema\nIMPORT FOREIGN SCHEMA public\n  FROM SERVER remote_db\n  INTO local_schema;\n\n-- Or create individual foreign tables\nCREATE FOREIGN TABLE remote_users (\n  id INT,\n  username VARCHAR(50),\n  email VARCHAR(100)\n) SERVER remote_db OPTIONS (table_name 'users');\n\n-- Query as if it's a local table\nSELECT * FROM remote_users WHERE username = 'admin';",
       "mysql": "-- MySQL uses FEDERATED engine for remote table access\n-- The FEDERATED engine must be enabled in the config\nCREATE SERVER remote_db\n  FOREIGN DATA WRAPPER mysql\n  OPTIONS (\n    HOST 'remote-server.example.com',\n    DATABASE 'production',\n    USER 'remote_user',\n    PASSWORD 'remote_pass',\n    PORT 3306\n  );\n\nCREATE TABLE remote_users (\n  id INT,\n  username VARCHAR(50),\n  email VARCHAR(100)\n) ENGINE=FEDERATED\n  CONNECTION='remote_db/users';",
@@ -64,15 +80,20 @@
       "sqlite": null
     },
     "vendorSupport": {
-      "postgresql": { "supported": true, "level": "full", "notes": "PostgreSQL has the most mature FDW ecosystem: postgres_fdw, mysql_fdw, oracle_fdw, file_fdw, redis_fdw, and many more." },
-      "mysql": { "supported": true, "level": "partial", "notes": "MySQL uses the FEDERATED engine, which is more limited than PostgreSQL's FDW framework." },
-      "mariadb": { "supported": true, "level": "partial", "notes": "MariaDB supports FEDERATED and the more powerful CONNECT storage engine for diverse data sources." },
+      "postgresql": { "supported": true, "level": "full", "notes": "PostgreSQL has the most mature FDW ecosystem: postgres_fdw, mysql_fdw, oracle_fdw, file_fdw, redis_fdw, and many more.", "notesKo": "PostgreSQL은 가장 성숙한 FDW 생태계를 보유하고 있습니다: postgres_fdw, mysql_fdw, oracle_fdw, file_fdw, redis_fdw 등 다양한 래퍼를 지원합니다." },
+      "mysql": { "supported": true, "level": "partial", "notes": "MySQL uses the FEDERATED engine, which is more limited than PostgreSQL's FDW framework.", "notesKo": "MySQL은 FEDERATED 엔진을 사용하며, PostgreSQL의 FDW 프레임워크보다 기능이 제한적입니다." },
+      "mariadb": { "supported": true, "level": "partial", "notes": "MariaDB supports FEDERATED and the more powerful CONNECT storage engine for diverse data sources.", "notesKo": "MariaDB는 FEDERATED 엔진과 더 강력한 CONNECT 스토리지 엔진을 지원하여 다양한 데이터 소스에 접근할 수 있습니다." },
       "sqlite": { "supported": false, "level": "none" }
     },
     "tips": [
       "Use IMPORT FOREIGN SCHEMA in PostgreSQL to automatically create foreign tables for all tables in a remote schema.",
       "Be aware of performance — every query on a foreign table involves a network round trip to the remote server.",
       "For read-heavy use cases, consider using materialized views to cache foreign table data locally."
+    ],
+    "tipsKo": [
+      "PostgreSQL에서 IMPORT FOREIGN SCHEMA를 사용하면 원격 Schema의 모든 테이블에 대한 Foreign Table을 자동으로 생성할 수 있습니다.",
+      "성능에 주의하세요. Foreign Table에 대한 모든 쿼리는 원격 서버와의 네트워크 왕복이 필요합니다.",
+      "읽기가 많은 경우에는 Materialized View를 사용하여 Foreign Table 데이터를 로컬에 캐시하는 것을 고려하세요."
     ],
     "relatedItems": ["foreign-table", "extension", "materialized-view"],
     "seeAlso": []
@@ -82,7 +103,9 @@
     "category": "advanced",
     "name": "Tablespace",
     "summary": "A storage location on disk where database objects are physically stored.",
+    "summaryKo": "데이터베이스 객체가 물리적으로 저장되는 디스크 상의 저장 위치입니다.",
     "description": "A tablespace defines a physical location on the filesystem where the database stores tables, indexes, and other objects. By creating tablespaces on different disks or storage systems, you can control where specific data lives. This is useful for performance optimization (fast SSD for hot data, HDD for archives) or for managing storage capacity across multiple drives.",
+    "descriptionKo": "Tablespace는 데이터베이스가 테이블, 인덱스 등의 객체를 저장하는 파일 시스템 상의 물리적 위치를 정의합니다. 서로 다른 디스크나 스토리지에 Tablespace를 만들면 특정 데이터가 어디에 저장될지 제어할 수 있습니다. 이를 통해 성능 최적화(자주 접근하는 데이터는 빠른 SSD에, 오래된 데이터는 HDD에)나 여러 드라이브에 걸친 저장 용량 관리에 활용할 수 있습니다.",
     "syntax": {
       "postgresql": "-- Create a tablespace on a fast SSD\nCREATE TABLESPACE fast_storage\n  LOCATION '/mnt/ssd/pgdata';\n\n-- Create a tablespace on slower, larger storage\nCREATE TABLESPACE archive_storage\n  LOCATION '/mnt/hdd/pgdata';\n\n-- Create a table in a specific tablespace\nCREATE TABLE orders (\n  id SERIAL PRIMARY KEY,\n  user_id INT NOT NULL,\n  total NUMERIC(10, 2)\n) TABLESPACE fast_storage;\n\n-- Move an existing table to a different tablespace\nALTER TABLE orders SET TABLESPACE archive_storage;\n\n-- Create an index in a specific tablespace\nCREATE INDEX idx_orders_user ON orders(user_id) TABLESPACE fast_storage;",
       "mysql": "-- Create a tablespace (InnoDB file-per-table)\nCREATE TABLESPACE my_tablespace\n  ADD DATAFILE 'my_tablespace.ibd'\n  ENGINE = InnoDB;\n\n-- Create a table in the tablespace\nCREATE TABLE orders (\n  id INT AUTO_INCREMENT PRIMARY KEY,\n  user_id INT NOT NULL,\n  total DECIMAL(10, 2)\n) TABLESPACE my_tablespace;",
@@ -91,14 +114,19 @@
     },
     "vendorSupport": {
       "postgresql": { "supported": true, "level": "full" },
-      "mysql": { "supported": true, "level": "partial", "notes": "MySQL supports general tablespaces and file-per-table tablespaces for InnoDB." },
-      "mariadb": { "supported": true, "level": "partial", "notes": "MariaDB supports InnoDB tablespaces." },
-      "sqlite": { "supported": false, "level": "none", "notes": "SQLite stores the entire database in a single file. No tablespace concept exists." }
+      "mysql": { "supported": true, "level": "partial", "notes": "MySQL supports general tablespaces and file-per-table tablespaces for InnoDB.", "notesKo": "MySQL은 InnoDB용 일반 Tablespace와 테이블별 파일 Tablespace를 지원합니다." },
+      "mariadb": { "supported": true, "level": "partial", "notes": "MariaDB supports InnoDB tablespaces.", "notesKo": "MariaDB는 InnoDB Tablespace를 지원합니다." },
+      "sqlite": { "supported": false, "level": "none", "notes": "SQLite stores the entire database in a single file. No tablespace concept exists.", "notesKo": "SQLite는 전체 데이터베이스를 하나의 파일에 저장합니다. Tablespace 개념이 존재하지 않습니다." }
     },
     "tips": [
       "Place frequently accessed tables and indexes on fast SSD storage, and archive data on cheaper HDD storage.",
       "In PostgreSQL, you can place indexes and tables in different tablespaces to optimize I/O patterns.",
       "Monitor tablespace disk usage to prevent running out of space — a full tablespace will cause write failures."
+    ],
+    "tipsKo": [
+      "자주 접근하는 테이블과 인덱스는 빠른 SSD 스토리지에, 오래된 데이터는 저렴한 HDD 스토리지에 배치하세요.",
+      "PostgreSQL에서는 인덱스와 테이블을 서로 다른 Tablespace에 배치하여 I/O 패턴을 최적화할 수 있습니다.",
+      "Tablespace의 디스크 사용량을 모니터링하여 공간 부족을 방지하세요. Tablespace가 가득 차면 쓰기 작업이 실패합니다."
     ],
     "relatedItems": ["table", "btree-index"],
     "seeAlso": []
@@ -108,7 +136,9 @@
     "category": "advanced",
     "name": "Collation",
     "summary": "Rules that determine how text is sorted and compared (e.g., case sensitivity, locale).",
+    "summaryKo": "텍스트를 정렬하고 비교하는 규칙을 정의합니다(예: 대소문자 구분, 로케일).",
     "description": "A collation defines the rules for comparing and sorting text data. It determines whether comparisons are case-sensitive or case-insensitive, how accented characters are handled, and the sort order for different languages. For example, in German, 'ae' might sort differently than in English. Choosing the right collation is important for internationalized applications.",
+    "descriptionKo": "Collation은 텍스트 데이터를 비교하고 정렬하는 규칙을 정의합니다. 비교 시 대소문자를 구분할지, 악센트 문자를 어떻게 처리할지, 언어별로 정렬 순서를 어떻게 할지 등을 결정합니다. 예를 들어 독일어에서 'ae'의 정렬 순서는 영어와 다를 수 있습니다. 다국어를 지원하는 애플리케이션에서는 적절한 Collation 선택이 중요합니다.",
     "syntax": {
       "postgresql": "-- Create a table with a specific collation\nCREATE TABLE products (\n  id SERIAL PRIMARY KEY,\n  name VARCHAR(100) COLLATE \"en_US.utf8\" NOT NULL,\n  name_ci VARCHAR(100) COLLATE \"en-US-x-icu\" NOT NULL  -- ICU collation\n);\n\n-- Case-insensitive collation per query\nSELECT * FROM products\nWHERE name COLLATE \"en-x-icu\" = 'keyboard';\n\n-- Create a custom collation\nCREATE COLLATION case_insensitive (\n  PROVIDER = icu,\n  LOCALE = 'und-u-ks-level2',\n  DETERMINISTIC = FALSE\n);\n\n-- List available collations\nSELECT collname, collprovider FROM pg_collation LIMIT 20;",
       "mysql": "-- Create a table with a specific collation\nCREATE TABLE products (\n  id INT AUTO_INCREMENT PRIMARY KEY,\n  name VARCHAR(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL\n);\n\n-- Case-insensitive comparison (default with _ci collation)\nSELECT * FROM products WHERE name = 'Keyboard';  -- matches 'keyboard', 'KEYBOARD'\n\n-- Case-sensitive comparison\nSELECT * FROM products WHERE name COLLATE utf8mb4_bin = 'Keyboard';\n\n-- Show available collations\nSHOW COLLATION WHERE Charset = 'utf8mb4';",
@@ -116,15 +146,20 @@
       "sqlite": "-- SQLite has limited collation support\n-- Built-in collations: BINARY, NOCASE, RTRIM\n\nCREATE TABLE products (\n  id INTEGER PRIMARY KEY AUTOINCREMENT,\n  name TEXT COLLATE NOCASE NOT NULL\n);\n\n-- Case-insensitive comparison with NOCASE\nSELECT * FROM products WHERE name = 'keyboard';  -- matches 'Keyboard', 'KEYBOARD'"
     },
     "vendorSupport": {
-      "postgresql": { "supported": true, "level": "full", "notes": "PostgreSQL supports ICU collations (since PG 10) and OS-provided collations." },
+      "postgresql": { "supported": true, "level": "full", "notes": "PostgreSQL supports ICU collations (since PG 10) and OS-provided collations.", "notesKo": "PostgreSQL은 ICU Collation(PG 10부터)과 운영체제 제공 Collation을 지원합니다." },
       "mysql": { "supported": true, "level": "full" },
       "mariadb": { "supported": true, "level": "full" },
-      "sqlite": { "supported": true, "level": "partial", "notes": "SQLite only supports BINARY, NOCASE, and RTRIM built-in collations. Custom collations require the C API." }
+      "sqlite": { "supported": true, "level": "partial", "notes": "SQLite only supports BINARY, NOCASE, and RTRIM built-in collations. Custom collations require the C API.", "notesKo": "SQLite는 BINARY, NOCASE, RTRIM 세 가지 내장 Collation만 지원합니다. 커스텀 Collation을 만들려면 C API가 필요합니다." }
     },
     "tips": [
       "Use utf8mb4_unicode_ci in MySQL/MariaDB for case-insensitive, accent-insensitive comparisons — it handles most languages correctly.",
       "In PostgreSQL, use ICU collations (provider = icu) for consistent cross-platform behavior.",
       "Collation affects index ordering — changing a column's collation may require rebuilding its indexes."
+    ],
+    "tipsKo": [
+      "MySQL/MariaDB에서 대소문자와 악센트를 구분하지 않는 비교가 필요하면 utf8mb4_unicode_ci를 사용하세요. 대부분의 언어를 올바르게 처리합니다.",
+      "PostgreSQL에서는 플랫폼 간 일관된 동작을 위해 ICU Collation(provider = icu)을 사용하세요.",
+      "Collation은 인덱스 정렬 순서에 영향을 줍니다. 컬럼의 Collation을 변경하면 해당 인덱스를 다시 만들어야 할 수 있습니다."
     ],
     "relatedItems": ["data-type", "btree-index", "extension"],
     "seeAlso": []
@@ -134,7 +169,9 @@
     "category": "advanced",
     "name": "Rule",
     "summary": "A mechanism that rewrites a SQL query into a different query before execution.",
+    "summaryKo": "SQL 쿼리를 실행 전에 다른 쿼리로 변환하는 메커니즘입니다.",
     "description": "A rule is a PostgreSQL-specific feature that intercepts a SQL command and rewrites it into one or more alternative commands before execution. Rules are used internally to implement views (a SELECT on a view is rewritten to execute the view's query). While rules can also be used to make views updatable or redirect writes, triggers are generally preferred for most use cases.",
+    "descriptionKo": "Rule은 PostgreSQL 전용 기능으로, SQL 명령을 가로채서 실행 전에 하나 이상의 다른 명령으로 변환합니다. 내부적으로 View를 구현하는 데 사용됩니다(View에 대한 SELECT는 View의 쿼리를 실행하도록 변환됨). Rule을 사용하면 View를 업데이트 가능하게 만들거나 쓰기를 리다이렉트할 수도 있지만, 대부분의 경우에는 Trigger를 사용하는 것이 권장됩니다.",
     "syntax": {
       "postgresql": "-- Create a view using a rule (implicit - this is how views work internally)\nCREATE VIEW active_users AS SELECT * FROM users WHERE status = 'active';\n\n-- Create a rule to redirect INSERTs on a view\nCREATE RULE insert_active_user AS\n  ON INSERT TO active_users\n  DO INSTEAD\n    INSERT INTO users (username, email, status)\n    VALUES (NEW.username, NEW.email, 'active');\n\n-- Create a rule to log deletions\nCREATE RULE log_user_delete AS\n  ON DELETE TO users\n  DO ALSO\n    INSERT INTO deleted_users_log (user_id, deleted_at)\n    VALUES (OLD.id, NOW());\n\n-- DO INSTEAD replaces the original command\n-- DO ALSO runs in addition to the original command",
       "mysql": null,
@@ -143,14 +180,19 @@
     },
     "vendorSupport": {
       "postgresql": { "supported": true, "level": "full" },
-      "mysql": { "supported": false, "level": "none", "notes": "MySQL does not support rules. Use triggers instead." },
-      "mariadb": { "supported": false, "level": "none", "notes": "MariaDB does not support rules. Use triggers instead." },
-      "sqlite": { "supported": false, "level": "none", "notes": "SQLite does not support rules. Use triggers instead." }
+      "mysql": { "supported": false, "level": "none", "notes": "MySQL does not support rules. Use triggers instead.", "notesKo": "MySQL은 Rule을 지원하지 않습니다. 대신 Trigger를 사용하세요." },
+      "mariadb": { "supported": false, "level": "none", "notes": "MariaDB does not support rules. Use triggers instead.", "notesKo": "MariaDB는 Rule을 지원하지 않습니다. 대신 Trigger를 사용하세요." },
+      "sqlite": { "supported": false, "level": "none", "notes": "SQLite does not support rules. Use triggers instead.", "notesKo": "SQLite는 Rule을 지원하지 않습니다. 대신 Trigger를 사용하세요." }
     },
     "tips": [
       "Rules are a PostgreSQL-specific feature — prefer triggers for portability across database vendors.",
       "The PostgreSQL documentation recommends using INSTEAD OF triggers rather than rules for making views updatable.",
       "Rules operate at the query rewriting level (before planning), while triggers operate at the row execution level — this is an important distinction for complex scenarios."
+    ],
+    "tipsKo": [
+      "Rule은 PostgreSQL 전용 기능입니다. 여러 데이터베이스 간 이식성을 위해서는 Trigger를 사용하는 것이 좋습니다.",
+      "PostgreSQL 공식 문서에서도 View를 업데이트 가능하게 만들 때는 Rule 대신 INSTEAD OF Trigger를 권장합니다.",
+      "Rule은 쿼리 변환 단계(실행 계획 수립 전)에서 동작하고, Trigger는 행 실행 단계에서 동작합니다. 복잡한 시나리오에서는 이 차이를 이해하는 것이 중요합니다."
     ],
     "relatedItems": ["regular-view", "updatable-view", "row-trigger"],
     "seeAlso": []

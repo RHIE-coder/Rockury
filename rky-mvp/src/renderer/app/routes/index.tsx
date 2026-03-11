@@ -58,8 +58,10 @@ export function AppRouter() {
             <Route path="query-collection" element={<QueryCollectionPage />} />
             <Route path="seed" element={<SeedCapturePage />} />
             <Route path="validation-run" element={<ValidationRunPage />} />
-            <Route path="reference" element={<DbReferencePage />} />
           </Route>
+
+          {/* Reference */}
+          <Route path="reference" element={<DbReferencePage />} />
         </Route>
 
         {/* Placeholder Services */}

@@ -4,7 +4,9 @@
     "category": "partitioning",
     "name": "Range Partitioning",
     "summary": "Divides a table into partitions based on a range of values (e.g., date ranges).",
+    "summaryKo": "값의 범위(예: 날짜 범위)를 기준으로 테이블을 파티션으로 나눕니다.",
     "description": "Range partitioning splits a table into smaller partitions where each partition holds rows within a specific range of values. The most common use case is partitioning by date — for example, one partition per month or year. This dramatically improves query performance on large tables because the database only scans relevant partitions instead of the entire table.",
+    "descriptionKo": "Range partitioning은 테이블을 특정 값 범위별로 작은 파티션들로 나누는 방식입니다. 가장 흔한 사용 사례는 날짜 기준 파티셔닝으로, 예를 들어 월별 또는 연도별로 하나의 파티션을 만듭니다. 대용량 테이블에서 데이터베이스가 전체 테이블 대신 필요한 파티션만 스캔하기 때문에 쿼리 성능이 크게 향상됩니다.",
     "syntax": {
       "postgresql": "-- Create a range-partitioned table by date\nCREATE TABLE orders (\n  id SERIAL,\n  user_id INT NOT NULL,\n  total NUMERIC(10, 2) NOT NULL,\n  created_at TIMESTAMPTZ NOT NULL\n) PARTITION BY RANGE (created_at);\n\n-- Create partitions\nCREATE TABLE orders_2025_q1 PARTITION OF orders\n  FOR VALUES FROM ('2025-01-01') TO ('2025-04-01');\n\nCREATE TABLE orders_2025_q2 PARTITION OF orders\n  FOR VALUES FROM ('2025-04-01') TO ('2025-07-01');\n\nCREATE TABLE orders_2025_q3 PARTITION OF orders\n  FOR VALUES FROM ('2025-07-01') TO ('2025-10-01');\n\nCREATE TABLE orders_2025_q4 PARTITION OF orders\n  FOR VALUES FROM ('2025-10-01') TO ('2026-01-01');",
       "mysql": "-- Create a range-partitioned table by year\nCREATE TABLE orders (\n  id INT AUTO_INCREMENT,\n  user_id INT NOT NULL,\n  total DECIMAL(10, 2) NOT NULL,\n  created_at DATETIME NOT NULL,\n  PRIMARY KEY (id, created_at)\n) PARTITION BY RANGE (YEAR(created_at)) (\n  PARTITION p2023 VALUES LESS THAN (2024),\n  PARTITION p2024 VALUES LESS THAN (2025),\n  PARTITION p2025 VALUES LESS THAN (2026),\n  PARTITION p_future VALUES LESS THAN MAXVALUE\n);",
@@ -15,12 +17,17 @@
       "postgresql": { "supported": true, "level": "full" },
       "mysql": { "supported": true, "level": "full" },
       "mariadb": { "supported": true, "level": "full" },
-      "sqlite": { "supported": false, "level": "none", "notes": "SQLite does not support table partitioning." }
+      "sqlite": { "supported": false, "level": "none", "notes": "SQLite does not support table partitioning.", "notesKo": "SQLite는 테이블 파티셔닝을 지원하지 않습니다." }
     },
     "tips": [
       "Always include the partition key in your WHERE clause — otherwise the database must scan all partitions.",
       "In MySQL/MariaDB, the partition key must be part of the PRIMARY KEY or any UNIQUE index.",
       "Create new partitions in advance (e.g., next quarter) to avoid insert failures when data falls outside existing ranges."
+    ],
+    "tipsKo": [
+      "WHERE 절에 반드시 파티션 키를 포함하세요. 그렇지 않으면 데이터베이스가 모든 파티션을 스캔해야 합니다.",
+      "MySQL/MariaDB에서는 파티션 키가 PRIMARY KEY 또는 UNIQUE 인덱스에 반드시 포함되어야 합니다.",
+      "데이터가 기존 범위를 벗어날 때 INSERT 실패를 방지하려면 새 파티션을 미리 만들어 두세요 (예: 다음 분기)."
     ],
     "relatedItems": ["list-partition", "hash-partition", "declarative-partition"],
     "seeAlso": []
@@ -30,7 +37,9 @@
     "category": "partitioning",
     "name": "List Partitioning",
     "summary": "Divides a table into partitions based on a list of specific values.",
+    "summaryKo": "특정 값 목록을 기준으로 테이블을 파티션으로 나눕니다.",
     "description": "List partitioning splits a table into partitions where each partition holds rows matching specific discrete values. This is ideal for columns with a known, finite set of values like country codes, status values, or categories. Each value is assigned to exactly one partition, and rows are routed automatically based on the partition key.",
+    "descriptionKo": "List partitioning은 각 파티션이 특정 개별 값과 일치하는 행을 보관하도록 테이블을 나누는 방식입니다. 국가 코드, 상태 값, 카테고리처럼 알려진 유한한 값 집합을 가진 컬럼에 이상적입니다. 각 값은 정확히 하나의 파티션에 할당되며, 파티션 키를 기준으로 행이 자동으로 라우팅됩니다.",
     "syntax": {
       "postgresql": "-- Create a list-partitioned table by region\nCREATE TABLE orders (\n  id SERIAL,\n  user_id INT NOT NULL,\n  total NUMERIC(10, 2) NOT NULL,\n  region VARCHAR(20) NOT NULL\n) PARTITION BY LIST (region);\n\nCREATE TABLE orders_asia PARTITION OF orders\n  FOR VALUES IN ('KR', 'JP', 'CN', 'SG');\n\nCREATE TABLE orders_europe PARTITION OF orders\n  FOR VALUES IN ('DE', 'FR', 'UK', 'NL');\n\nCREATE TABLE orders_americas PARTITION OF orders\n  FOR VALUES IN ('US', 'CA', 'BR', 'MX');\n\n-- Default partition for unmatched values\nCREATE TABLE orders_other PARTITION OF orders DEFAULT;",
       "mysql": "-- Create a list-partitioned table by region_id\nCREATE TABLE orders (\n  id INT AUTO_INCREMENT,\n  user_id INT NOT NULL,\n  total DECIMAL(10, 2) NOT NULL,\n  region_id INT NOT NULL,\n  PRIMARY KEY (id, region_id)\n) PARTITION BY LIST (region_id) (\n  PARTITION p_asia VALUES IN (1, 2, 3, 4),\n  PARTITION p_europe VALUES IN (5, 6, 7, 8),\n  PARTITION p_americas VALUES IN (9, 10, 11, 12)\n);",
@@ -39,14 +48,19 @@
     },
     "vendorSupport": {
       "postgresql": { "supported": true, "level": "full" },
-      "mysql": { "supported": true, "level": "partial", "notes": "MySQL list partitioning only supports integer expressions, not string values directly." },
-      "mariadb": { "supported": true, "level": "partial", "notes": "MariaDB list partitioning only supports integer expressions." },
+      "mysql": { "supported": true, "level": "partial", "notes": "MySQL list partitioning only supports integer expressions, not string values directly.", "notesKo": "MySQL의 List partitioning은 정수 표현식만 지원하며, 문자열 값을 직접 사용할 수 없습니다." },
+      "mariadb": { "supported": true, "level": "partial", "notes": "MariaDB list partitioning only supports integer expressions.", "notesKo": "MariaDB의 List partitioning은 정수 표현식만 지원합니다." },
       "sqlite": { "supported": false, "level": "none" }
     },
     "tips": [
       "Always create a DEFAULT partition (PostgreSQL) to catch rows that don't match any defined list — otherwise inserts will fail.",
       "List partitioning works best when the number of distinct values is small and stable (e.g., regions, categories).",
       "In MySQL/MariaDB, use integer mappings for list partitions since string-based list partitioning is not supported."
+    ],
+    "tipsKo": [
+      "PostgreSQL에서는 항상 DEFAULT 파티션을 만들어 정의된 목록에 일치하지 않는 행을 받아 주세요. 그렇지 않으면 INSERT가 실패합니다.",
+      "List partitioning은 고유 값의 수가 적고 안정적인 경우(예: 지역, 카테고리)에 가장 효과적입니다.",
+      "MySQL/MariaDB에서는 문자열 기반 List partitioning을 지원하지 않으므로 정수 매핑을 사용하세요."
     ],
     "relatedItems": ["range-partition", "hash-partition", "declarative-partition"],
     "seeAlso": []
@@ -56,7 +70,9 @@
     "category": "partitioning",
     "name": "Hash Partitioning",
     "summary": "Distributes rows evenly across partitions using a hash function.",
+    "summaryKo": "해시 함수를 사용하여 행을 파티션에 균등하게 분배합니다.",
     "description": "Hash partitioning divides rows across partitions by applying a hash function to the partition key. This distributes data evenly regardless of the actual values, which is useful when there is no natural range or list to partition by. Hash partitioning is ideal for spreading workload evenly and avoiding hotspots in tables with high write volumes.",
+    "descriptionKo": "Hash partitioning은 파티션 키에 해시 함수를 적용하여 행을 여러 파티션에 나누는 방식입니다. 실제 값에 관계없이 데이터를 균등하게 분배하므로, 자연스러운 범위나 목록이 없는 경우에 유용합니다. 쓰기 작업이 많은 테이블에서 부하를 고르게 분산하고 핫스팟을 방지하는 데 이상적입니다.",
     "syntax": {
       "postgresql": "-- Create a hash-partitioned table\nCREATE TABLE orders (\n  id SERIAL,\n  user_id INT NOT NULL,\n  total NUMERIC(10, 2) NOT NULL,\n  created_at TIMESTAMPTZ NOT NULL\n) PARTITION BY HASH (id);\n\n-- Create 4 hash partitions\nCREATE TABLE orders_p0 PARTITION OF orders FOR VALUES WITH (MODULUS 4, REMAINDER 0);\nCREATE TABLE orders_p1 PARTITION OF orders FOR VALUES WITH (MODULUS 4, REMAINDER 1);\nCREATE TABLE orders_p2 PARTITION OF orders FOR VALUES WITH (MODULUS 4, REMAINDER 2);\nCREATE TABLE orders_p3 PARTITION OF orders FOR VALUES WITH (MODULUS 4, REMAINDER 3);",
       "mysql": "-- Create a hash-partitioned table with 4 partitions\nCREATE TABLE orders (\n  id INT AUTO_INCREMENT,\n  user_id INT NOT NULL,\n  total DECIMAL(10, 2) NOT NULL,\n  created_at DATETIME NOT NULL,\n  PRIMARY KEY (id)\n) PARTITION BY HASH (id)\n  PARTITIONS 4;",
@@ -74,6 +90,11 @@
       "Hash partitioning does not support partition pruning for range queries — only equality lookups on the hash key benefit.",
       "Use hash partitioning when data has no natural range or grouping and you simply want to spread load evenly."
     ],
+    "tipsKo": [
+      "가장 균등한 분배를 위해 파티션 수를 2의 거듭제곱(4, 8, 16)으로 설정하세요.",
+      "Hash partitioning은 범위 쿼리에 대한 파티션 프루닝을 지원하지 않습니다. 해시 키에 대한 동등(=) 조건 조회만 이점이 있습니다.",
+      "데이터에 자연스러운 범위나 그룹이 없고 부하를 고르게 분산하고 싶을 때 Hash partitioning을 사용하세요."
+    ],
     "relatedItems": ["range-partition", "list-partition", "declarative-partition"],
     "seeAlso": []
   },
@@ -82,7 +103,9 @@
     "category": "partitioning",
     "name": "Sub-Partitioning",
     "summary": "Divides partitions further into smaller sub-partitions using a second partitioning strategy.",
+    "summaryKo": "두 번째 파티셔닝 전략을 사용하여 파티션을 더 작은 서브 파티션으로 나눕니다.",
     "description": "Sub-partitioning (also called composite partitioning) applies a second level of partitioning within each partition. For example, you could range-partition by year and then hash-partition each year's data for even distribution. Sub-partitioning is useful for very large tables where a single level of partitioning is not granular enough.",
+    "descriptionKo": "Sub-partitioning(복합 파티셔닝이라고도 함)은 각 파티션 내부에 두 번째 수준의 파티셔닝을 적용하는 방식입니다. 예를 들어, 연도별로 Range partition을 하고 각 연도의 데이터를 Hash partition으로 균등하게 분배할 수 있습니다. 단일 수준의 파티셔닝으로는 충분히 세분화되지 않는 매우 큰 테이블에 유용합니다.",
     "syntax": {
       "postgresql": "-- Range partition by year, then list sub-partition by region\nCREATE TABLE orders (\n  id SERIAL,\n  user_id INT NOT NULL,\n  region VARCHAR(20) NOT NULL,\n  created_at TIMESTAMPTZ NOT NULL\n) PARTITION BY RANGE (created_at);\n\n-- Create a partition for 2025, sub-partitioned by region\nCREATE TABLE orders_2025 PARTITION OF orders\n  FOR VALUES FROM ('2025-01-01') TO ('2026-01-01')\n  PARTITION BY LIST (region);\n\nCREATE TABLE orders_2025_asia PARTITION OF orders_2025\n  FOR VALUES IN ('KR', 'JP', 'CN');\n\nCREATE TABLE orders_2025_europe PARTITION OF orders_2025\n  FOR VALUES IN ('DE', 'FR', 'UK');",
       "mysql": "-- Range partition by year, hash sub-partition\nCREATE TABLE orders (\n  id INT AUTO_INCREMENT,\n  user_id INT NOT NULL,\n  total DECIMAL(10, 2) NOT NULL,\n  created_at DATETIME NOT NULL,\n  PRIMARY KEY (id, created_at)\n) PARTITION BY RANGE (YEAR(created_at))\n  SUBPARTITION BY HASH (id)\n  SUBPARTITIONS 4 (\n    PARTITION p2024 VALUES LESS THAN (2025),\n    PARTITION p2025 VALUES LESS THAN (2026),\n    PARTITION p_future VALUES LESS THAN MAXVALUE\n  );",
@@ -90,15 +113,20 @@
       "sqlite": null
     },
     "vendorSupport": {
-      "postgresql": { "supported": true, "level": "full", "notes": "PostgreSQL supports multi-level partitioning by creating partitions that are themselves partitioned." },
-      "mysql": { "supported": true, "level": "partial", "notes": "MySQL supports sub-partitioning with HASH or KEY only as the sub-partition strategy." },
-      "mariadb": { "supported": true, "level": "partial", "notes": "MariaDB supports sub-partitioning with HASH or KEY only as the sub-partition strategy." },
+      "postgresql": { "supported": true, "level": "full", "notes": "PostgreSQL supports multi-level partitioning by creating partitions that are themselves partitioned.", "notesKo": "PostgreSQL은 파티션 자체를 다시 파티셔닝하는 방식으로 다단계 파티셔닝을 지원합니다." },
+      "mysql": { "supported": true, "level": "partial", "notes": "MySQL supports sub-partitioning with HASH or KEY only as the sub-partition strategy.", "notesKo": "MySQL은 서브 파티션 전략으로 HASH 또는 KEY만 지원합니다." },
+      "mariadb": { "supported": true, "level": "partial", "notes": "MariaDB supports sub-partitioning with HASH or KEY only as the sub-partition strategy.", "notesKo": "MariaDB는 서브 파티션 전략으로 HASH 또는 KEY만 지원합니다." },
       "sqlite": { "supported": false, "level": "none" }
     },
     "tips": [
       "Use sub-partitioning only when a single level of partitioning creates partitions that are still too large.",
       "In MySQL/MariaDB, the sub-partition strategy must be HASH or KEY — you cannot use RANGE or LIST for sub-partitions.",
       "Too many sub-partitions can lead to management complexity — keep the total number of partitions manageable."
+    ],
+    "tipsKo": [
+      "단일 수준의 파티셔닝으로 만든 파티션이 여전히 너무 클 때만 Sub-partitioning을 사용하세요.",
+      "MySQL/MariaDB에서 서브 파티션 전략은 HASH 또는 KEY여야 합니다. RANGE나 LIST는 서브 파티션에 사용할 수 없습니다.",
+      "서브 파티션이 너무 많으면 관리가 복잡해질 수 있습니다. 전체 파티션 수를 관리 가능한 수준으로 유지하세요."
     ],
     "relatedItems": ["range-partition", "list-partition", "hash-partition"],
     "seeAlso": []
@@ -108,7 +136,9 @@
     "category": "partitioning",
     "name": "Declarative Partitioning",
     "summary": "A modern syntax for defining partitioned tables declaratively in the CREATE TABLE statement.",
+    "summaryKo": "CREATE TABLE 문에서 선언적으로 파티션 테이블을 정의하는 최신 문법입니다.",
     "description": "Declarative partitioning is the modern, built-in approach to partitioning where you define the partitioning strategy directly in the CREATE TABLE statement. The database automatically routes rows to the correct partition based on the partition key. This replaced the older inheritance-based partitioning (PostgreSQL) and is now the recommended approach across all databases that support partitioning.",
+    "descriptionKo": "Declarative partitioning은 CREATE TABLE 문에서 파티셔닝 전략을 직접 정의하는 최신 내장 방식입니다. 데이터베이스가 파티션 키를 기준으로 자동으로 행을 올바른 파티션에 라우팅합니다. 이 방식은 PostgreSQL의 기존 상속 기반 파티셔닝을 대체했으며, 현재 파티셔닝을 지원하는 모든 데이터베이스에서 권장되는 접근 방식입니다.",
     "syntax": {
       "postgresql": "-- Declarative partitioning (PostgreSQL 10+)\nCREATE TABLE orders (\n  id SERIAL,\n  user_id INT NOT NULL,\n  total NUMERIC(10, 2) NOT NULL,\n  created_at TIMESTAMPTZ NOT NULL\n) PARTITION BY RANGE (created_at);\n\n-- Partitions are managed declaratively\nCREATE TABLE orders_2025_q1 PARTITION OF orders\n  FOR VALUES FROM ('2025-01-01') TO ('2025-04-01');\n\n-- Attach an existing table as a partition\nALTER TABLE orders ATTACH PARTITION orders_archive\n  FOR VALUES FROM ('2020-01-01') TO ('2025-01-01');\n\n-- Detach a partition\nALTER TABLE orders DETACH PARTITION orders_2025_q1;",
       "mysql": "-- Declarative partitioning in MySQL\nCREATE TABLE orders (\n  id INT AUTO_INCREMENT,\n  user_id INT NOT NULL,\n  total DECIMAL(10, 2) NOT NULL,\n  created_at DATETIME NOT NULL,\n  PRIMARY KEY (id, created_at)\n) PARTITION BY RANGE (YEAR(created_at)) (\n  PARTITION p2024 VALUES LESS THAN (2025),\n  PARTITION p2025 VALUES LESS THAN (2026),\n  PARTITION p_future VALUES LESS THAN MAXVALUE\n);\n\n-- Add a new partition\nALTER TABLE orders ADD PARTITION (PARTITION p2026 VALUES LESS THAN (2027));\n\n-- Drop a partition (deletes its data)\nALTER TABLE orders DROP PARTITION p2024;",
@@ -116,7 +146,7 @@
       "sqlite": null
     },
     "vendorSupport": {
-      "postgresql": { "supported": true, "level": "full", "notes": "Declarative partitioning was introduced in PostgreSQL 10 and has been enhanced in every subsequent version." },
+      "postgresql": { "supported": true, "level": "full", "notes": "Declarative partitioning was introduced in PostgreSQL 10 and has been enhanced in every subsequent version.", "notesKo": "Declarative partitioning은 PostgreSQL 10에서 도입되었으며, 이후 모든 버전에서 지속적으로 개선되고 있습니다." },
       "mysql": { "supported": true, "level": "full" },
       "mariadb": { "supported": true, "level": "full" },
       "sqlite": { "supported": false, "level": "none" }
@@ -125,6 +155,11 @@
       "PostgreSQL's DETACH PARTITION is great for archiving — detach old partitions and move them to cheaper storage.",
       "Always plan your partition key carefully — changing the partition strategy later requires recreating the table.",
       "Partition pruning (skipping irrelevant partitions) only works if the WHERE clause includes the partition key."
+    ],
+    "tipsKo": [
+      "PostgreSQL의 DETACH PARTITION은 아카이빙에 유용합니다. 오래된 파티션을 분리하여 저렴한 스토리지로 옮길 수 있습니다.",
+      "파티션 키는 신중하게 계획하세요. 나중에 파티셔닝 전략을 변경하려면 테이블을 다시 만들어야 합니다.",
+      "파티션 프루닝(관련 없는 파티션 건너뛰기)은 WHERE 절에 파티션 키가 포함된 경우에만 작동합니다."
     ],
     "relatedItems": ["range-partition", "list-partition", "hash-partition", "sub-partition"],
     "seeAlso": []

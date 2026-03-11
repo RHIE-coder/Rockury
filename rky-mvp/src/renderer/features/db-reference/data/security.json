@@ -4,7 +4,9 @@
     "category": "security",
     "name": "Role",
     "summary": "A database identity that defines access permissions and can represent a user or a group.",
+    "summaryKo": "데이터베이스에서 접근 권한을 정의하는 신원(identity)으로, 사용자 또는 그룹을 나타낼 수 있습니다.",
     "description": "A role is a database-level identity that controls who can do what. Roles can represent individual users (with login capability) or groups of permissions (without login). You can grant privileges to roles and then assign roles to other roles, creating a flexible permission hierarchy. Roles are the foundation of database security.",
+    "descriptionKo": "Role은 데이터베이스에서 '누가 무엇을 할 수 있는지'를 제어하는 신원입니다. Role은 개별 사용자(로그인 가능)를 나타낼 수도 있고, 권한 묶음(로그인 불가)을 나타낼 수도 있습니다. Role에 권한을 부여하고, 다른 Role에 해당 Role을 할당하면 유연한 권한 계층 구조를 만들 수 있습니다. Role은 데이터베이스 보안의 기본 토대입니다.",
     "syntax": {
       "postgresql": "-- Create a login role (user)\nCREATE ROLE app_user WITH LOGIN PASSWORD 'secure_password';\n\n-- Create a group role (no login)\nCREATE ROLE readonly_group;\n\n-- Grant privileges to the group\nGRANT SELECT ON ALL TABLES IN SCHEMA public TO readonly_group;\n\n-- Add a user to the group\nGRANT readonly_group TO app_user;\n\n-- Create a superuser\nCREATE ROLE admin WITH LOGIN PASSWORD 'admin_pass' SUPERUSER;",
       "mysql": "-- Create a user\nCREATE USER 'app_user'@'%' IDENTIFIED BY 'secure_password';\n\n-- Create a role (MySQL 8.0+)\nCREATE ROLE 'readonly_role';\n\n-- Grant privileges to the role\nGRANT SELECT ON testdb.* TO 'readonly_role';\n\n-- Assign role to user\nGRANT 'readonly_role' TO 'app_user'@'%';\n\n-- Activate the role\nSET DEFAULT ROLE 'readonly_role' TO 'app_user'@'%';",
@@ -12,15 +14,20 @@
       "sqlite": null
     },
     "vendorSupport": {
-      "postgresql": { "supported": true, "level": "full", "notes": "In PostgreSQL, users and groups are both roles — the difference is whether LOGIN is granted." },
-      "mysql": { "supported": true, "level": "full", "notes": "Roles were added in MySQL 8.0. Users and roles are separate concepts." },
-      "mariadb": { "supported": true, "level": "full", "notes": "Roles were added in MariaDB 10.0.5." },
-      "sqlite": { "supported": false, "level": "none", "notes": "SQLite has no user/role system. Access control must be handled at the application or filesystem level." }
+      "postgresql": { "supported": true, "level": "full", "notes": "In PostgreSQL, users and groups are both roles — the difference is whether LOGIN is granted.", "notesKo": "PostgreSQL에서는 사용자와 그룹 모두 Role입니다. 차이점은 LOGIN 권한이 있는지 여부뿐입니다." },
+      "mysql": { "supported": true, "level": "full", "notes": "Roles were added in MySQL 8.0. Users and roles are separate concepts.", "notesKo": "Role은 MySQL 8.0에서 추가되었습니다. 사용자와 Role은 별개의 개념입니다." },
+      "mariadb": { "supported": true, "level": "full", "notes": "Roles were added in MariaDB 10.0.5.", "notesKo": "Role은 MariaDB 10.0.5에서 추가되었습니다." },
+      "sqlite": { "supported": false, "level": "none", "notes": "SQLite has no user/role system. Access control must be handled at the application or filesystem level.", "notesKo": "SQLite에는 사용자/Role 시스템이 없습니다. 접근 제어는 애플리케이션이나 파일 시스템 수준에서 처리해야 합니다." }
     },
     "tips": [
       "Follow the principle of least privilege — grant only the minimum permissions needed for each role.",
       "Use group roles to manage permissions centrally, then assign users to groups instead of granting permissions individually.",
       "In MySQL, roles must be activated with SET DEFAULT ROLE — otherwise the user won't inherit the role's privileges."
+    ],
+    "tipsKo": [
+      "최소 권한 원칙을 따르세요 — 각 Role에 꼭 필요한 최소한의 권한만 부여합니다.",
+      "그룹 Role을 사용해서 권한을 중앙에서 관리하고, 개별 사용자에게 직접 권한을 주는 대신 그룹에 할당하세요.",
+      "MySQL에서는 SET DEFAULT ROLE로 Role을 활성화해야 합니다. 그렇지 않으면 사용자가 해당 Role의 권한을 물려받지 못합니다."
     ],
     "relatedItems": ["grant", "rls", "policy"],
     "seeAlso": []
@@ -30,7 +37,9 @@
     "category": "security",
     "name": "Row-Level Security (RLS)",
     "summary": "Restricts which rows a user can see or modify based on security policies.",
+    "summaryKo": "보안 정책에 따라 사용자가 볼 수 있거나 수정할 수 있는 행을 제한합니다.",
     "description": "Row-Level Security (RLS) allows you to control access to individual rows in a table based on the user or role executing the query. When RLS is enabled, even a SELECT * query will only return rows that the user is allowed to see. This is powerful for multi-tenant applications where different customers share the same table but should only see their own data.",
+    "descriptionKo": "Row-Level Security(RLS)는 쿼리를 실행하는 사용자나 Role에 따라 테이블의 개별 행에 대한 접근을 제어할 수 있게 해줍니다. RLS가 활성화되면 SELECT * 쿼리를 실행해도 해당 사용자가 볼 수 있는 행만 반환됩니다. 이 기능은 여러 고객이 같은 테이블을 공유하지만 자기 데이터만 볼 수 있어야 하는 멀티 테넌트 애플리케이션에서 매우 유용합니다.",
     "syntax": {
       "postgresql": "-- Enable RLS on a table\nALTER TABLE orders ENABLE ROW LEVEL SECURITY;\n\n-- Create a policy: users can only see their own orders\nCREATE POLICY user_orders_policy ON orders\n  FOR SELECT\n  USING (user_id = current_setting('app.current_user_id')::INT);\n\n-- Create a policy: users can only insert orders for themselves\nCREATE POLICY user_insert_policy ON orders\n  FOR INSERT\n  WITH CHECK (user_id = current_setting('app.current_user_id')::INT);\n\n-- Set the current user context\nSET app.current_user_id = '42';\n\n-- Now SELECT * FROM orders only returns orders for user 42",
       "mysql": null,
@@ -39,14 +48,19 @@
     },
     "vendorSupport": {
       "postgresql": { "supported": true, "level": "full" },
-      "mysql": { "supported": false, "level": "none", "notes": "MySQL does not support RLS. Implement row-level filtering in application code or using views." },
-      "mariadb": { "supported": false, "level": "none", "notes": "MariaDB does not support RLS. Use views or application-level filtering." },
-      "sqlite": { "supported": false, "level": "none", "notes": "SQLite does not support RLS." }
+      "mysql": { "supported": false, "level": "none", "notes": "MySQL does not support RLS. Implement row-level filtering in application code or using views.", "notesKo": "MySQL은 RLS를 지원하지 않습니다. 애플리케이션 코드나 View를 사용해서 행 수준 필터링을 구현하세요." },
+      "mariadb": { "supported": false, "level": "none", "notes": "MariaDB does not support RLS. Use views or application-level filtering.", "notesKo": "MariaDB는 RLS를 지원하지 않습니다. View나 애플리케이션 수준 필터링을 사용하세요." },
+      "sqlite": { "supported": false, "level": "none", "notes": "SQLite does not support RLS.", "notesKo": "SQLite는 RLS를 지원하지 않습니다." }
     },
     "tips": [
       "RLS policies are enforced automatically — even if application code has a bug, the database still protects the data.",
       "Remember that table owners bypass RLS by default. Use ALTER TABLE ... FORCE ROW LEVEL SECURITY to apply policies to owners too.",
       "Test RLS policies thoroughly — a misconfigured policy can either leak data or block legitimate access."
+    ],
+    "tipsKo": [
+      "RLS 정책은 자동으로 적용됩니다 — 애플리케이션 코드에 버그가 있어도 데이터베이스가 데이터를 보호합니다.",
+      "테이블 소유자는 기본적으로 RLS를 우회합니다. 소유자에게도 정책을 적용하려면 ALTER TABLE ... FORCE ROW LEVEL SECURITY를 사용하세요.",
+      "RLS 정책을 철저히 테스트하세요 — 잘못 설정된 정책은 데이터가 유출되거나 정상적인 접근이 차단될 수 있습니다."
     ],
     "relatedItems": ["policy", "role", "grant"],
     "seeAlso": []
@@ -56,7 +70,9 @@
     "category": "security",
     "name": "Policy",
     "summary": "A rule that defines which rows a role can access under Row-Level Security.",
+    "summaryKo": "Row-Level Security에서 특정 Role이 어떤 행에 접근할 수 있는지 정의하는 규칙입니다.",
     "description": "A policy is a named rule attached to a table that defines which rows specific roles can SELECT, INSERT, UPDATE, or DELETE when Row-Level Security is enabled. Policies use USING clauses (for reads) and WITH CHECK clauses (for writes) to filter rows. Multiple policies can exist on a single table, and they are combined using OR (permissive) or AND (restrictive) logic.",
+    "descriptionKo": "Policy는 Row-Level Security가 활성화된 테이블에 붙이는 이름 있는 규칙으로, 특정 Role이 어떤 행을 SELECT, INSERT, UPDATE, DELETE할 수 있는지 정의합니다. USING 절(읽기용)과 WITH CHECK 절(쓰기용)을 사용해서 행을 필터링합니다. 하나의 테이블에 여러 Policy를 설정할 수 있으며, OR(허용적) 또는 AND(제한적) 논리로 결합됩니다.",
     "syntax": {
       "postgresql": "-- Permissive policy (default): users see their own data\nCREATE POLICY own_data_policy ON orders\n  FOR ALL\n  TO app_user\n  USING (user_id = current_setting('app.current_user_id')::INT)\n  WITH CHECK (user_id = current_setting('app.current_user_id')::INT);\n\n-- Restrictive policy: additionally require active status\nCREATE POLICY active_only_policy ON orders\n  AS RESTRICTIVE\n  FOR SELECT\n  TO app_user\n  USING (status != 'cancelled');\n\n-- Admin policy: admins can see everything\nCREATE POLICY admin_policy ON orders\n  FOR ALL\n  TO admin_role\n  USING (TRUE)\n  WITH CHECK (TRUE);\n\n-- View policies\nSELECT * FROM pg_policies WHERE tablename = 'orders';",
       "mysql": null,
@@ -74,6 +90,11 @@
       "Permissive policies (default) are combined with OR — any matching policy grants access. Restrictive policies are combined with AND.",
       "Always create an admin policy with USING (TRUE) so administrators can still access all data when needed."
     ],
+    "tipsKo": [
+      "USING은 읽을 수 있는 행(SELECT, UPDATE, DELETE)을 제어하고, WITH CHECK은 쓸 수 있는 행(INSERT, UPDATE)을 제어합니다.",
+      "허용적(Permissive) Policy(기본값)는 OR로 결합됩니다 — 하나라도 매칭되면 접근이 허용됩니다. 제한적(Restrictive) Policy는 AND로 결합됩니다.",
+      "관리자용 Policy는 항상 USING (TRUE)로 만들어서 필요할 때 모든 데이터에 접근할 수 있게 하세요."
+    ],
     "relatedItems": ["rls", "role", "grant"],
     "seeAlso": []
   },
@@ -82,7 +103,9 @@
     "category": "security",
     "name": "GRANT / REVOKE",
     "summary": "Controls which privileges a role has on database objects.",
+    "summaryKo": "데이터베이스 객체에 대해 Role이 가진 권한을 제어합니다.",
     "description": "GRANT and REVOKE are SQL commands that control access privileges. GRANT gives a role permission to perform specific operations (SELECT, INSERT, UPDATE, DELETE, etc.) on specific objects (tables, schemas, functions). REVOKE removes those permissions. This is the primary mechanism for implementing access control in a database.",
+    "descriptionKo": "GRANT와 REVOKE는 접근 권한을 제어하는 SQL 명령어입니다. GRANT는 특정 객체(테이블, 스키마, 함수 등)에 대해 특정 작업(SELECT, INSERT, UPDATE, DELETE 등)을 수행할 수 있는 권한을 Role에 부여합니다. REVOKE는 그 권한을 제거합니다. 이것이 데이터베이스에서 접근 제어를 구현하는 가장 기본적인 방법입니다.",
     "syntax": {
       "postgresql": "-- Grant SELECT on a specific table\nGRANT SELECT ON users TO readonly_role;\n\n-- Grant all privileges on a table\nGRANT ALL PRIVILEGES ON orders TO app_role;\n\n-- Grant on all tables in a schema\nGRANT SELECT ON ALL TABLES IN SCHEMA public TO reporting_role;\n\n-- Grant with the ability to re-grant\nGRANT SELECT ON products TO manager_role WITH GRANT OPTION;\n\n-- Revoke a privilege\nREVOKE INSERT, UPDATE ON users FROM readonly_role;\n\n-- Grant schema usage\nGRANT USAGE ON SCHEMA public TO app_role;",
       "mysql": "-- Grant SELECT on a specific table\nGRANT SELECT ON testdb.users TO 'readonly_user'@'%';\n\n-- Grant all privileges on a database\nGRANT ALL PRIVILEGES ON testdb.* TO 'app_user'@'%';\n\n-- Grant specific privileges\nGRANT SELECT, INSERT, UPDATE ON testdb.orders TO 'app_user'@'%';\n\n-- Grant with the ability to re-grant\nGRANT SELECT ON testdb.products TO 'manager'@'%' WITH GRANT OPTION;\n\n-- Revoke a privilege\nREVOKE INSERT ON testdb.users FROM 'readonly_user'@'%';\n\n-- Apply changes\nFLUSH PRIVILEGES;",
@@ -93,12 +116,17 @@
       "postgresql": { "supported": true, "level": "full" },
       "mysql": { "supported": true, "level": "full" },
       "mariadb": { "supported": true, "level": "full" },
-      "sqlite": { "supported": false, "level": "none", "notes": "SQLite does not support GRANT/REVOKE. Use filesystem permissions to control access." }
+      "sqlite": { "supported": false, "level": "none", "notes": "SQLite does not support GRANT/REVOKE. Use filesystem permissions to control access.", "notesKo": "SQLite는 GRANT/REVOKE를 지원하지 않습니다. 파일 시스템 권한을 사용해서 접근을 제어하세요." }
     },
     "tips": [
       "Use WITH GRANT OPTION sparingly — it allows the grantee to grant the same privilege to others, which can be hard to track.",
       "In PostgreSQL, don't forget GRANT USAGE ON SCHEMA — without it, users can't see objects in the schema even with table-level grants.",
       "Review grants periodically with queries on information_schema or pg_roles to ensure no excessive privileges exist."
+    ],
+    "tipsKo": [
+      "WITH GRANT OPTION은 신중하게 사용하세요 — 권한을 받은 사람이 다른 사람에게 같은 권한을 줄 수 있어서 추적이 어려워집니다.",
+      "PostgreSQL에서는 GRANT USAGE ON SCHEMA를 잊지 마세요 — 이것이 없으면 테이블 수준 권한이 있어도 스키마 안의 객체를 볼 수 없습니다.",
+      "information_schema나 pg_roles를 쿼리해서 주기적으로 권한을 점검하고, 과도한 권한이 없는지 확인하세요."
     ],
     "relatedItems": ["role", "rls", "policy"],
     "seeAlso": []
@@ -108,7 +136,9 @@
     "category": "security",
     "name": "Definer vs Invoker Rights",
     "summary": "Controls whether a routine runs with the permissions of its creator or the calling user.",
+    "summaryKo": "함수나 프로시저가 만든 사람의 권한으로 실행될지, 호출한 사람의 권한으로 실행될지를 제어합니다.",
     "description": "When a function or procedure runs, it can execute with the privileges of the user who created it (DEFINER/SECURITY DEFINER) or the user who is calling it (INVOKER/SECURITY INVOKER). Definer rights are like 'setuid' in Unix — the routine temporarily escalates privileges. This is useful when you want a user to perform specific actions through a function without granting direct table access.",
+    "descriptionKo": "함수나 프로시저가 실행될 때, 해당 함수를 만든 사람의 권한(DEFINER/SECURITY DEFINER)으로 실행하거나 호출한 사람의 권한(INVOKER/SECURITY INVOKER)으로 실행할 수 있습니다. Definer 권한은 Unix의 'setuid'와 비슷해서, 실행 중에 일시적으로 권한이 상승합니다. 사용자에게 테이블에 대한 직접 접근 권한을 주지 않고도 함수를 통해 특정 작업을 수행하게 하고 싶을 때 유용합니다.",
     "syntax": {
       "postgresql": "-- SECURITY DEFINER: runs with creator's privileges\nCREATE FUNCTION get_user_email(uid INT)\nRETURNS VARCHAR\nLANGUAGE SQL\nSECURITY DEFINER\nAS $$\n  SELECT email FROM users WHERE id = uid;\n$$;\n\n-- SECURITY INVOKER (default): runs with caller's privileges\nCREATE FUNCTION search_products(keyword TEXT)\nRETURNS TABLE(id INT, name VARCHAR)\nLANGUAGE SQL\nSECURITY INVOKER\nAS $$\n  SELECT id, name FROM products WHERE name ILIKE '%' || keyword || '%';\n$$;",
       "mysql": "-- DEFINER: runs with creator's privileges (default)\nDELIMITER //\nCREATE DEFINER = 'admin'@'localhost'\nFUNCTION get_user_email(uid INT)\nRETURNS VARCHAR(100)\nSQL SECURITY DEFINER\nDETERMINISTIC\nBEGIN\n  DECLARE user_email VARCHAR(100);\n  SELECT email INTO user_email FROM users WHERE id = uid;\n  RETURN user_email;\nEND //\nDELIMITER ;\n\n-- INVOKER: runs with caller's privileges\nDELIMITER //\nCREATE FUNCTION search_count(keyword VARCHAR(100))\nRETURNS INT\nSQL SECURITY INVOKER\nDETERMINISTIC\nBEGIN\n  DECLARE cnt INT;\n  SELECT COUNT(*) INTO cnt FROM products WHERE name LIKE CONCAT('%', keyword, '%');\n  RETURN cnt;\nEND //\nDELIMITER ;",
@@ -116,15 +146,20 @@
       "sqlite": null
     },
     "vendorSupport": {
-      "postgresql": { "supported": true, "level": "full", "notes": "Default is SECURITY INVOKER. Use SECURITY DEFINER for privilege escalation." },
-      "mysql": { "supported": true, "level": "full", "notes": "Default is SQL SECURITY DEFINER. Views, functions, procedures, and triggers all support this." },
-      "mariadb": { "supported": true, "level": "full", "notes": "Default is SQL SECURITY DEFINER." },
+      "postgresql": { "supported": true, "level": "full", "notes": "Default is SECURITY INVOKER. Use SECURITY DEFINER for privilege escalation.", "notesKo": "기본값은 SECURITY INVOKER입니다. 권한 상승이 필요하면 SECURITY DEFINER를 사용하세요." },
+      "mysql": { "supported": true, "level": "full", "notes": "Default is SQL SECURITY DEFINER. Views, functions, procedures, and triggers all support this.", "notesKo": "기본값은 SQL SECURITY DEFINER입니다. View, 함수, 프로시저, 트리거 모두 이 설정을 지원합니다." },
+      "mariadb": { "supported": true, "level": "full", "notes": "Default is SQL SECURITY DEFINER.", "notesKo": "기본값은 SQL SECURITY DEFINER입니다." },
       "sqlite": { "supported": false, "level": "none" }
     },
     "tips": [
       "Use SECURITY DEFINER to create controlled APIs — users call the function without needing direct table access.",
       "Be very careful with SECURITY DEFINER functions — a SQL injection vulnerability could escalate to the definer's full privileges.",
       "In PostgreSQL, always set search_path explicitly in SECURITY DEFINER functions to prevent search path attacks."
+    ],
+    "tipsKo": [
+      "SECURITY DEFINER를 사용해서 제어된 API를 만드세요 — 사용자가 테이블에 직접 접근하지 않고도 함수를 호출할 수 있습니다.",
+      "SECURITY DEFINER 함수는 매우 주의해서 사용하세요 — SQL injection 취약점이 있으면 함수 생성자의 전체 권한으로 악용될 수 있습니다.",
+      "PostgreSQL에서는 SECURITY DEFINER 함수에 search_path를 항상 명시적으로 설정해서 search path 공격을 방지하세요."
     ],
     "relatedItems": ["function", "procedure", "grant", "role"],
     "seeAlso": []

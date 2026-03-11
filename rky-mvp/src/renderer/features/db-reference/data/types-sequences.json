@@ -4,7 +4,9 @@
     "category": "types-sequences",
     "name": "Enum Type",
     "summary": "A custom data type that restricts a column to a predefined set of values.",
+    "summaryKo": "컬럼에 허용되는 값을 미리 정해둔 목록으로 제한하는 사용자 정의 데이터 타입입니다.",
     "description": "An enum type defines a fixed list of allowed values for a column, similar to a dropdown menu. For example, an order status might only allow 'pending', 'processing', 'shipped', or 'delivered'. Enums provide type safety at the database level and are more efficient than CHECK constraints with string lists because the database stores them as integers internally.",
+    "descriptionKo": "Enum 타입은 컬럼에 허용되는 값을 고정된 목록으로 정의합니다. 드롭다운 메뉴와 비슷하다고 생각하면 됩니다. 예를 들어, 주문 상태를 'pending', 'processing', 'shipped', 'delivered'만 허용하도록 설정할 수 있습니다. Enum은 데이터베이스 수준에서 타입 안전성을 제공하며, 내부적으로 정수로 저장되기 때문에 문자열 목록을 사용하는 CHECK 제약 조건보다 효율적입니다.",
     "syntax": {
       "postgresql": "-- Create an enum type\nCREATE TYPE order_status AS ENUM ('pending', 'processing', 'shipped', 'delivered', 'cancelled');\n\n-- Use it in a table\nCREATE TABLE orders (\n  id SERIAL PRIMARY KEY,\n  status order_status NOT NULL DEFAULT 'pending'\n);\n\n-- Add a new value to an existing enum\nALTER TYPE order_status ADD VALUE 'refunded' AFTER 'cancelled';",
       "mysql": "-- ENUM is defined inline in the column definition\nCREATE TABLE orders (\n  id INT AUTO_INCREMENT PRIMARY KEY,\n  status ENUM('pending', 'processing', 'shipped', 'delivered', 'cancelled') NOT NULL DEFAULT 'pending'\n);",
@@ -12,15 +14,20 @@
       "sqlite": null
     },
     "vendorSupport": {
-      "postgresql": { "supported": true, "level": "full", "notes": "PostgreSQL supports standalone enum types that can be reused across multiple tables." },
-      "mysql": { "supported": true, "level": "partial", "notes": "MySQL ENUM is defined per column, not as a reusable type. Changing values requires ALTER TABLE." },
-      "mariadb": { "supported": true, "level": "partial", "notes": "MariaDB ENUM is defined per column, not as a reusable type." },
-      "sqlite": { "supported": false, "level": "none", "notes": "SQLite does not support ENUM types. Use a CHECK constraint instead: CHECK (status IN ('pending', 'shipped'))." }
+      "postgresql": { "supported": true, "level": "full", "notes": "PostgreSQL supports standalone enum types that can be reused across multiple tables.", "notesKo": "PostgreSQL은 독립적인 Enum 타입을 지원하며, 여러 테이블에서 재사용할 수 있습니다." },
+      "mysql": { "supported": true, "level": "partial", "notes": "MySQL ENUM is defined per column, not as a reusable type. Changing values requires ALTER TABLE.", "notesKo": "MySQL의 ENUM은 컬럼별로 정의되며, 재사용 가능한 타입이 아닙니다. 값을 변경하려면 ALTER TABLE이 필요합니다." },
+      "mariadb": { "supported": true, "level": "partial", "notes": "MariaDB ENUM is defined per column, not as a reusable type.", "notesKo": "MariaDB의 ENUM은 컬럼별로 정의되며, 재사용 가능한 타입이 아닙니다." },
+      "sqlite": { "supported": false, "level": "none", "notes": "SQLite does not support ENUM types. Use a CHECK constraint instead: CHECK (status IN ('pending', 'shipped')).", "notesKo": "SQLite는 ENUM 타입을 지원하지 않습니다. 대신 CHECK 제약 조건을 사용하세요: CHECK (status IN ('pending', 'shipped'))." }
     },
     "tips": [
       "In PostgreSQL, enum types are reusable — define the type once and use it in multiple tables for consistency.",
       "Avoid enums for values that change frequently — adding/removing values can be tricky and may require migrations.",
       "In MySQL, ENUM values are stored as integers internally (1, 2, 3...), which makes storage and comparison efficient."
+    ],
+    "tipsKo": [
+      "PostgreSQL에서는 Enum 타입을 재사용할 수 있습니다. 한 번 정의하면 여러 테이블에서 일관되게 사용할 수 있어요.",
+      "자주 변경되는 값에는 Enum을 피하세요. 값을 추가하거나 삭제하는 것이 까다롭고 마이그레이션이 필요할 수 있습니다.",
+      "MySQL에서 ENUM 값은 내부적으로 정수(1, 2, 3...)로 저장되므로 저장 공간과 비교 성능이 효율적입니다."
     ],
     "relatedItems": ["check", "domain-type", "composite-type"],
     "seeAlso": []
@@ -30,7 +37,9 @@
     "category": "types-sequences",
     "name": "Composite Type",
     "summary": "A custom type composed of multiple named fields, like a row structure.",
+    "summaryKo": "여러 개의 이름이 있는 필드를 하나로 묶은 사용자 정의 타입으로, 행(row) 구조와 비슷합니다.",
     "description": "A composite type is a user-defined type that groups multiple fields together into a single named structure, similar to a struct in programming languages. For example, you could define an 'address' type with fields for street, city, state, and zip code. Composite types are useful for returning multiple values from functions or for organizing related fields.",
+    "descriptionKo": "Composite 타입은 여러 필드를 하나의 이름 있는 구조로 묶은 사용자 정의 타입입니다. 프로그래밍 언어의 struct와 비슷합니다. 예를 들어, 도로명, 도시, 주, 우편번호 필드를 가진 'address' 타입을 정의할 수 있습니다. Composite 타입은 함수에서 여러 값을 반환하거나 관련된 필드를 정리할 때 유용합니다.",
     "syntax": {
       "postgresql": "-- Create a composite type\nCREATE TYPE address AS (\n  street VARCHAR(200),\n  city VARCHAR(100),\n  state VARCHAR(50),\n  zip_code VARCHAR(10),\n  country VARCHAR(50)\n);\n\n-- Use in a table\nCREATE TABLE users (\n  id SERIAL PRIMARY KEY,\n  username VARCHAR(50) NOT NULL,\n  home_address address,\n  work_address address\n);\n\n-- Insert data\nINSERT INTO users (username, home_address)\nVALUES ('john', ROW('123 Main St', 'Seoul', 'Seoul', '04524', 'KR'));\n\n-- Access fields\nSELECT username, (home_address).city FROM users;",
       "mysql": null,
@@ -39,14 +48,19 @@
     },
     "vendorSupport": {
       "postgresql": { "supported": true, "level": "full" },
-      "mysql": { "supported": false, "level": "none", "notes": "MySQL does not support composite types. Use separate columns or JSON for structured data." },
-      "mariadb": { "supported": false, "level": "none", "notes": "MariaDB does not support composite types. Use separate columns or JSON." },
-      "sqlite": { "supported": false, "level": "none", "notes": "SQLite does not support composite types. Use JSON or separate columns." }
+      "mysql": { "supported": false, "level": "none", "notes": "MySQL does not support composite types. Use separate columns or JSON for structured data.", "notesKo": "MySQL은 Composite 타입을 지원하지 않습니다. 별도의 컬럼이나 JSON을 사용하세요." },
+      "mariadb": { "supported": false, "level": "none", "notes": "MariaDB does not support composite types. Use separate columns or JSON.", "notesKo": "MariaDB는 Composite 타입을 지원하지 않습니다. 별도의 컬럼이나 JSON을 사용하세요." },
+      "sqlite": { "supported": false, "level": "none", "notes": "SQLite does not support composite types. Use JSON or separate columns.", "notesKo": "SQLite는 Composite 타입을 지원하지 않습니다. JSON이나 별도의 컬럼을 사용하세요." }
     },
     "tips": [
       "Composite types are great for function return types when you need to return multiple values.",
       "Access composite type fields using parentheses: (column_name).field_name — the parentheses are required.",
       "Consider using JSONB instead of composite types if the structure might change frequently."
+    ],
+    "tipsKo": [
+      "Composite 타입은 함수에서 여러 값을 반환해야 할 때 반환 타입으로 사용하기 좋습니다.",
+      "Composite 타입의 필드에 접근할 때는 괄호를 사용하세요: (column_name).field_name — 괄호가 반드시 필요합니다.",
+      "구조가 자주 변경될 수 있다면 Composite 타입 대신 JSONB 사용을 고려하세요."
     ],
     "relatedItems": ["enum-type", "domain-type", "json-column"],
     "seeAlso": []
@@ -56,7 +70,9 @@
     "category": "types-sequences",
     "name": "Domain Type",
     "summary": "A custom data type based on an existing type with added constraints.",
+    "summaryKo": "기존 데이터 타입에 제약 조건을 추가하여 만든 사용자 정의 데이터 타입입니다.",
     "description": "A domain is a user-defined data type that wraps an existing type and adds constraints (like NOT NULL or CHECK) to it. For example, you could create an 'email' domain based on VARCHAR that validates the format, or a 'positive_int' domain that ensures values are always greater than zero. Domains let you reuse validation logic across multiple tables.",
+    "descriptionKo": "Domain은 기존 타입을 감싸면서 NOT NULL이나 CHECK 같은 제약 조건을 추가한 사용자 정의 데이터 타입입니다. 예를 들어, VARCHAR 기반으로 이메일 형식을 검증하는 'email' Domain을 만들거나, 값이 항상 0보다 큰지 확인하는 'positive_int' Domain을 만들 수 있습니다. Domain을 사용하면 여러 테이블에서 동일한 유효성 검사 로직을 재사용할 수 있습니다.",
     "syntax": {
       "postgresql": "-- Create a domain for email addresses\nCREATE DOMAIN email_address AS VARCHAR(255)\n  CHECK (VALUE ~* '^[a-z0-9._%+-]+@[a-z0-9.-]+\\.[a-z]{2,}$');\n\n-- Create a domain for positive integers\nCREATE DOMAIN positive_int AS INT\n  CHECK (VALUE > 0);\n\n-- Use domains in tables\nCREATE TABLE users (\n  id SERIAL PRIMARY KEY,\n  email email_address NOT NULL,\n  age positive_int\n);\n\nCREATE TABLE products (\n  id SERIAL PRIMARY KEY,\n  contact_email email_address,\n  stock positive_int NOT NULL DEFAULT 0\n);",
       "mysql": null,
@@ -65,14 +81,19 @@
     },
     "vendorSupport": {
       "postgresql": { "supported": true, "level": "full" },
-      "mysql": { "supported": false, "level": "none", "notes": "MySQL does not support domain types. Use CHECK constraints on individual columns instead." },
-      "mariadb": { "supported": false, "level": "none", "notes": "MariaDB does not support domain types. Use CHECK constraints instead." },
-      "sqlite": { "supported": false, "level": "none", "notes": "SQLite does not support domain types." }
+      "mysql": { "supported": false, "level": "none", "notes": "MySQL does not support domain types. Use CHECK constraints on individual columns instead.", "notesKo": "MySQL은 Domain 타입을 지원하지 않습니다. 대신 개별 컬럼에 CHECK 제약 조건을 사용하세요." },
+      "mariadb": { "supported": false, "level": "none", "notes": "MariaDB does not support domain types. Use CHECK constraints instead.", "notesKo": "MariaDB는 Domain 타입을 지원하지 않습니다. 대신 CHECK 제약 조건을 사용하세요." },
+      "sqlite": { "supported": false, "level": "none", "notes": "SQLite does not support domain types.", "notesKo": "SQLite는 Domain 타입을 지원하지 않습니다." }
     },
     "tips": [
       "Use domains to enforce the same validation rule across multiple tables without repeating CHECK constraints.",
       "Domains are ideal for common patterns like email addresses, phone numbers, URLs, or currency amounts.",
       "Changing a domain's constraint automatically applies to all columns using that domain."
+    ],
+    "tipsKo": [
+      "Domain을 사용하면 CHECK 제약 조건을 반복하지 않고도 여러 테이블에 동일한 유효성 검사 규칙을 적용할 수 있습니다.",
+      "Domain은 이메일 주소, 전화번호, URL, 금액 등 자주 사용되는 패턴에 적합합니다.",
+      "Domain의 제약 조건을 변경하면 해당 Domain을 사용하는 모든 컬럼에 자동으로 적용됩니다."
     ],
     "relatedItems": ["check", "enum-type", "data-type"],
     "seeAlso": []
@@ -82,7 +103,9 @@
     "category": "types-sequences",
     "name": "Range Type",
     "summary": "A data type that represents a range of values (e.g., date ranges, numeric ranges).",
+    "summaryKo": "값의 범위(예: 날짜 범위, 숫자 범위)를 표현하는 데이터 타입입니다.",
     "description": "A range type stores a continuous range of values with a lower and upper bound. PostgreSQL provides built-in range types for integers (INT4RANGE), numbers (NUMRANGE), timestamps (TSRANGE, TSTZRANGE), and dates (DATERANGE). Ranges are powerful for scheduling systems, time-series data, and any domain that deals with intervals.",
+    "descriptionKo": "Range 타입은 하한과 상한이 있는 연속적인 값의 범위를 저장합니다. PostgreSQL은 정수(INT4RANGE), 숫자(NUMRANGE), 타임스탬프(TSRANGE, TSTZRANGE), 날짜(DATERANGE)에 대한 내장 Range 타입을 제공합니다. Range 타입은 일정 관리 시스템, 시계열 데이터, 구간을 다루는 모든 분야에서 강력하게 활용됩니다.",
     "syntax": {
       "postgresql": "-- Use built-in range types\nCREATE TABLE events (\n  id SERIAL PRIMARY KEY,\n  name VARCHAR(100) NOT NULL,\n  during TSTZRANGE NOT NULL\n);\n\n-- Insert a range\nINSERT INTO events (name, during)\nVALUES ('Conference', '[2025-06-01 09:00, 2025-06-03 18:00)');\n\n-- Query: find events happening on a specific date\nSELECT name FROM events\nWHERE during @> '2025-06-02 12:00'::TIMESTAMPTZ;\n\n-- Query: find overlapping events\nSELECT a.name, b.name\nFROM events a, events b\nWHERE a.id < b.id AND a.during && b.during;\n\n-- Create a custom range type\nCREATE TYPE price_range AS RANGE (SUBTYPE = NUMERIC);",
       "mysql": null,
@@ -91,14 +114,19 @@
     },
     "vendorSupport": {
       "postgresql": { "supported": true, "level": "full" },
-      "mysql": { "supported": false, "level": "none", "notes": "MySQL does not support range types. Use two separate columns (start/end) and application logic for range operations." },
-      "mariadb": { "supported": false, "level": "none", "notes": "MariaDB does not support range types." },
-      "sqlite": { "supported": false, "level": "none", "notes": "SQLite does not support range types." }
+      "mysql": { "supported": false, "level": "none", "notes": "MySQL does not support range types. Use two separate columns (start/end) and application logic for range operations.", "notesKo": "MySQL은 Range 타입을 지원하지 않습니다. 시작/끝 값을 별도의 컬럼 두 개로 나누고, 범위 연산은 애플리케이션 로직으로 처리하세요." },
+      "mariadb": { "supported": false, "level": "none", "notes": "MariaDB does not support range types.", "notesKo": "MariaDB는 Range 타입을 지원하지 않습니다." },
+      "sqlite": { "supported": false, "level": "none", "notes": "SQLite does not support range types.", "notesKo": "SQLite는 Range 타입을 지원하지 않습니다." }
     },
     "tips": [
       "Use brackets [ ] for inclusive bounds and parentheses ( ) for exclusive bounds: '[1, 10)' includes 1 but not 10.",
       "Combine range types with EXCLUDE constraints and GiST indexes to prevent overlapping bookings or schedules.",
       "Range operators: @> (contains), && (overlaps), << (strictly left of), >> (strictly right of)."
+    ],
+    "tipsKo": [
+      "대괄호 [ ]는 포함(inclusive), 소괄호 ( )는 미포함(exclusive)을 의미합니다: '[1, 10)'은 1은 포함하지만 10은 포함하지 않습니다.",
+      "Range 타입을 EXCLUDE 제약 조건 및 GiST 인덱스와 함께 사용하면 예약이나 일정의 겹침을 방지할 수 있습니다.",
+      "Range 연산자: @> (포함), && (겹침), << (완전히 왼쪽), >> (완전히 오른쪽)."
     ],
     "relatedItems": ["exclude", "gist-index", "composite-type"],
     "seeAlso": []
@@ -108,7 +136,9 @@
     "category": "types-sequences",
     "name": "SET Type",
     "summary": "A data type that stores zero or more values from a predefined list (MySQL/MariaDB only).",
+    "summaryKo": "미리 정의된 목록에서 0개 이상의 값을 저장하는 데이터 타입입니다 (MySQL/MariaDB 전용).",
     "description": "A SET type is a MySQL/MariaDB-specific data type that allows a column to store zero or more values from a predefined list. Unlike ENUM (which allows only one value), SET allows multiple selections — similar to checkboxes. Values are stored as a compact bitmask internally, making storage efficient. SET is useful for storing tags, permissions, or feature flags.",
+    "descriptionKo": "SET 타입은 MySQL/MariaDB 전용 데이터 타입으로, 미리 정의된 목록에서 0개 이상의 값을 저장할 수 있습니다. 하나의 값만 허용하는 ENUM과 달리 SET은 여러 개를 선택할 수 있어서 체크박스와 비슷합니다. 값은 내부적으로 비트마스크로 저장되어 저장 공간이 효율적입니다. SET은 태그, 권한, 기능 플래그 등을 저장할 때 유용합니다.",
     "syntax": {
       "postgresql": null,
       "mysql": "-- Create a table with a SET column\nCREATE TABLE users (\n  id INT AUTO_INCREMENT PRIMARY KEY,\n  username VARCHAR(50) NOT NULL,\n  permissions SET('read', 'write', 'delete', 'admin') NOT NULL DEFAULT 'read'\n);\n\n-- Insert multiple values\nINSERT INTO users (username, permissions) VALUES ('alice', 'read,write');\nINSERT INTO users (username, permissions) VALUES ('bob', 'read,write,delete,admin');\n\n-- Query: find users with 'admin' permission\nSELECT username FROM users WHERE FIND_IN_SET('admin', permissions);",
@@ -116,15 +146,20 @@
       "sqlite": null
     },
     "vendorSupport": {
-      "postgresql": { "supported": false, "level": "none", "notes": "PostgreSQL does not support SET types. Use array types (TEXT[]) or a junction table instead." },
+      "postgresql": { "supported": false, "level": "none", "notes": "PostgreSQL does not support SET types. Use array types (TEXT[]) or a junction table instead.", "notesKo": "PostgreSQL은 SET 타입을 지원하지 않습니다. 대신 배열 타입(TEXT[])이나 연결 테이블(junction table)을 사용하세요." },
       "mysql": { "supported": true, "level": "full" },
       "mariadb": { "supported": true, "level": "full" },
-      "sqlite": { "supported": false, "level": "none", "notes": "SQLite does not support SET types. Store as comma-separated TEXT or use a junction table." }
+      "sqlite": { "supported": false, "level": "none", "notes": "SQLite does not support SET types. Store as comma-separated TEXT or use a junction table.", "notesKo": "SQLite는 SET 타입을 지원하지 않습니다. 쉼표로 구분된 TEXT로 저장하거나 연결 테이블(junction table)을 사용하세요." }
     },
     "tips": [
       "SET is limited to 64 distinct members — for larger sets, use a junction/bridge table instead.",
       "Use FIND_IN_SET() to query for a specific value within a SET column.",
       "For better portability and normalization, consider using a junction table instead of SET — it's the standard relational approach."
+    ],
+    "tipsKo": [
+      "SET은 최대 64개의 고유 값만 허용합니다. 더 많은 값이 필요하면 연결 테이블(junction table)을 사용하세요.",
+      "SET 컬럼에서 특정 값을 검색하려면 FIND_IN_SET() 함수를 사용하세요.",
+      "이식성과 정규화를 위해 SET 대신 연결 테이블(junction table)을 사용하는 것이 좋습니다. 이것이 표준 관계형 설계 방식입니다."
     ],
     "relatedItems": ["enum-type", "array-type"],
     "seeAlso": []
@@ -134,7 +169,9 @@
     "category": "types-sequences",
     "name": "Sequence",
     "summary": "A database object that generates unique sequential numbers.",
+    "summaryKo": "고유한 순차 번호를 생성하는 데이터베이스 객체입니다.",
     "description": "A sequence is a standalone database object that generates a series of unique numbers, typically used for auto-incrementing primary keys. Unlike auto-increment (which is tied to a specific column), sequences are independent objects that can be shared across multiple tables or used in custom ways. Sequences guarantee uniqueness even in concurrent environments.",
+    "descriptionKo": "Sequence는 고유한 번호를 순차적으로 생성하는 독립적인 데이터베이스 객체로, 주로 자동 증가 기본 키에 사용됩니다. 특정 컬럼에 종속되는 AUTO_INCREMENT와 달리 Sequence는 독립적인 객체이므로 여러 테이블에서 공유하거나 커스텀 방식으로 사용할 수 있습니다. 동시 접속 환경에서도 고유성을 보장합니다.",
     "syntax": {
       "postgresql": "-- Create a sequence\nCREATE SEQUENCE order_number_seq\n  START WITH 1000\n  INCREMENT BY 1\n  NO MAXVALUE\n  CACHE 10;\n\n-- Use in a table\nCREATE TABLE orders (\n  id SERIAL PRIMARY KEY,\n  order_number INT NOT NULL DEFAULT nextval('order_number_seq')\n);\n\n-- Use directly\nSELECT nextval('order_number_seq');  -- Get next value\nSELECT currval('order_number_seq');  -- Get current value\nSELECT setval('order_number_seq', 5000);  -- Set to specific value",
       "mysql": null,
@@ -143,14 +180,19 @@
     },
     "vendorSupport": {
       "postgresql": { "supported": true, "level": "full" },
-      "mysql": { "supported": false, "level": "none", "notes": "MySQL does not support sequences. Use AUTO_INCREMENT or application-level sequence generation." },
-      "mariadb": { "supported": true, "level": "full", "notes": "MariaDB supports sequences since version 10.3." },
-      "sqlite": { "supported": false, "level": "none", "notes": "SQLite does not support sequences. Use AUTOINCREMENT on INTEGER PRIMARY KEY." }
+      "mysql": { "supported": false, "level": "none", "notes": "MySQL does not support sequences. Use AUTO_INCREMENT or application-level sequence generation.", "notesKo": "MySQL은 Sequence를 지원하지 않습니다. AUTO_INCREMENT 또는 애플리케이션 레벨의 번호 생성을 사용하세요." },
+      "mariadb": { "supported": true, "level": "full", "notes": "MariaDB supports sequences since version 10.3.", "notesKo": "MariaDB는 버전 10.3부터 Sequence를 지원합니다." },
+      "sqlite": { "supported": false, "level": "none", "notes": "SQLite does not support sequences. Use AUTOINCREMENT on INTEGER PRIMARY KEY.", "notesKo": "SQLite는 Sequence를 지원하지 않습니다. INTEGER PRIMARY KEY에 AUTOINCREMENT를 사용하세요." }
     },
     "tips": [
       "Use sequences when you need a single counter shared across multiple tables (e.g., a global document number).",
       "Sequences can have gaps — if a transaction is rolled back, the sequence number is not reused.",
       "Use CACHE to improve performance in high-concurrency environments by pre-allocating sequence numbers in memory."
+    ],
+    "tipsKo": [
+      "여러 테이블에서 공유하는 하나의 카운터가 필요할 때 Sequence를 사용하세요 (예: 전역 문서 번호).",
+      "Sequence에는 빈 번호가 생길 수 있습니다. 트랜잭션이 롤백되어도 이미 사용된 번호는 재사용되지 않습니다.",
+      "동시 접속이 많은 환경에서는 CACHE를 사용하여 메모리에 번호를 미리 할당하면 성능을 향상시킬 수 있습니다."
     ],
     "relatedItems": ["auto-increment", "identity-column"],
     "seeAlso": []
@@ -160,7 +202,9 @@
     "category": "types-sequences",
     "name": "Array Type",
     "summary": "A data type that stores an ordered list of values in a single column.",
+    "summaryKo": "하나의 컬럼에 정렬된 값의 목록을 저장하는 데이터 타입입니다.",
     "description": "An array type allows you to store multiple values of the same type in a single column — like a list or collection. For example, you could store a list of tags, phone numbers, or scores in one column instead of creating a separate table. Arrays are convenient for simple lists but should not replace proper relational design for complex relationships.",
+    "descriptionKo": "Array 타입을 사용하면 같은 타입의 여러 값을 하나의 컬럼에 저장할 수 있습니다. 리스트나 컬렉션과 비슷합니다. 예를 들어, 별도의 테이블을 만들지 않고도 태그 목록, 전화번호 목록, 점수 목록을 하나의 컬럼에 저장할 수 있습니다. Array는 단순한 목록에는 편리하지만, 복잡한 관계에서는 적절한 관계형 설계를 대체해서는 안 됩니다.",
     "syntax": {
       "postgresql": "-- Create a table with array columns\nCREATE TABLE products (\n  id SERIAL PRIMARY KEY,\n  name VARCHAR(100) NOT NULL,\n  tags TEXT[] NOT NULL DEFAULT '{}',\n  scores INT[]\n);\n\n-- Insert with array values\nINSERT INTO products (name, tags, scores)\nVALUES ('Keyboard', ARRAY['electronics', 'peripherals', 'input'], ARRAY[85, 92, 78]);\n\n-- Query: find products with a specific tag\nSELECT name FROM products WHERE 'electronics' = ANY(tags);\n\n-- Query: find products containing all specified tags\nSELECT name FROM products WHERE tags @> ARRAY['electronics', 'peripherals'];\n\n-- Access array element (1-indexed)\nSELECT name, tags[1] AS first_tag FROM products;",
       "mysql": null,
@@ -169,14 +213,19 @@
     },
     "vendorSupport": {
       "postgresql": { "supported": true, "level": "full" },
-      "mysql": { "supported": false, "level": "none", "notes": "MySQL does not support array types. Use JSON arrays or a junction table instead." },
-      "mariadb": { "supported": false, "level": "none", "notes": "MariaDB does not support array types. Use JSON arrays or a junction table instead." },
-      "sqlite": { "supported": false, "level": "none", "notes": "SQLite does not support array types. Use JSON arrays via the JSON1 extension or a separate table." }
+      "mysql": { "supported": false, "level": "none", "notes": "MySQL does not support array types. Use JSON arrays or a junction table instead.", "notesKo": "MySQL은 Array 타입을 지원하지 않습니다. 대신 JSON 배열이나 연결 테이블(junction table)을 사용하세요." },
+      "mariadb": { "supported": false, "level": "none", "notes": "MariaDB does not support array types. Use JSON arrays or a junction table instead.", "notesKo": "MariaDB는 Array 타입을 지원하지 않습니다. 대신 JSON 배열이나 연결 테이블(junction table)을 사용하세요." },
+      "sqlite": { "supported": false, "level": "none", "notes": "SQLite does not support array types. Use JSON arrays via the JSON1 extension or a separate table.", "notesKo": "SQLite는 Array 타입을 지원하지 않습니다. JSON1 확장을 통한 JSON 배열이나 별도의 테이블을 사용하세요." }
     },
     "tips": [
       "Arrays in PostgreSQL are 1-indexed (the first element is tags[1], not tags[0]).",
       "Create a GIN index on array columns for fast containment queries: CREATE INDEX idx_tags ON products USING GIN (tags).",
       "Don't overuse arrays — if you need to JOIN or query individual elements frequently, a junction table is better."
+    ],
+    "tipsKo": [
+      "PostgreSQL의 Array는 1부터 시작합니다 (첫 번째 요소는 tags[0]이 아니라 tags[1]입니다).",
+      "Array 컬럼에 GIN 인덱스를 생성하면 포함 여부 쿼리가 빨라집니다: CREATE INDEX idx_tags ON products USING GIN (tags).",
+      "Array를 남용하지 마세요. 개별 요소를 자주 JOIN하거나 조회해야 한다면 연결 테이블(junction table)이 더 좋습니다."
     ],
     "relatedItems": ["json-column", "gin-index", "set-type"],
     "seeAlso": []

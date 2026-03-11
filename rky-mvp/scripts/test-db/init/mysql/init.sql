@@ -1127,12 +1127,12 @@ INSERT INTO payments (order_id, order_created_at, method, status, amount, transa
 -- 8.16 Shipping Addresses
 -- --------------------------------------------------------------------------
 INSERT INTO shipping_addresses (user_id, label, addr_street, addr_city, addr_state, addr_postal_code, addr_country, is_default) VALUES
-    ('b0000000-0000-0000-0000-000000000001', 'Home',   '123 Main St',       'New York',      'NY',       '10001',   TRUE),
-    ('b0000000-0000-0000-0000-000000000001', 'Office', '456 Broadway',      'New York',      'NY',       '10012',   FALSE),
-    ('b0000000-0000-0000-0000-000000000002', 'Home',   '45 Oxford Rd',      'London',        'England',  'W1D 1BS', TRUE),
-    ('b0000000-0000-0000-0000-000000000003', 'Home',   '789 Gangnam-daero', 'Seoul',         'Seoul',    '06053',   TRUE),
-    ('b0000000-0000-0000-0000-000000000004', 'Home',   '321 Tech Blvd',     'San Francisco', 'CA',       '94105',   TRUE),
-    ('b0000000-0000-0000-0000-000000000006', 'Home',   '88 Berliner Str',   'Berlin',        'Berlin',   '10115',   TRUE);
+    ('b0000000-0000-0000-0000-000000000001', 'Home',   '123 Main St',       'New York',      'NY',       '10001',   'US', TRUE),
+    ('b0000000-0000-0000-0000-000000000001', 'Office', '456 Broadway',      'New York',      'NY',       '10012',   'US', FALSE),
+    ('b0000000-0000-0000-0000-000000000002', 'Home',   '45 Oxford Rd',      'London',        'England',  'W1D 1BS', 'UK', TRUE),
+    ('b0000000-0000-0000-0000-000000000003', 'Home',   '789 Gangnam-daero', 'Seoul',         'Seoul',    '06053',   'KR', TRUE),
+    ('b0000000-0000-0000-0000-000000000004', 'Home',   '321 Tech Blvd',     'San Francisco', 'CA',       '94105',   'US', TRUE),
+    ('b0000000-0000-0000-0000-000000000006', 'Home',   '88 Berliner Str',   'Berlin',        'Berlin',   '10115',   'DE', TRUE);
 
 -- --------------------------------------------------------------------------
 -- 8.17 Warehouses (3 rows with POINT location)

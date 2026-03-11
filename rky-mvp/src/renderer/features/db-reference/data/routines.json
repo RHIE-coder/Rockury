@@ -4,7 +4,9 @@
     "category": "routines",
     "name": "Function",
     "summary": "A reusable block of code that takes inputs and returns a value.",
+    "summaryKo": "입력값을 받아 결과를 반환하는 재사용 가능한 코드 블록입니다.",
     "description": "A database function is a named block of code stored in the database that accepts parameters, performs computations, and returns a result. Functions can be used inside SQL queries (SELECT, WHERE, etc.) just like built-in functions. They are ideal for encapsulating business logic, complex calculations, or data transformations that you need to reuse across multiple queries.",
+    "descriptionKo": "데이터베이스 Function은 데이터베이스에 저장되는 이름이 있는 코드 블록으로, 매개변수를 받아 계산을 수행하고 결과를 반환합니다. Function은 기본 내장 함수처럼 SQL 쿼리(SELECT, WHERE 등) 안에서 사용할 수 있습니다. 여러 쿼리에서 반복적으로 사용해야 하는 비즈니스 로직, 복잡한 계산, 데이터 변환 등을 하나로 묶어두기에 적합합니다.",
     "syntax": {
       "postgresql": "-- Create a function that calculates order total with tax\nCREATE FUNCTION calculate_total(subtotal NUMERIC, tax_rate NUMERIC DEFAULT 0.1)\nRETURNS NUMERIC\nLANGUAGE plpgsql\nAS $$\nBEGIN\n  RETURN subtotal + (subtotal * tax_rate);\nEND;\n$$;\n\n-- Use in a query\nSELECT order_id, calculate_total(subtotal) AS total FROM orders;",
       "mysql": "-- Create a function that calculates order total with tax\nDELIMITER //\nCREATE FUNCTION calculate_total(subtotal DECIMAL(10,2), tax_rate DECIMAL(3,2))\nRETURNS DECIMAL(10,2)\nDETERMINISTIC\nBEGIN\n  RETURN subtotal + (subtotal * tax_rate);\nEND //\nDELIMITER ;\n\n-- Use in a query\nSELECT order_id, calculate_total(subtotal, 0.1) AS total FROM orders;",
@@ -15,12 +17,17 @@
       "postgresql": { "supported": true, "level": "full" },
       "mysql": { "supported": true, "level": "full" },
       "mariadb": { "supported": true, "level": "full" },
-      "sqlite": { "supported": false, "level": "none", "notes": "SQLite does not support user-defined functions in SQL. Functions can only be added via the C API or application bindings." }
+      "sqlite": { "supported": false, "level": "none", "notes": "SQLite does not support user-defined functions in SQL. Functions can only be added via the C API or application bindings.", "notesKo": "SQLite는 SQL에서 사용자 정의 함수를 지원하지 않습니다. C API나 애플리케이션 바인딩을 통해서만 함수를 추가할 수 있습니다." }
     },
     "tips": [
       "Mark functions as IMMUTABLE (PostgreSQL) or DETERMINISTIC (MySQL) when they always return the same output for the same input — this allows caching and optimization.",
       "Keep functions focused on a single task. If a function does too much, split it into smaller functions.",
       "Functions run inside the database, so they are great for reducing data transfer between the application and database."
+    ],
+    "tipsKo": [
+      "같은 입력에 항상 같은 결과를 반환하는 함수는 IMMUTABLE(PostgreSQL) 또는 DETERMINISTIC(MySQL)으로 표시하세요. 캐싱과 최적화가 가능해집니다.",
+      "함수는 하나의 작업에만 집중하도록 만드세요. 함수가 너무 많은 일을 한다면 작은 함수들로 나누세요.",
+      "함수는 데이터베이스 내부에서 실행되므로, 애플리케이션과 데이터베이스 사이의 데이터 전송량을 줄이는 데 유용합니다."
     ],
     "relatedItems": ["procedure", "language", "parameter-modes"],
     "seeAlso": []
@@ -30,7 +37,9 @@
     "category": "routines",
     "name": "Procedure",
     "summary": "A reusable block of code that performs actions but does not return a value directly.",
+    "summaryKo": "작업을 수행하지만 값을 직접 반환하지 않는 재사용 가능한 코드 블록입니다.",
     "description": "A stored procedure is similar to a function, but it is designed to perform actions (INSERT, UPDATE, DELETE, transaction control) rather than return a value. Procedures are called using CALL and cannot be used inside a SELECT query. They are ideal for encapsulating multi-step operations like transferring funds between accounts or processing batch updates.",
+    "descriptionKo": "Stored Procedure는 Function과 비슷하지만, 값을 반환하는 것이 아니라 작업(INSERT, UPDATE, DELETE, 트랜잭션 제어 등)을 수행하도록 설계되었습니다. Procedure는 CALL 명령으로 호출하며, SELECT 쿼리 안에서는 사용할 수 없습니다. 계좌 간 송금이나 대량 업데이트 처리처럼 여러 단계로 이루어진 작업을 하나로 묶어두기에 적합합니다.",
     "syntax": {
       "postgresql": "-- Create a procedure to transfer funds between users\nCREATE PROCEDURE transfer_funds(\n  sender_id INT,\n  receiver_id INT,\n  amount NUMERIC\n)\nLANGUAGE plpgsql\nAS $$\nBEGIN\n  UPDATE accounts SET balance = balance - amount WHERE user_id = sender_id;\n  UPDATE accounts SET balance = balance + amount WHERE user_id = receiver_id;\n  COMMIT;\nEND;\n$$;\n\n-- Call the procedure\nCALL transfer_funds(1, 2, 100.00);",
       "mysql": "-- Create a procedure to transfer funds between users\nDELIMITER //\nCREATE PROCEDURE transfer_funds(\n  IN sender_id INT,\n  IN receiver_id INT,\n  IN amount DECIMAL(10,2)\n)\nBEGIN\n  START TRANSACTION;\n  UPDATE accounts SET balance = balance - amount WHERE user_id = sender_id;\n  UPDATE accounts SET balance = balance + amount WHERE user_id = receiver_id;\n  COMMIT;\nEND //\nDELIMITER ;\n\n-- Call the procedure\nCALL transfer_funds(1, 2, 100.00);",
@@ -38,15 +47,20 @@
       "sqlite": null
     },
     "vendorSupport": {
-      "postgresql": { "supported": true, "level": "full", "notes": "Procedures were added in PostgreSQL 11. They support transaction control (COMMIT/ROLLBACK) inside the body." },
+      "postgresql": { "supported": true, "level": "full", "notes": "Procedures were added in PostgreSQL 11. They support transaction control (COMMIT/ROLLBACK) inside the body.", "notesKo": "Procedure는 PostgreSQL 11에서 추가되었습니다. 본문 안에서 트랜잭션 제어(COMMIT/ROLLBACK)를 지원합니다." },
       "mysql": { "supported": true, "level": "full" },
       "mariadb": { "supported": true, "level": "full" },
-      "sqlite": { "supported": false, "level": "none", "notes": "SQLite does not support stored procedures." }
+      "sqlite": { "supported": false, "level": "none", "notes": "SQLite does not support stored procedures.", "notesKo": "SQLite는 Stored Procedure를 지원하지 않습니다." }
     },
     "tips": [
       "Use procedures (not functions) when you need transaction control (COMMIT/ROLLBACK) inside the routine.",
       "Procedures are called with CALL, not inside SELECT — they are meant for side effects, not value computation.",
       "In MySQL/MariaDB, use DELIMITER to change the statement terminator when creating procedures with semicolons inside."
+    ],
+    "tipsKo": [
+      "루틴 안에서 트랜잭션 제어(COMMIT/ROLLBACK)가 필요하면 Function이 아닌 Procedure를 사용하세요.",
+      "Procedure는 CALL로 호출하며, SELECT 안에서는 사용할 수 없습니다. 값을 계산하는 것이 아니라 부수 효과(데이터 변경 등)를 위한 것입니다.",
+      "MySQL/MariaDB에서는 본문에 세미콜론이 포함된 Procedure를 만들 때 DELIMITER로 구문 종결자를 변경해야 합니다."
     ],
     "relatedItems": ["function", "language", "parameter-modes"],
     "seeAlso": []
@@ -56,7 +70,9 @@
     "category": "routines",
     "name": "Aggregate Function",
     "summary": "A custom function that processes multiple rows and returns a single result.",
+    "summaryKo": "여러 행을 처리하여 하나의 결과를 반환하는 사용자 정의 함수입니다.",
     "description": "A user-defined aggregate function processes a set of rows (like built-in SUM, AVG, or COUNT) and returns a single value. You define how the function initializes its state, processes each row, and produces the final result. Custom aggregates are useful when built-in aggregate functions don't cover your specific calculation needs.",
+    "descriptionKo": "사용자 정의 Aggregate Function은 내장 함수인 SUM, AVG, COUNT처럼 여러 행의 집합을 처리하여 하나의 값을 반환합니다. 함수의 초기 상태, 각 행을 처리하는 방법, 최종 결과를 만드는 방법을 직접 정의할 수 있습니다. 기본 내장 집계 함수로는 원하는 계산을 할 수 없을 때 유용합니다.",
     "syntax": {
       "postgresql": "-- Create a custom aggregate that concatenates strings with a separator\nCREATE FUNCTION concat_agg_sfunc(state TEXT, value TEXT)\nRETURNS TEXT\nLANGUAGE plpgsql\nAS $$\nBEGIN\n  IF state IS NULL THEN\n    RETURN value;\n  END IF;\n  RETURN state || ', ' || value;\nEND;\n$$;\n\nCREATE AGGREGATE group_concat(TEXT) (\n  SFUNC = concat_agg_sfunc,\n  STYPE = TEXT\n);\n\n-- Usage\nSELECT category, group_concat(name) AS product_names\nFROM products\nGROUP BY category;",
       "mysql": "-- MySQL does not support CREATE AGGREGATE\n-- But has built-in GROUP_CONCAT\nSELECT category, GROUP_CONCAT(name SEPARATOR ', ') AS product_names\nFROM products\nGROUP BY category;",
@@ -65,14 +81,19 @@
     },
     "vendorSupport": {
       "postgresql": { "supported": true, "level": "full" },
-      "mysql": { "supported": false, "level": "none", "notes": "MySQL does not support user-defined aggregate functions in SQL. Use built-in aggregates or UDFs via C plugins." },
-      "mariadb": { "supported": false, "level": "none", "notes": "MariaDB does not support user-defined aggregate functions in SQL." },
-      "sqlite": { "supported": false, "level": "none", "notes": "SQLite supports custom aggregates only through its C API or application-level bindings." }
+      "mysql": { "supported": false, "level": "none", "notes": "MySQL does not support user-defined aggregate functions in SQL. Use built-in aggregates or UDFs via C plugins.", "notesKo": "MySQL은 SQL에서 사용자 정의 Aggregate Function을 지원하지 않습니다. 내장 집계 함수를 사용하거나 C 플러그인을 통해 UDF를 추가할 수 있습니다." },
+      "mariadb": { "supported": false, "level": "none", "notes": "MariaDB does not support user-defined aggregate functions in SQL.", "notesKo": "MariaDB는 SQL에서 사용자 정의 Aggregate Function을 지원하지 않습니다." },
+      "sqlite": { "supported": false, "level": "none", "notes": "SQLite supports custom aggregates only through its C API or application-level bindings.", "notesKo": "SQLite는 C API 또는 애플리케이션 수준의 바인딩을 통해서만 사용자 정의 집계 함수를 지원합니다." }
     },
     "tips": [
       "Before creating a custom aggregate, check if a built-in aggregate or window function already does what you need.",
       "Custom aggregates in PostgreSQL require defining a state transition function (SFUNC) and a state type (STYPE).",
       "You can optionally define a FINALFUNC to transform the accumulated state into the final result."
+    ],
+    "tipsKo": [
+      "사용자 정의 집계 함수를 만들기 전에, 내장 집계 함수나 윈도우 함수로 이미 원하는 결과를 얻을 수 있는지 먼저 확인하세요.",
+      "PostgreSQL에서 사용자 정의 집계 함수를 만들려면 상태 전이 함수(SFUNC)와 상태 타입(STYPE)을 정의해야 합니다.",
+      "누적된 상태를 최종 결과로 변환하는 FINALFUNC를 선택적으로 정의할 수도 있습니다."
     ],
     "relatedItems": ["function"],
     "seeAlso": []
@@ -82,7 +103,9 @@
     "category": "routines",
     "name": "Procedural Language",
     "summary": "The programming language used to write function and procedure bodies.",
+    "summaryKo": "Function과 Procedure의 본문을 작성하는 데 사용하는 프로그래밍 언어입니다.",
     "description": "When creating functions or procedures, you specify the language that the routine body is written in. Each database supports different languages. PostgreSQL is the most flexible, supporting SQL, PL/pgSQL, PL/Python, PL/Perl, and more. MySQL and MariaDB support SQL-based procedural language. The choice of language affects what you can do inside the routine.",
+    "descriptionKo": "Function이나 Procedure를 만들 때, 루틴 본문이 어떤 언어로 작성되었는지 지정합니다. 각 데이터베이스마다 지원하는 언어가 다릅니다. PostgreSQL이 가장 유연하며, SQL, PL/pgSQL, PL/Python, PL/Perl 등을 지원합니다. MySQL과 MariaDB는 SQL 기반의 절차적 언어를 지원합니다. 어떤 언어를 선택하느냐에 따라 루틴 안에서 할 수 있는 작업이 달라집니다.",
     "syntax": {
       "postgresql": "-- SQL language (simple, no procedural logic)\nCREATE FUNCTION get_user_email(uid INT)\nRETURNS VARCHAR\nLANGUAGE SQL\nAS $$\n  SELECT email FROM users WHERE id = uid;\n$$;\n\n-- PL/pgSQL language (procedural logic with variables, loops, IF/ELSE)\nCREATE FUNCTION get_user_status(uid INT)\nRETURNS VARCHAR\nLANGUAGE plpgsql\nAS $$\nDECLARE\n  user_status VARCHAR;\nBEGIN\n  SELECT status INTO user_status FROM users WHERE id = uid;\n  IF user_status IS NULL THEN\n    RETURN 'unknown';\n  END IF;\n  RETURN user_status;\nEND;\n$$;\n\n-- PL/Python (requires extension)\n-- CREATE EXTENSION plpython3u;\n-- CREATE FUNCTION parse_json(data TEXT) RETURNS TEXT\n-- LANGUAGE plpython3u AS $$ ... $$;",
       "mysql": "-- MySQL only supports SQL-based procedural language\nDELIMITER //\nCREATE FUNCTION get_user_status(uid INT)\nRETURNS VARCHAR(20)\nDETERMINISTIC\nBEGIN\n  DECLARE user_status VARCHAR(20);\n  SELECT status INTO user_status FROM users WHERE id = uid;\n  IF user_status IS NULL THEN\n    RETURN 'unknown';\n  END IF;\n  RETURN user_status;\nEND //\nDELIMITER ;",
@@ -90,15 +113,20 @@
       "sqlite": null
     },
     "vendorSupport": {
-      "postgresql": { "supported": true, "level": "full", "notes": "PostgreSQL supports SQL, PL/pgSQL, PL/Python, PL/Perl, PL/Tcl, and more via extensions." },
-      "mysql": { "supported": true, "level": "partial", "notes": "MySQL only supports its own SQL-based procedural language." },
-      "mariadb": { "supported": true, "level": "partial", "notes": "MariaDB supports SQL-based procedural language and experimental PL/SQL compatibility." },
+      "postgresql": { "supported": true, "level": "full", "notes": "PostgreSQL supports SQL, PL/pgSQL, PL/Python, PL/Perl, PL/Tcl, and more via extensions.", "notesKo": "PostgreSQL은 SQL, PL/pgSQL, PL/Python, PL/Perl, PL/Tcl 등을 확장 기능을 통해 지원합니다." },
+      "mysql": { "supported": true, "level": "partial", "notes": "MySQL only supports its own SQL-based procedural language.", "notesKo": "MySQL은 자체 SQL 기반 절차적 언어만 지원합니다." },
+      "mariadb": { "supported": true, "level": "partial", "notes": "MariaDB supports SQL-based procedural language and experimental PL/SQL compatibility.", "notesKo": "MariaDB는 SQL 기반 절차적 언어와 실험적인 PL/SQL 호환 기능을 지원합니다." },
       "sqlite": { "supported": false, "level": "none" }
     },
     "tips": [
       "Use SQL language for simple single-query functions — it's the fastest and most portable option.",
       "Use PL/pgSQL (PostgreSQL) when you need variables, loops, IF/ELSE, or exception handling.",
       "PL/Python in PostgreSQL is powerful but runs as an 'untrusted' language — it has full system access, so use it carefully."
+    ],
+    "tipsKo": [
+      "단순히 쿼리 하나로 끝나는 함수는 SQL 언어를 사용하세요. 가장 빠르고 이식성이 좋습니다.",
+      "변수, 반복문, IF/ELSE, 예외 처리가 필요하면 PL/pgSQL(PostgreSQL)을 사용하세요.",
+      "PostgreSQL의 PL/Python은 강력하지만 'untrusted' 언어로 실행되어 시스템 전체에 접근할 수 있으므로 신중하게 사용하세요."
     ],
     "relatedItems": ["function", "procedure"],
     "seeAlso": []
@@ -108,7 +136,9 @@
     "category": "routines",
     "name": "Parameter Modes",
     "summary": "Defines whether a function/procedure parameter is for input, output, or both.",
+    "summaryKo": "Function/Procedure의 매개변수가 입력용인지, 출력용인지, 또는 양쪽 모두인지를 정의합니다.",
     "description": "Parameter modes specify how data flows in and out of a function or procedure. IN parameters pass data into the routine (the default). OUT parameters return data from the routine. INOUT parameters do both — they accept input and can be modified to return a new value. Understanding parameter modes is important for procedures that need to return multiple values.",
+    "descriptionKo": "Parameter Mode는 Function이나 Procedure에서 데이터가 어떻게 들어오고 나가는지를 지정합니다. IN 매개변수는 데이터를 루틴에 전달하며 기본값입니다. OUT 매개변수는 루틴에서 데이터를 반환합니다. INOUT 매개변수는 입력과 출력을 모두 수행하여, 값을 받아서 수정한 뒤 새 값을 돌려줍니다. 여러 값을 반환해야 하는 Procedure를 이해하는 데 중요한 개념입니다.",
     "syntax": {
       "postgresql": "-- IN parameter (default) - input only\n-- OUT parameter - output only\n-- INOUT parameter - input and output\nCREATE PROCEDURE get_order_stats(\n  IN p_user_id INT,\n  OUT p_order_count INT,\n  OUT p_total_spent NUMERIC\n)\nLANGUAGE plpgsql\nAS $$\nBEGIN\n  SELECT COUNT(*), COALESCE(SUM(total), 0)\n  INTO p_order_count, p_total_spent\n  FROM orders\n  WHERE user_id = p_user_id;\nEND;\n$$;\n\n-- Call with OUT parameters\nCALL get_order_stats(1, NULL, NULL);",
       "mysql": "-- IN parameter - input only\n-- OUT parameter - output only\n-- INOUT parameter - input and output\nDELIMITER //\nCREATE PROCEDURE get_order_stats(\n  IN p_user_id INT,\n  OUT p_order_count INT,\n  OUT p_total_spent DECIMAL(10,2)\n)\nBEGIN\n  SELECT COUNT(*), COALESCE(SUM(total), 0)\n  INTO p_order_count, p_total_spent\n  FROM orders\n  WHERE user_id = p_user_id;\nEND //\nDELIMITER ;\n\n-- Call with OUT parameters\nCALL get_order_stats(1, @count, @total);\nSELECT @count, @total;",
@@ -125,6 +155,11 @@
       "Use OUT parameters in procedures when you need to return multiple values — functions can only return a single value.",
       "In MySQL/MariaDB, OUT parameter values are accessed via session variables (e.g., @count) after calling the procedure.",
       "Prefer IN parameters as the default — use OUT or INOUT only when you specifically need to return data from a procedure."
+    ],
+    "tipsKo": [
+      "여러 값을 반환해야 할 때는 Procedure에서 OUT 매개변수를 사용하세요. Function은 하나의 값만 반환할 수 있습니다.",
+      "MySQL/MariaDB에서는 Procedure 호출 후 세션 변수(예: @count)를 통해 OUT 매개변수 값을 확인할 수 있습니다.",
+      "기본적으로 IN 매개변수를 사용하고, Procedure에서 데이터를 반환해야 할 때만 OUT이나 INOUT을 사용하세요."
     ],
     "relatedItems": ["function", "procedure"],
     "seeAlso": []

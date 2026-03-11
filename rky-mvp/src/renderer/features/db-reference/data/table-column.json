@@ -4,7 +4,9 @@
     "category": "table-column",
     "name": "Table",
     "summary": "The fundamental structure for storing data in rows and columns.",
+    "summaryKo": "행(row)과 열(column)로 데이터를 저장하는 가장 기본적인 구조입니다.",
     "description": "A table is the most basic building block of a relational database. It organizes data into rows (records) and columns (fields), similar to a spreadsheet. Every piece of data you store in a database lives inside a table. Tables have a defined structure (schema) that specifies what columns exist and what type of data each column can hold.",
+    "descriptionKo": "테이블은 관계형 데이터베이스의 가장 기본적인 구성 요소입니다. 스프레드시트처럼 데이터를 행(레코드)과 열(필드)로 정리해서 저장합니다. 데이터베이스에 저장하는 모든 데이터는 테이블 안에 존재합니다. 테이블에는 어떤 컬럼이 있고, 각 컬럼에 어떤 타입의 데이터를 저장할 수 있는지를 정의하는 구조(스키마)가 있습니다.",
     "syntax": {
       "postgresql": "CREATE TABLE users (\n  id SERIAL PRIMARY KEY,\n  username VARCHAR(50) NOT NULL,\n  email VARCHAR(100) UNIQUE NOT NULL,\n  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP\n);",
       "mysql": "CREATE TABLE users (\n  id INT AUTO_INCREMENT PRIMARY KEY,\n  username VARCHAR(50) NOT NULL,\n  email VARCHAR(100) UNIQUE NOT NULL,\n  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP\n) ENGINE=InnoDB;",
@@ -22,6 +24,11 @@
       "Define a PRIMARY KEY for every table to uniquely identify each row.",
       "Keep tables focused on a single entity — if a table has too many unrelated columns, consider splitting it."
     ],
+    "tipsKo": [
+      "테이블 이름은 저장하는 데이터를 잘 설명하는 복수형 명사로 짓세요 (예: 'users', 'orders').",
+      "모든 테이블에 PRIMARY KEY를 정의해서 각 행을 고유하게 식별할 수 있도록 하세요.",
+      "테이블은 하나의 대상에 집중하세요 — 서로 관련 없는 컬럼이 너무 많다면 테이블을 분리하는 것이 좋습니다."
+    ],
     "relatedItems": ["column", "temporary-table", "foreign-table", "table-comment"],
     "seeAlso": []
   },
@@ -30,7 +37,9 @@
     "category": "table-column",
     "name": "Temporary Table",
     "summary": "A table that exists only for the duration of a session or transaction.",
+    "summaryKo": "세션이나 트랜잭션이 끝나면 자동으로 사라지는 임시 테이블입니다.",
     "description": "A temporary table is a short-lived table that is automatically dropped when the session ends or the connection is closed. It is useful for storing intermediate results during complex queries or batch processing. Temporary tables are only visible to the session that created them, so they won't interfere with other users.",
+    "descriptionKo": "임시 테이블은 세션이 끝나거나 연결이 종료되면 자동으로 삭제되는 수명이 짧은 테이블입니다. 복잡한 쿼리나 일괄 처리 중에 중간 결과를 저장할 때 유용합니다. 임시 테이블은 생성한 세션에서만 보이기 때문에, 다른 사용자에게 영향을 주지 않습니다.",
     "syntax": {
       "postgresql": "CREATE TEMPORARY TABLE temp_active_users (\n  user_id INT,\n  username VARCHAR(50),\n  last_login TIMESTAMP\n);\n\n-- Automatically dropped when the session ends",
       "mysql": "CREATE TEMPORARY TABLE temp_active_users (\n  user_id INT,\n  username VARCHAR(50),\n  last_login TIMESTAMP\n);\n\n-- Automatically dropped when the session ends",
@@ -48,6 +57,11 @@
       "Temporary tables are session-scoped, so two different users can create temp tables with the same name without conflict.",
       "In PostgreSQL, you can use ON COMMIT DROP to make a temp table last only for the current transaction."
     ],
+    "tipsKo": [
+      "여러 단계로 나눠서 데이터를 처리할 때, 중간 쿼리 결과를 저장하려면 임시 테이블을 사용하세요.",
+      "임시 테이블은 세션 단위로 격리되므로, 서로 다른 사용자가 같은 이름의 임시 테이블을 만들어도 충돌이 생기지 않습니다.",
+      "PostgreSQL에서는 ON COMMIT DROP 옵션을 사용하면 현재 트랜잭션이 끝날 때 임시 테이블을 자동 삭제할 수 있습니다."
+    ],
     "relatedItems": ["table"],
     "seeAlso": []
   },
@@ -56,7 +70,9 @@
     "category": "table-column",
     "name": "Foreign Table",
     "summary": "A table that references data stored in an external data source.",
+    "summaryKo": "외부 데이터 소스에 저장된 데이터를 참조하는 테이블입니다.",
     "description": "A foreign table allows you to query data from an external source (another database, a CSV file, a remote server) as if it were a regular table in your database. This is part of the SQL/MED (Management of External Data) standard. Foreign tables are commonly used to integrate data across different systems without copying it.",
+    "descriptionKo": "외부 테이블을 사용하면 다른 데이터베이스, CSV 파일, 원격 서버 등 외부 소스에 있는 데이터를 마치 내 데이터베이스의 일반 테이블처럼 조회할 수 있습니다. 이는 SQL/MED (외부 데이터 관리) 표준의 일부입니다. 외부 테이블은 데이터를 복사하지 않고도 서로 다른 시스템의 데이터를 통합할 때 주로 사용됩니다.",
     "syntax": {
       "postgresql": "-- First, create a foreign data wrapper and server\nCREATE EXTENSION postgres_fdw;\n\nCREATE SERVER remote_server\n  FOREIGN DATA WRAPPER postgres_fdw\n  OPTIONS (host 'remote-host', dbname 'remote_db');\n\nCREATE FOREIGN TABLE remote_users (\n  id INT,\n  username VARCHAR(50),\n  email VARCHAR(100)\n) SERVER remote_server\n  OPTIONS (table_name 'users');",
       "mysql": "CREATE SERVER remote_server\n  FOREIGN DATA WRAPPER mysql\n  OPTIONS (HOST 'remote-host', DATABASE 'remote_db', USER 'admin', PASSWORD 'secret');\n\nCREATE TABLE remote_users (\n  id INT,\n  username VARCHAR(50),\n  email VARCHAR(100)\n) ENGINE=FEDERATED\n  CONNECTION='remote_server/users';",
@@ -65,14 +81,19 @@
     },
     "vendorSupport": {
       "postgresql": { "supported": true, "level": "full" },
-      "mysql": { "supported": true, "level": "partial", "notes": "MySQL uses the FEDERATED storage engine instead of the SQL/MED standard. It must be explicitly enabled." },
-      "mariadb": { "supported": true, "level": "partial", "notes": "MariaDB uses the FEDERATED or CONNECT engine for remote table access." },
+      "mysql": { "supported": true, "level": "partial", "notes": "MySQL uses the FEDERATED storage engine instead of the SQL/MED standard. It must be explicitly enabled.", "notesKo": "MySQL은 SQL/MED 표준 대신 FEDERATED 스토리지 엔진을 사용합니다. 명시적으로 활성화해야 합니다." },
+      "mariadb": { "supported": true, "level": "partial", "notes": "MariaDB uses the FEDERATED or CONNECT engine for remote table access.", "notesKo": "MariaDB는 원격 테이블 접근을 위해 FEDERATED 또는 CONNECT 엔진을 사용합니다." },
       "sqlite": { "supported": false, "level": "none" }
     },
     "tips": [
       "Foreign tables are read-heavy — writing to them may be slow or unsupported depending on the wrapper.",
       "In PostgreSQL, use postgres_fdw for connecting to other PostgreSQL databases, or file_fdw for reading CSV/text files.",
       "Always test query performance on foreign tables, as network latency can make them significantly slower than local tables."
+    ],
+    "tipsKo": [
+      "외부 테이블은 주로 읽기용입니다 — wrapper 종류에 따라 쓰기가 느리거나 지원되지 않을 수 있습니다.",
+      "PostgreSQL에서는 다른 PostgreSQL 데이터베이스에 연결할 때 postgres_fdw를, CSV/텍스트 파일을 읽을 때는 file_fdw를 사용하세요.",
+      "외부 테이블은 네트워크 지연 때문에 로컬 테이블보다 훨씬 느릴 수 있으니, 반드시 쿼리 성능을 테스트하세요."
     ],
     "relatedItems": ["table", "fdw"],
     "seeAlso": []
@@ -82,7 +103,9 @@
     "category": "table-column",
     "name": "Column",
     "summary": "A named field in a table that holds a specific type of data.",
+    "summaryKo": "테이블에서 특정 타입의 데이터를 저장하는 이름이 있는 필드입니다.",
     "description": "A column defines one attribute of the data stored in a table. For example, a 'users' table might have columns like 'username', 'email', and 'created_at'. Each column has a name and a data type that determines what kind of values it can store (text, numbers, dates, etc.). Columns can also have constraints like NOT NULL or DEFAULT values.",
+    "descriptionKo": "컬럼은 테이블에 저장되는 데이터의 하나의 속성을 정의합니다. 예를 들어, 'users' 테이블에는 'username', 'email', 'created_at' 같은 컬럼이 있을 수 있습니다. 각 컬럼에는 이름과 데이터 타입이 있어서, 어떤 종류의 값(텍스트, 숫자, 날짜 등)을 저장할 수 있는지가 결정됩니다. 컬럼에는 NOT NULL이나 DEFAULT 값 같은 제약 조건도 설정할 수 있습니다.",
     "syntax": {
       "postgresql": "-- Adding a column to an existing table\nALTER TABLE users ADD COLUMN phone VARCHAR(20);\n\n-- Adding a column with constraints\nALTER TABLE users ADD COLUMN status VARCHAR(10) NOT NULL DEFAULT 'active';",
       "mysql": "-- Adding a column to an existing table\nALTER TABLE users ADD COLUMN phone VARCHAR(20);\n\n-- Adding a column with constraints\nALTER TABLE users ADD COLUMN status VARCHAR(10) NOT NULL DEFAULT 'active';",
@@ -93,12 +116,17 @@
       "postgresql": { "supported": true, "level": "full" },
       "mysql": { "supported": true, "level": "full" },
       "mariadb": { "supported": true, "level": "full" },
-      "sqlite": { "supported": true, "level": "partial", "notes": "SQLite only supports ADD COLUMN. You cannot drop or rename columns in older versions (before 3.35.0)." }
+      "sqlite": { "supported": true, "level": "partial", "notes": "SQLite only supports ADD COLUMN. You cannot drop or rename columns in older versions (before 3.35.0).", "notesKo": "SQLite는 ADD COLUMN만 지원합니다. 3.35.0 이전 버전에서는 컬럼 삭제나 이름 변경이 불가능합니다." }
     },
     "tips": [
       "Use descriptive column names that clearly convey the data they hold (e.g., 'created_at' instead of 'date1').",
       "Always specify NOT NULL for columns that should never be empty to enforce data integrity.",
       "Consider adding DEFAULT values for columns so that inserts don't fail if the column is omitted."
+    ],
+    "tipsKo": [
+      "컬럼 이름은 저장하는 데이터를 명확하게 나타내도록 지으세요 (예: 'date1' 대신 'created_at').",
+      "비어 있으면 안 되는 컬럼에는 반드시 NOT NULL을 지정해서 데이터 무결성을 보장하세요.",
+      "INSERT 시 컬럼을 생략해도 오류가 나지 않도록 DEFAULT 값을 설정하는 것을 고려하세요."
     ],
     "relatedItems": ["data-type", "default-value", "not-null", "column-comment"],
     "seeAlso": []
@@ -108,7 +136,9 @@
     "category": "table-column",
     "name": "Data Type",
     "summary": "Defines what kind of value a column can store (text, number, date, etc.).",
+    "summaryKo": "컬럼에 저장할 수 있는 값의 종류(텍스트, 숫자, 날짜 등)를 정의합니다.",
     "description": "A data type tells the database what kind of value a column holds, such as integers, text, dates, or booleans. Choosing the right data type is important because it affects storage efficiency, query performance, and data validation. Each database vendor has its own set of data types, though many are shared across vendors.",
+    "descriptionKo": "데이터 타입은 컬럼이 어떤 종류의 값을 저장하는지 데이터베이스에 알려줍니다. 정수, 텍스트, 날짜, 불리언 등이 있습니다. 적절한 데이터 타입을 선택하는 것이 중요한데, 이는 저장 효율성, 쿼리 성능, 데이터 유효성 검사에 영향을 미치기 때문입니다. 데이터베이스 벤더마다 고유한 데이터 타입이 있지만, 많은 부분이 공통으로 사용됩니다.",
     "syntax": {
       "postgresql": "CREATE TABLE products (\n  id SERIAL PRIMARY KEY,\n  name VARCHAR(100) NOT NULL,\n  price NUMERIC(10, 2) NOT NULL,\n  in_stock BOOLEAN DEFAULT TRUE,\n  tags TEXT[],\n  metadata JSONB,\n  created_at TIMESTAMPTZ DEFAULT NOW()\n);",
       "mysql": "CREATE TABLE products (\n  id INT AUTO_INCREMENT PRIMARY KEY,\n  name VARCHAR(100) NOT NULL,\n  price DECIMAL(10, 2) NOT NULL,\n  in_stock TINYINT(1) DEFAULT 1,\n  tags JSON,\n  metadata JSON,\n  created_at DATETIME DEFAULT CURRENT_TIMESTAMP\n);",
@@ -119,12 +149,17 @@
       "postgresql": { "supported": true, "level": "full" },
       "mysql": { "supported": true, "level": "full" },
       "mariadb": { "supported": true, "level": "full" },
-      "sqlite": { "supported": true, "level": "partial", "notes": "SQLite uses dynamic typing with type affinities (TEXT, INTEGER, REAL, BLOB, NUMERIC) rather than strict data types." }
+      "sqlite": { "supported": true, "level": "partial", "notes": "SQLite uses dynamic typing with type affinities (TEXT, INTEGER, REAL, BLOB, NUMERIC) rather than strict data types.", "notesKo": "SQLite는 엄격한 데이터 타입 대신, 타입 친화성(TEXT, INTEGER, REAL, BLOB, NUMERIC)을 사용하는 동적 타이핑 방식입니다." }
     },
     "tips": [
       "Use the smallest data type that fits your data — e.g., SMALLINT instead of BIGINT for small numbers, to save storage.",
       "Use VARCHAR with a sensible maximum length instead of TEXT when you want to enforce a size limit.",
       "For monetary values, always use NUMERIC/DECIMAL instead of FLOAT to avoid rounding errors."
+    ],
+    "tipsKo": [
+      "데이터에 맞는 가장 작은 타입을 사용하세요 — 예를 들어, 작은 숫자에는 BIGINT 대신 SMALLINT를 쓰면 저장 공간을 아낄 수 있습니다.",
+      "크기 제한을 두고 싶다면 TEXT 대신 적절한 최대 길이의 VARCHAR를 사용하세요.",
+      "금액을 다룰 때는 반올림 오류를 피하기 위해 FLOAT 대신 반드시 NUMERIC/DECIMAL을 사용하세요."
     ],
     "relatedItems": ["column", "json-column"],
     "seeAlso": []
@@ -134,7 +169,9 @@
     "category": "table-column",
     "name": "Generated Column",
     "summary": "A column whose value is automatically computed from other columns.",
+    "summaryKo": "다른 컬럼의 값을 기반으로 자동 계산되는 컬럼입니다.",
     "description": "A generated column (also called a computed column) is a column whose value is derived from an expression using other columns in the same row. Instead of manually computing and storing a value, the database calculates it for you. Generated columns can be 'stored' (physically saved to disk) or 'virtual' (computed on-the-fly when queried).",
+    "descriptionKo": "생성 컬럼(계산 컬럼이라고도 함)은 같은 행의 다른 컬럼들을 사용한 수식으로부터 값이 만들어지는 컬럼입니다. 값을 직접 계산해서 저장하는 대신, 데이터베이스가 자동으로 계산해 줍니다. 생성 컬럼은 'STORED'(디스크에 물리적으로 저장) 또는 'VIRTUAL'(조회할 때 즉석에서 계산) 방식이 있습니다.",
     "syntax": {
       "postgresql": "CREATE TABLE orders (\n  id SERIAL PRIMARY KEY,\n  quantity INT NOT NULL,\n  unit_price NUMERIC(10, 2) NOT NULL,\n  total_price NUMERIC(10, 2) GENERATED ALWAYS AS (quantity * unit_price) STORED\n);",
       "mysql": "CREATE TABLE orders (\n  id INT AUTO_INCREMENT PRIMARY KEY,\n  quantity INT NOT NULL,\n  unit_price DECIMAL(10, 2) NOT NULL,\n  total_price DECIMAL(10, 2) GENERATED ALWAYS AS (quantity * unit_price) STORED\n);",
@@ -142,7 +179,7 @@
       "sqlite": "CREATE TABLE orders (\n  id INTEGER PRIMARY KEY AUTOINCREMENT,\n  quantity INTEGER NOT NULL,\n  unit_price REAL NOT NULL,\n  total_price REAL GENERATED ALWAYS AS (quantity * unit_price) STORED\n);"
     },
     "vendorSupport": {
-      "postgresql": { "supported": true, "level": "partial", "notes": "PostgreSQL only supports STORED generated columns (not VIRTUAL) as of version 16." },
+      "postgresql": { "supported": true, "level": "partial", "notes": "PostgreSQL only supports STORED generated columns (not VIRTUAL) as of version 16.", "notesKo": "PostgreSQL은 버전 16 기준으로 STORED 생성 컬럼만 지원하며, VIRTUAL은 지원하지 않습니다." },
       "mysql": { "supported": true, "level": "full" },
       "mariadb": { "supported": true, "level": "full" },
       "sqlite": { "supported": true, "level": "full" }
@@ -152,6 +189,11 @@
       "Virtual generated columns save disk space since they are computed on read, but stored columns are faster to query.",
       "You cannot directly INSERT or UPDATE a generated column — the database manages its value automatically."
     ],
+    "tipsKo": [
+      "데이터 불일치를 방지하려면 생성 컬럼을 사용하세요 — 데이터베이스가 계산 값이 항상 정확하도록 보장합니다.",
+      "VIRTUAL 생성 컬럼은 읽을 때 계산되므로 디스크 공간을 절약하지만, STORED 컬럼이 쿼리 속도는 더 빠릅니다.",
+      "생성 컬럼에는 직접 INSERT나 UPDATE를 할 수 없습니다 — 데이터베이스가 자동으로 값을 관리합니다."
+    ],
     "relatedItems": ["column", "expression-index"],
     "seeAlso": []
   },
@@ -160,7 +202,9 @@
     "category": "table-column",
     "name": "Identity Column",
     "summary": "A column that auto-generates unique sequential values using the SQL standard syntax.",
+    "summaryKo": "SQL 표준 문법을 사용하여 고유한 순차 값을 자동 생성하는 컬럼입니다.",
     "description": "An identity column is the SQL standard way of defining a column that automatically generates unique, sequential values. It is the modern replacement for vendor-specific auto-increment features. Identity columns give you more control than auto-increment, such as specifying start values, increments, and whether the generated value can be overridden.",
+    "descriptionKo": "Identity 컬럼은 고유한 순차 값을 자동으로 생성하는 SQL 표준 방식입니다. 벤더별로 다른 자동 증가 기능을 대체하는 현대적인 방법입니다. Identity 컬럼은 시작 값, 증가 폭, 생성된 값을 직접 지정할 수 있는지 여부 등 자동 증가보다 더 세밀한 제어가 가능합니다.",
     "syntax": {
       "postgresql": "CREATE TABLE users (\n  id INT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,\n  username VARCHAR(50) NOT NULL\n);\n\n-- With custom sequence options\nCREATE TABLE orders (\n  id INT GENERATED BY DEFAULT AS IDENTITY (START WITH 1000 INCREMENT BY 1) PRIMARY KEY,\n  user_id INT NOT NULL\n);",
       "mysql": null,
@@ -169,14 +213,19 @@
     },
     "vendorSupport": {
       "postgresql": { "supported": true, "level": "full" },
-      "mysql": { "supported": false, "level": "none", "notes": "MySQL does not support identity columns. Use AUTO_INCREMENT instead." },
-      "mariadb": { "supported": false, "level": "none", "notes": "MariaDB does not support identity columns. Use AUTO_INCREMENT or SEQUENCE instead." },
-      "sqlite": { "supported": false, "level": "none", "notes": "SQLite does not support identity columns. Use INTEGER PRIMARY KEY AUTOINCREMENT instead." }
+      "mysql": { "supported": false, "level": "none", "notes": "MySQL does not support identity columns. Use AUTO_INCREMENT instead.", "notesKo": "MySQL은 Identity 컬럼을 지원하지 않습니다. 대신 AUTO_INCREMENT를 사용하세요." },
+      "mariadb": { "supported": false, "level": "none", "notes": "MariaDB does not support identity columns. Use AUTO_INCREMENT or SEQUENCE instead.", "notesKo": "MariaDB는 Identity 컬럼을 지원하지 않습니다. 대신 AUTO_INCREMENT 또는 SEQUENCE를 사용하세요." },
+      "sqlite": { "supported": false, "level": "none", "notes": "SQLite does not support identity columns. Use INTEGER PRIMARY KEY AUTOINCREMENT instead.", "notesKo": "SQLite는 Identity 컬럼을 지원하지 않습니다. 대신 INTEGER PRIMARY KEY AUTOINCREMENT를 사용하세요." }
     },
     "tips": [
       "Prefer GENERATED ALWAYS over GENERATED BY DEFAULT — it prevents accidental manual inserts that could cause conflicts.",
       "In PostgreSQL, identity columns are the recommended way to create auto-incrementing IDs instead of using SERIAL.",
       "You can customize the start value and increment step using sequence options inside the identity definition."
+    ],
+    "tipsKo": [
+      "GENERATED BY DEFAULT보다 GENERATED ALWAYS를 권장합니다 — 실수로 직접 값을 넣어 충돌이 생기는 것을 방지합니다.",
+      "PostgreSQL에서는 SERIAL 대신 Identity 컬럼을 사용하는 것이 자동 증가 ID를 만드는 권장 방법입니다.",
+      "Identity 정의 안에서 시퀀스 옵션을 사용하면 시작 값과 증가 폭을 원하는 대로 설정할 수 있습니다."
     ],
     "relatedItems": ["auto-increment", "sequence"],
     "seeAlso": []
@@ -186,7 +235,9 @@
     "category": "table-column",
     "name": "Auto Increment",
     "summary": "Automatically generates a unique incrementing number for each new row.",
+    "summaryKo": "새 행이 추가될 때마다 고유한 증가 숫자를 자동으로 생성합니다.",
     "description": "Auto increment is a column feature that automatically assigns a unique, incrementing integer to each new row inserted into a table. It is most commonly used for primary key columns to ensure every row has a unique identifier without manual input. Each vendor implements this slightly differently, but the concept is the same.",
+    "descriptionKo": "자동 증가는 테이블에 새 행이 삽입될 때마다 고유한 증가 정수를 자동으로 부여하는 컬럼 기능입니다. 주로 기본 키 컬럼에 사용되어, 직접 값을 입력하지 않아도 모든 행이 고유한 식별자를 갖도록 합니다. 벤더마다 구현 방식이 약간 다르지만, 개념은 동일합니다.",
     "syntax": {
       "postgresql": "-- PostgreSQL uses SERIAL (shorthand) or IDENTITY (preferred)\nCREATE TABLE users (\n  id SERIAL PRIMARY KEY,\n  username VARCHAR(50) NOT NULL\n);\n\n-- Equivalent to:\n-- CREATE SEQUENCE users_id_seq;\n-- id INT DEFAULT nextval('users_id_seq')",
       "mysql": "CREATE TABLE users (\n  id INT AUTO_INCREMENT PRIMARY KEY,\n  username VARCHAR(50) NOT NULL\n);",
@@ -194,7 +245,7 @@
       "sqlite": "CREATE TABLE users (\n  id INTEGER PRIMARY KEY AUTOINCREMENT,\n  username TEXT NOT NULL\n);"
     },
     "vendorSupport": {
-      "postgresql": { "supported": true, "level": "full", "notes": "PostgreSQL uses SERIAL or IDENTITY syntax instead of AUTO_INCREMENT keyword." },
+      "postgresql": { "supported": true, "level": "full", "notes": "PostgreSQL uses SERIAL or IDENTITY syntax instead of AUTO_INCREMENT keyword.", "notesKo": "PostgreSQL은 AUTO_INCREMENT 키워드 대신 SERIAL 또는 IDENTITY 문법을 사용합니다." },
       "mysql": { "supported": true, "level": "full" },
       "mariadb": { "supported": true, "level": "full" },
       "sqlite": { "supported": true, "level": "full" }
@@ -204,6 +255,11 @@
       "Never assume auto-increment values are gap-free — deletions and failed inserts can create gaps.",
       "In PostgreSQL, prefer IDENTITY columns over SERIAL for new projects as they follow the SQL standard."
     ],
+    "tipsKo": [
+      "SQLite에서는 INTEGER PRIMARY KEY만으로도 자동 증가됩니다. AUTOINCREMENT를 추가하면 삭제된 ID가 재사용되지 않을 뿐입니다.",
+      "자동 증가 값이 빈틈 없이 연속된다고 가정하지 마세요 — 삭제나 실패한 INSERT로 인해 중간에 빈 번호가 생길 수 있습니다.",
+      "PostgreSQL에서 새 프로젝트라면 SQL 표준을 따르는 IDENTITY 컬럼을 SERIAL보다 권장합니다."
+    ],
     "relatedItems": ["identity-column", "pk", "sequence"],
     "seeAlso": []
   },
@@ -212,7 +268,9 @@
     "category": "table-column",
     "name": "Column Comment",
     "summary": "A text description attached to a column for documentation purposes.",
+    "summaryKo": "문서화 목적으로 컬럼에 붙이는 텍스트 설명입니다.",
     "description": "A column comment is a piece of metadata that describes the purpose or content of a column. Comments help other developers (and future you) understand what data a column holds, its format, or any business rules it encodes. Comments are stored in the database catalog and can be viewed using database tools.",
+    "descriptionKo": "컬럼 코멘트는 컬럼의 용도나 내용을 설명하는 메타데이터입니다. 코멘트를 달아 두면 다른 개발자(그리고 미래의 나)가 해당 컬럼에 어떤 데이터가 들어가는지, 형식은 무엇인지, 어떤 비즈니스 규칙이 적용되는지 이해하는 데 도움이 됩니다. 코멘트는 데이터베이스 카탈로그에 저장되며, 데이터베이스 관리 도구에서 확인할 수 있습니다.",
     "syntax": {
       "postgresql": "-- Add a comment to an existing column\nCOMMENT ON COLUMN users.email IS 'Primary email address used for login and notifications';",
       "mysql": "-- Add comment during table creation\nCREATE TABLE users (\n  id INT AUTO_INCREMENT PRIMARY KEY,\n  email VARCHAR(100) NOT NULL COMMENT 'Primary email address used for login and notifications'\n);\n\n-- Add comment to existing column\nALTER TABLE users MODIFY COLUMN email VARCHAR(100) NOT NULL COMMENT 'Primary email address used for login and notifications';",
@@ -223,12 +281,17 @@
       "postgresql": { "supported": true, "level": "full" },
       "mysql": { "supported": true, "level": "full" },
       "mariadb": { "supported": true, "level": "full" },
-      "sqlite": { "supported": false, "level": "none", "notes": "SQLite does not support column comments. Use SQL comments in your schema file instead." }
+      "sqlite": { "supported": false, "level": "none", "notes": "SQLite does not support column comments. Use SQL comments in your schema file instead.", "notesKo": "SQLite는 컬럼 코멘트를 지원하지 않습니다. 대신 스키마 파일에 SQL 주석을 사용하세요." }
     },
     "tips": [
       "Write comments for columns with non-obvious meanings, coded values, or specific format requirements.",
       "Keep comments concise but informative — focus on what the business meaning is, not just the data type.",
       "In MySQL/MariaDB, you must re-specify the full column definition when modifying a comment."
+    ],
+    "tipsKo": [
+      "의미가 바로 와닿지 않는 컬럼, 코드화된 값, 특정 형식 요구사항이 있는 컬럼에 코멘트를 작성하세요.",
+      "코멘트는 간결하되 유용하게 — 단순히 데이터 타입이 아니라 비즈니스적 의미에 초점을 맞추세요.",
+      "MySQL/MariaDB에서는 코멘트를 수정할 때 컬럼 정의 전체를 다시 작성해야 합니다."
     ],
     "relatedItems": ["table-comment", "column"],
     "seeAlso": []
@@ -238,7 +301,9 @@
     "category": "table-column",
     "name": "Table Comment",
     "summary": "A text description attached to a table for documentation purposes.",
+    "summaryKo": "문서화 목적으로 테이블에 붙이는 텍스트 설명입니다.",
     "description": "A table comment is a metadata description that explains the purpose of a table. It helps developers and database administrators understand the role of each table at a glance, which is especially valuable in large databases with hundreds of tables. Comments are stored in the database catalog and are visible in most database management tools.",
+    "descriptionKo": "테이블 코멘트는 테이블의 용도를 설명하는 메타데이터입니다. 개발자와 데이터베이스 관리자가 각 테이블의 역할을 한눈에 파악할 수 있게 해주며, 테이블이 수백 개인 대규모 데이터베이스에서 특히 유용합니다. 코멘트는 데이터베이스 카탈로그에 저장되며, 대부분의 데이터베이스 관리 도구에서 확인할 수 있습니다.",
     "syntax": {
       "postgresql": "-- Add a comment to a table\nCOMMENT ON TABLE users IS 'Stores registered user accounts and their profile information';",
       "mysql": "-- Add comment during table creation\nCREATE TABLE users (\n  id INT AUTO_INCREMENT PRIMARY KEY\n) COMMENT = 'Stores registered user accounts and their profile information';\n\n-- Add comment to existing table\nALTER TABLE users COMMENT = 'Stores registered user accounts and their profile information';",
@@ -249,12 +314,17 @@
       "postgresql": { "supported": true, "level": "full" },
       "mysql": { "supported": true, "level": "full" },
       "mariadb": { "supported": true, "level": "full" },
-      "sqlite": { "supported": false, "level": "none", "notes": "SQLite does not support table comments natively." }
+      "sqlite": { "supported": false, "level": "none", "notes": "SQLite does not support table comments natively.", "notesKo": "SQLite는 테이블 코멘트를 기본적으로 지원하지 않습니다." }
     },
     "tips": [
       "Add a table comment to every table describing its purpose and the type of data it stores.",
       "Include business context in comments (e.g., 'Stores user orders placed through the web checkout flow').",
       "Table comments are great for onboarding new team members who need to understand the database schema quickly."
+    ],
+    "tipsKo": [
+      "모든 테이블에 용도와 저장하는 데이터 종류를 설명하는 코멘트를 추가하세요.",
+      "코멘트에 비즈니스 맥락을 포함하세요 (예: '웹 결제 과정에서 생성된 사용자 주문을 저장합니다').",
+      "테이블 코멘트는 데이터베이스 스키마를 빠르게 파악해야 하는 신규 팀원 온보딩에 큰 도움이 됩니다."
     ],
     "relatedItems": ["column-comment", "table"],
     "seeAlso": []
@@ -264,7 +334,9 @@
     "category": "table-column",
     "name": "Default Value",
     "summary": "A value automatically assigned to a column when no value is provided during INSERT.",
+    "summaryKo": "INSERT 시 값을 지정하지 않으면 컬럼에 자동으로 할당되는 값입니다.",
     "description": "A default value is a fallback value that the database uses when you insert a row without specifying a value for that column. Defaults help ensure data consistency and reduce the amount of data you need to provide in every INSERT statement. Common defaults include timestamps (NOW()), boolean flags (TRUE/FALSE), and status strings ('active').",
+    "descriptionKo": "기본값은 행을 삽입할 때 해당 컬럼에 값을 지정하지 않으면 데이터베이스가 대신 사용하는 대체 값입니다. 기본값을 설정하면 데이터 일관성을 유지하고, 매번 INSERT 문에 모든 값을 입력하지 않아도 됩니다. 흔히 사용되는 기본값으로는 타임스탬프(NOW()), 불리언 플래그(TRUE/FALSE), 상태 문자열('active') 등이 있습니다.",
     "syntax": {
       "postgresql": "CREATE TABLE orders (\n  id SERIAL PRIMARY KEY,\n  status VARCHAR(20) DEFAULT 'pending',\n  is_paid BOOLEAN DEFAULT FALSE,\n  created_at TIMESTAMPTZ DEFAULT NOW(),\n  order_number UUID DEFAULT gen_random_uuid()\n);",
       "mysql": "CREATE TABLE orders (\n  id INT AUTO_INCREMENT PRIMARY KEY,\n  status VARCHAR(20) DEFAULT 'pending',\n  is_paid TINYINT(1) DEFAULT 0,\n  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,\n  order_number CHAR(36) DEFAULT (UUID())\n);",
@@ -282,6 +354,11 @@
       "Combine DEFAULT with NOT NULL to ensure a column always has a meaningful value.",
       "In MySQL 8.0+, you can use expressions as defaults (e.g., UUID()), but wrap them in parentheses."
     ],
+    "tipsKo": [
+      "타임스탬프에는 DEFAULT를 사용하면 애플리케이션 코드에서 현재 시간을 직접 전달하지 않아도 됩니다.",
+      "DEFAULT와 NOT NULL을 함께 사용하면 컬럼에 항상 의미 있는 값이 들어가도록 보장할 수 있습니다.",
+      "MySQL 8.0 이상에서는 기본값으로 수식을 사용할 수 있지만 (예: UUID()), 반드시 괄호로 감싸야 합니다."
+    ],
     "relatedItems": ["column", "not-null", "default-constraint"],
     "seeAlso": []
   },
@@ -290,7 +367,9 @@
     "category": "table-column",
     "name": "JSON Column",
     "summary": "A column that stores structured JSON data inside a relational table.",
+    "summaryKo": "관계형 테이블 안에 구조화된 JSON 데이터를 저장하는 컬럼입니다.",
     "description": "A JSON column lets you store semi-structured data (objects, arrays) inside a relational table. This is useful when you have flexible or nested data that doesn't fit neatly into traditional columns, such as user preferences, API responses, or metadata. Most modern databases can query, index, and validate JSON data efficiently.",
+    "descriptionKo": "JSON 컬럼을 사용하면 관계형 테이블 안에 반정형 데이터(객체, 배열)를 저장할 수 있습니다. 사용자 환경설정, API 응답, 메타데이터처럼 기존 컬럼 구조에 깔끔하게 맞지 않는 유연하거나 중첩된 데이터를 다룰 때 유용합니다. 대부분의 최신 데이터베이스는 JSON 데이터를 효율적으로 조회, 인덱싱, 검증할 수 있습니다.",
     "syntax": {
       "postgresql": "CREATE TABLE products (\n  id SERIAL PRIMARY KEY,\n  name VARCHAR(100) NOT NULL,\n  attributes JSONB NOT NULL DEFAULT '{}'\n);\n\n-- Query JSON data\nSELECT name, attributes->>'color' AS color\nFROM products\nWHERE attributes @> '{\"category\": \"electronics\"}';",
       "mysql": "CREATE TABLE products (\n  id INT AUTO_INCREMENT PRIMARY KEY,\n  name VARCHAR(100) NOT NULL,\n  attributes JSON NOT NULL\n);\n\n-- Query JSON data\nSELECT name, JSON_EXTRACT(attributes, '$.color') AS color\nFROM products\nWHERE JSON_CONTAINS(attributes, '\"electronics\"', '$.category');",
@@ -298,15 +377,20 @@
       "sqlite": "CREATE TABLE products (\n  id INTEGER PRIMARY KEY AUTOINCREMENT,\n  name TEXT NOT NULL,\n  attributes TEXT NOT NULL DEFAULT '{}'\n);\n\n-- Query JSON data (requires JSON1 extension)\nSELECT name, json_extract(attributes, '$.color') AS color\nFROM products\nWHERE json_extract(attributes, '$.category') = 'electronics';"
     },
     "vendorSupport": {
-      "postgresql": { "supported": true, "level": "full", "notes": "PostgreSQL offers both JSON (text-based) and JSONB (binary, faster queries, indexable). Prefer JSONB." },
+      "postgresql": { "supported": true, "level": "full", "notes": "PostgreSQL offers both JSON (text-based) and JSONB (binary, faster queries, indexable). Prefer JSONB.", "notesKo": "PostgreSQL은 JSON(텍스트 기반)과 JSONB(바이너리, 더 빠른 쿼리, 인덱싱 가능) 두 가지를 제공합니다. JSONB를 권장합니다." },
       "mysql": { "supported": true, "level": "full" },
-      "mariadb": { "supported": true, "level": "partial", "notes": "MariaDB stores JSON as a LONGTEXT alias with validation. Some advanced JSON functions differ from MySQL." },
-      "sqlite": { "supported": true, "level": "partial", "notes": "SQLite stores JSON as TEXT. JSON functions require the JSON1 extension (built-in since 3.38.0)." }
+      "mariadb": { "supported": true, "level": "partial", "notes": "MariaDB stores JSON as a LONGTEXT alias with validation. Some advanced JSON functions differ from MySQL.", "notesKo": "MariaDB는 JSON을 유효성 검사가 포함된 LONGTEXT 별칭으로 저장합니다. 일부 고급 JSON 함수는 MySQL과 다릅니다." },
+      "sqlite": { "supported": true, "level": "partial", "notes": "SQLite stores JSON as TEXT. JSON functions require the JSON1 extension (built-in since 3.38.0).", "notesKo": "SQLite는 JSON을 TEXT로 저장합니다. JSON 함수를 사용하려면 JSON1 확장이 필요합니다 (3.38.0부터 기본 내장)." }
     },
     "tips": [
       "In PostgreSQL, always use JSONB instead of JSON — it is faster to query and supports indexing with GIN indexes.",
       "Don't store everything in JSON just because you can — if the data has a fixed structure, use regular columns for better performance.",
       "Create GIN indexes on JSONB columns in PostgreSQL to speed up queries that filter by JSON keys or values."
+    ],
+    "tipsKo": [
+      "PostgreSQL에서는 JSON 대신 항상 JSONB를 사용하세요 — 쿼리가 더 빠르고 GIN 인덱스로 인덱싱도 가능합니다.",
+      "할 수 있다고 해서 모든 것을 JSON에 넣지 마세요 — 데이터 구조가 고정되어 있다면 일반 컬럼이 성능이 더 좋습니다.",
+      "PostgreSQL에서 JSON 키나 값으로 필터링하는 쿼리를 빠르게 하려면 JSONB 컬럼에 GIN 인덱스를 생성하세요."
     ],
     "relatedItems": ["data-type", "gin-index"],
     "seeAlso": []

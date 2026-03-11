@@ -1,4 +1,4 @@
-import { LayoutDashboard, Package, PenTool, Monitor } from 'lucide-react';
+import { LayoutDashboard, Package, PenTool, Monitor, BookOpen } from 'lucide-react';
 import { ROUTES } from '@/shared/config/constants';
 import type { IDbAreaItem } from '../model/types';
 import { AreaToggleButton } from './AreaToggleButton';
@@ -8,6 +8,7 @@ const areas: IDbAreaItem[] = [
   { id: 'package', label: 'Package', icon: Package, path: ROUTES.DB.PACKAGE },
   { id: 'studio', label: 'Schema Studio', icon: PenTool, path: ROUTES.DB.SCHEMA_STUDIO.ROOT },
   { id: 'console', label: 'Live Console', icon: Monitor, path: ROUTES.DB.LIVE_CONSOLE.ROOT },
+  { id: 'reference', label: 'Reference', icon: BookOpen, path: ROUTES.DB.REFERENCE },
 ];
 
 export function AreaToggle() {

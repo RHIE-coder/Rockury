@@ -4,7 +4,9 @@
     "category": "triggers-events",
     "name": "Row-Level Trigger",
     "summary": "A trigger that fires once for each row affected by the triggering statement.",
+    "summaryKo": "트리거를 발생시킨 SQL 문에 의해 영향받는 각 행마다 한 번씩 실행되는 트리거입니다.",
     "description": "A row-level trigger executes its code once for every row that is inserted, updated, or deleted. Inside the trigger, you can access the old and new values of the row using special variables (OLD and NEW). Row triggers are perfect for auditing changes, validating data, or maintaining derived values on a per-row basis.",
+    "descriptionKo": "Row-level trigger는 INSERT, UPDATE, DELETE되는 모든 행에 대해 한 번씩 코드를 실행합니다. 트리거 내부에서는 OLD와 NEW라는 특수 변수를 사용하여 행의 이전 값과 새 값에 접근할 수 있습니다. Row trigger는 변경 이력 추적, 데이터 유효성 검사, 행 단위 파생 값 유지에 적합합니다.",
     "syntax": {
       "postgresql": "-- Trigger function to auto-update updated_at timestamp\nCREATE FUNCTION update_timestamp()\nRETURNS TRIGGER\nLANGUAGE plpgsql\nAS $$\nBEGIN\n  NEW.updated_at = NOW();\n  RETURN NEW;\nEND;\n$$;\n\n-- Row-level trigger\nCREATE TRIGGER trg_users_updated\n  BEFORE UPDATE ON users\n  FOR EACH ROW\n  EXECUTE FUNCTION update_timestamp();",
       "mysql": "-- Row-level trigger to auto-update timestamp\nDELIMITER //\nCREATE TRIGGER trg_users_updated\n  BEFORE UPDATE ON users\n  FOR EACH ROW\nBEGIN\n  SET NEW.updated_at = NOW();\nEND //\nDELIMITER ;",
@@ -13,14 +15,19 @@
     },
     "vendorSupport": {
       "postgresql": { "supported": true, "level": "full" },
-      "mysql": { "supported": true, "level": "full", "notes": "MySQL only supports row-level triggers (FOR EACH ROW is the only option)." },
-      "mariadb": { "supported": true, "level": "full", "notes": "MariaDB only supports row-level triggers." },
+      "mysql": { "supported": true, "level": "full", "notes": "MySQL only supports row-level triggers (FOR EACH ROW is the only option).", "notesKo": "MySQL은 row-level trigger만 지원합니다 (FOR EACH ROW만 사용 가능)." },
+      "mariadb": { "supported": true, "level": "full", "notes": "MariaDB only supports row-level triggers.", "notesKo": "MariaDB는 row-level trigger만 지원합니다." },
       "sqlite": { "supported": true, "level": "full" }
     },
     "tips": [
       "Use row triggers for auditing — log OLD and NEW values to an audit table on every UPDATE.",
       "Be careful with triggers on high-traffic tables — a row trigger fires for every affected row, which can impact performance.",
       "In PostgreSQL, the trigger function must RETURN NEW for BEFORE INSERT/UPDATE triggers, or the operation will be cancelled."
+    ],
+    "tipsKo": [
+      "변경 이력 추적에 row trigger를 활용하세요 — UPDATE가 발생할 때마다 OLD와 NEW 값을 감사(audit) 테이블에 기록할 수 있습니다.",
+      "트래픽이 많은 테이블에 트리거를 사용할 때는 주의하세요 — row trigger는 영향받는 모든 행마다 실행되므로 성능에 영향을 줄 수 있습니다.",
+      "PostgreSQL에서 BEFORE INSERT/UPDATE 트리거 함수는 반드시 RETURN NEW를 해야 합니다. 그렇지 않으면 해당 작업이 취소됩니다."
     ],
     "relatedItems": ["statement-trigger", "trigger-timing", "trigger-event"],
     "seeAlso": []
@@ -30,7 +37,9 @@
     "category": "triggers-events",
     "name": "Statement-Level Trigger",
     "summary": "A trigger that fires once per SQL statement, regardless of how many rows are affected.",
+    "summaryKo": "영향받는 행 수에 관계없이 SQL 문 하나당 한 번만 실행되는 트리거입니다.",
     "description": "A statement-level trigger fires exactly once for the entire SQL statement, no matter how many rows are affected (even zero). Unlike row triggers, statement triggers do not have access to individual OLD/NEW row values. They are useful for logging operations, sending notifications, or enforcing rules that apply to the entire operation as a whole.",
+    "descriptionKo": "Statement-level trigger는 영향받는 행 수(0건이라도)에 관계없이 SQL 문 전체에 대해 정확히 한 번만 실행됩니다. Row trigger와 달리, statement trigger는 개별 행의 OLD/NEW 값에 접근할 수 없습니다. 작업 로깅, 알림 전송, 전체 작업에 대한 규칙 적용 등에 유용합니다.",
     "syntax": {
       "postgresql": "-- Statement-level trigger for logging bulk operations\nCREATE FUNCTION log_bulk_insert()\nRETURNS TRIGGER\nLANGUAGE plpgsql\nAS $$\nBEGIN\n  INSERT INTO audit_log (table_name, operation, executed_at)\n  VALUES (TG_TABLE_NAME, TG_OP, NOW());\n  RETURN NULL;\nEND;\n$$;\n\nCREATE TRIGGER trg_orders_bulk_log\n  AFTER INSERT ON orders\n  FOR EACH STATEMENT\n  EXECUTE FUNCTION log_bulk_insert();",
       "mysql": null,
@@ -39,14 +48,19 @@
     },
     "vendorSupport": {
       "postgresql": { "supported": true, "level": "full" },
-      "mysql": { "supported": false, "level": "none", "notes": "MySQL only supports row-level triggers. Statement-level triggers are not available." },
-      "mariadb": { "supported": false, "level": "none", "notes": "MariaDB only supports row-level triggers." },
-      "sqlite": { "supported": false, "level": "none", "notes": "SQLite only supports row-level triggers." }
+      "mysql": { "supported": false, "level": "none", "notes": "MySQL only supports row-level triggers. Statement-level triggers are not available.", "notesKo": "MySQL은 row-level trigger만 지원합니다. Statement-level trigger는 사용할 수 없습니다." },
+      "mariadb": { "supported": false, "level": "none", "notes": "MariaDB only supports row-level triggers.", "notesKo": "MariaDB는 row-level trigger만 지원합니다." },
+      "sqlite": { "supported": false, "level": "none", "notes": "SQLite only supports row-level triggers.", "notesKo": "SQLite는 row-level trigger만 지원합니다." }
     },
     "tips": [
       "Use statement triggers for operations that should happen once per query (e.g., logging, cache invalidation), not per row.",
       "Statement triggers cannot access OLD/NEW values — use transition tables in PostgreSQL to see all affected rows.",
       "AFTER statement triggers with REFERENCING clauses let you access all inserted/deleted rows as a set."
+    ],
+    "tipsKo": [
+      "쿼리당 한 번만 수행해야 하는 작업(예: 로깅, 캐시 무효화)에는 statement trigger를 사용하세요. 행마다 실행할 필요가 없습니다.",
+      "Statement trigger에서는 OLD/NEW 값에 접근할 수 없습니다 — PostgreSQL에서는 transition table을 사용하면 영향받은 모든 행을 확인할 수 있습니다.",
+      "REFERENCING 절이 있는 AFTER statement trigger를 사용하면 삽입/삭제된 모든 행을 집합으로 접근할 수 있습니다."
     ],
     "relatedItems": ["row-trigger", "trigger-timing"],
     "seeAlso": []
@@ -56,7 +70,9 @@
     "category": "triggers-events",
     "name": "Trigger Timing",
     "summary": "Determines whether a trigger fires BEFORE, AFTER, or INSTEAD OF the triggering operation.",
+    "summaryKo": "트리거가 작업 BEFORE(이전), AFTER(이후), 또는 INSTEAD OF(대신)에 실행되는지를 결정합니다.",
     "description": "Trigger timing controls when the trigger code runs relative to the data change. BEFORE triggers run before the data is modified — they can validate or alter the new values. AFTER triggers run after the data is committed — they are ideal for logging or cascading actions. INSTEAD OF triggers replace the operation entirely and are used on views to make them updatable.",
+    "descriptionKo": "Trigger timing은 데이터 변경 시점 기준으로 트리거 코드가 언제 실행되는지를 제어합니다. BEFORE 트리거는 데이터가 수정되기 전에 실행되어 새 값을 검증하거나 변경할 수 있습니다. AFTER 트리거는 데이터가 커밋된 후 실행되어 로깅이나 연쇄 작업에 적합합니다. INSTEAD OF 트리거는 작업 자체를 대체하며, 뷰를 수정 가능하게 만들 때 사용됩니다.",
     "syntax": {
       "postgresql": "-- BEFORE trigger: validate or modify data before it's saved\nCREATE TRIGGER trg_users_before_insert\n  BEFORE INSERT ON users\n  FOR EACH ROW\n  EXECUTE FUNCTION validate_user();\n\n-- AFTER trigger: log the change after it's committed\nCREATE TRIGGER trg_users_after_update\n  AFTER UPDATE ON users\n  FOR EACH ROW\n  EXECUTE FUNCTION log_user_change();\n\n-- INSTEAD OF trigger: make a view updatable\nCREATE TRIGGER trg_active_users_insert\n  INSTEAD OF INSERT ON active_users\n  FOR EACH ROW\n  EXECUTE FUNCTION insert_active_user();",
       "mysql": "-- BEFORE trigger: validate or modify data\nDELIMITER //\nCREATE TRIGGER trg_users_before_insert\n  BEFORE INSERT ON users\n  FOR EACH ROW\nBEGIN\n  SET NEW.username = LOWER(NEW.username);\nEND //\n\n-- AFTER trigger: log the change\nCREATE TRIGGER trg_users_after_update\n  AFTER UPDATE ON users\n  FOR EACH ROW\nBEGIN\n  INSERT INTO audit_log (table_name, record_id, action)\n  VALUES ('users', OLD.id, 'UPDATE');\nEND //\nDELIMITER ;",
@@ -65,14 +81,19 @@
     },
     "vendorSupport": {
       "postgresql": { "supported": true, "level": "full" },
-      "mysql": { "supported": true, "level": "partial", "notes": "MySQL supports BEFORE and AFTER timing but not INSTEAD OF triggers." },
-      "mariadb": { "supported": true, "level": "partial", "notes": "MariaDB supports BEFORE and AFTER timing but not INSTEAD OF triggers." },
-      "sqlite": { "supported": true, "level": "partial", "notes": "SQLite supports BEFORE, AFTER, and INSTEAD OF (on views only)." }
+      "mysql": { "supported": true, "level": "partial", "notes": "MySQL supports BEFORE and AFTER timing but not INSTEAD OF triggers.", "notesKo": "MySQL은 BEFORE와 AFTER 타이밍만 지원하며, INSTEAD OF 트리거는 지원하지 않습니다." },
+      "mariadb": { "supported": true, "level": "partial", "notes": "MariaDB supports BEFORE and AFTER timing but not INSTEAD OF triggers.", "notesKo": "MariaDB는 BEFORE와 AFTER 타이밍만 지원하며, INSTEAD OF 트리거는 지원하지 않습니다." },
+      "sqlite": { "supported": true, "level": "partial", "notes": "SQLite supports BEFORE, AFTER, and INSTEAD OF (on views only).", "notesKo": "SQLite는 BEFORE, AFTER, 그리고 INSTEAD OF(뷰에서만)를 지원합니다." }
     },
     "tips": [
       "Use BEFORE triggers when you need to validate or transform data before it is written to the table.",
       "Use AFTER triggers for logging and audit trails — the data is already committed so you know it was successful.",
       "INSTEAD OF triggers are only used on views — they replace the default INSERT/UPDATE/DELETE behavior."
+    ],
+    "tipsKo": [
+      "데이터가 테이블에 저장되기 전에 유효성 검사나 변환이 필요하다면 BEFORE 트리거를 사용하세요.",
+      "로깅과 감사 추적에는 AFTER 트리거를 사용하세요 — 데이터가 이미 커밋된 상태이므로 작업이 성공했음을 보장합니다.",
+      "INSTEAD OF 트리거는 뷰에서만 사용되며, 기본 INSERT/UPDATE/DELETE 동작을 대체합니다."
     ],
     "relatedItems": ["row-trigger", "statement-trigger", "trigger-event"],
     "seeAlso": []
@@ -82,7 +103,9 @@
     "category": "triggers-events",
     "name": "Trigger Event",
     "summary": "The DML operation (INSERT, UPDATE, DELETE, or TRUNCATE) that activates a trigger.",
+    "summaryKo": "트리거를 활성화하는 DML 작업(INSERT, UPDATE, DELETE, 또는 TRUNCATE)입니다.",
     "description": "A trigger event specifies which data modification operation causes the trigger to fire. The three main events are INSERT (new row added), UPDATE (existing row modified), and DELETE (row removed). PostgreSQL also supports TRUNCATE as a trigger event. You can combine multiple events in a single trigger, and for UPDATE triggers, you can specify which columns trigger the action.",
+    "descriptionKo": "Trigger event는 어떤 데이터 수정 작업이 트리거를 실행시키는지를 지정합니다. 세 가지 주요 이벤트는 INSERT(새 행 추가), UPDATE(기존 행 수정), DELETE(행 삭제)입니다. PostgreSQL은 TRUNCATE도 트리거 이벤트로 지원합니다. 하나의 트리거에 여러 이벤트를 결합할 수 있으며, UPDATE 트리거의 경우 어떤 컬럼이 변경될 때 실행할지 지정할 수 있습니다.",
     "syntax": {
       "postgresql": "-- Trigger on INSERT\nCREATE TRIGGER trg_on_insert\n  AFTER INSERT ON orders\n  FOR EACH ROW EXECUTE FUNCTION notify_new_order();\n\n-- Trigger on specific column UPDATE\nCREATE TRIGGER trg_on_status_change\n  AFTER UPDATE OF status ON orders\n  FOR EACH ROW\n  WHEN (OLD.status IS DISTINCT FROM NEW.status)\n  EXECUTE FUNCTION handle_status_change();\n\n-- Trigger on multiple events\nCREATE TRIGGER trg_audit_products\n  AFTER INSERT OR UPDATE OR DELETE ON products\n  FOR EACH ROW EXECUTE FUNCTION audit_product_change();",
       "mysql": "-- Trigger on INSERT\nDELIMITER //\nCREATE TRIGGER trg_on_insert\n  AFTER INSERT ON orders\n  FOR EACH ROW\nBEGIN\n  INSERT INTO notifications (message) VALUES (CONCAT('New order: ', NEW.id));\nEND //\n\n-- Trigger on DELETE\nCREATE TRIGGER trg_on_delete\n  BEFORE DELETE ON users\n  FOR EACH ROW\nBEGIN\n  INSERT INTO deleted_users (user_id, deleted_at) VALUES (OLD.id, NOW());\nEND //\nDELIMITER ;",
@@ -90,15 +113,20 @@
       "sqlite": "-- Trigger on INSERT\nCREATE TRIGGER trg_on_insert\n  AFTER INSERT ON orders\nBEGIN\n  INSERT INTO notifications (message) VALUES ('New order: ' || NEW.id);\nEND;\n\n-- Trigger on UPDATE of specific columns\nCREATE TRIGGER trg_on_status_change\n  AFTER UPDATE OF status ON orders\nBEGIN\n  INSERT INTO status_history (order_id, old_status, new_status)\n  VALUES (OLD.id, OLD.status, NEW.status);\nEND;"
     },
     "vendorSupport": {
-      "postgresql": { "supported": true, "level": "full", "notes": "PostgreSQL supports INSERT, UPDATE, DELETE, and TRUNCATE events. UPDATE OF column_name is also supported." },
-      "mysql": { "supported": true, "level": "partial", "notes": "MySQL supports INSERT, UPDATE, and DELETE events. You cannot combine multiple events in one trigger." },
-      "mariadb": { "supported": true, "level": "partial", "notes": "MariaDB supports INSERT, UPDATE, and DELETE events. You cannot combine multiple events in one trigger." },
-      "sqlite": { "supported": true, "level": "full", "notes": "SQLite supports INSERT, UPDATE, DELETE, and UPDATE OF column_name events." }
+      "postgresql": { "supported": true, "level": "full", "notes": "PostgreSQL supports INSERT, UPDATE, DELETE, and TRUNCATE events. UPDATE OF column_name is also supported.", "notesKo": "PostgreSQL은 INSERT, UPDATE, DELETE, TRUNCATE 이벤트를 지원합니다. UPDATE OF column_name도 사용할 수 있습니다." },
+      "mysql": { "supported": true, "level": "partial", "notes": "MySQL supports INSERT, UPDATE, and DELETE events. You cannot combine multiple events in one trigger.", "notesKo": "MySQL은 INSERT, UPDATE, DELETE 이벤트를 지원합니다. 하나의 트리거에 여러 이벤트를 결합할 수 없습니다." },
+      "mariadb": { "supported": true, "level": "partial", "notes": "MariaDB supports INSERT, UPDATE, and DELETE events. You cannot combine multiple events in one trigger.", "notesKo": "MariaDB는 INSERT, UPDATE, DELETE 이벤트를 지원합니다. 하나의 트리거에 여러 이벤트를 결합할 수 없습니다." },
+      "sqlite": { "supported": true, "level": "full", "notes": "SQLite supports INSERT, UPDATE, DELETE, and UPDATE OF column_name events.", "notesKo": "SQLite는 INSERT, UPDATE, DELETE, 그리고 UPDATE OF column_name 이벤트를 지원합니다." }
     },
     "tips": [
       "Use UPDATE OF column_name to fire the trigger only when specific columns change, not on every UPDATE.",
       "In PostgreSQL, add a WHEN clause to conditionally fire the trigger (e.g., WHEN OLD.status IS DISTINCT FROM NEW.status).",
       "In MySQL/MariaDB, you need separate triggers for each event — you cannot combine INSERT OR UPDATE in one trigger."
+    ],
+    "tipsKo": [
+      "UPDATE OF column_name을 사용하면 모든 UPDATE가 아닌 특정 컬럼이 변경될 때만 트리거가 실행됩니다.",
+      "PostgreSQL에서는 WHEN 절을 추가하여 조건부로 트리거를 실행할 수 있습니다 (예: WHEN OLD.status IS DISTINCT FROM NEW.status).",
+      "MySQL/MariaDB에서는 이벤트별로 별도의 트리거가 필요합니다 — 하나의 트리거에 INSERT OR UPDATE를 결합할 수 없습니다."
     ],
     "relatedItems": ["row-trigger", "trigger-timing"],
     "seeAlso": []
@@ -108,7 +136,9 @@
     "category": "triggers-events",
     "name": "Scheduled Event",
     "summary": "A task that runs automatically on a schedule, like a database-level cron job.",
+    "summaryKo": "데이터베이스 수준의 cron job처럼 정해진 일정에 따라 자동으로 실행되는 작업입니다.",
     "description": "A scheduled event is a database-managed task that executes SQL statements on a defined schedule (one-time or recurring). It is like a cron job but managed entirely within the database. Scheduled events are commonly used for periodic maintenance tasks like purging old data, refreshing materialized views, or generating reports.",
+    "descriptionKo": "Scheduled event는 정해진 일정(일회성 또는 반복)에 따라 SQL 문을 실행하는 데이터베이스 관리 작업입니다. cron job과 비슷하지만 데이터베이스 안에서 완전히 관리됩니다. 오래된 데이터 삭제, materialized view 갱신, 리포트 생성 등 주기적인 유지보수 작업에 주로 사용됩니다.",
     "syntax": {
       "postgresql": "-- PostgreSQL uses the pg_cron extension for scheduled events\n-- Install: CREATE EXTENSION pg_cron;\n\n-- Delete old audit logs every day at midnight\nSELECT cron.schedule(\n  'cleanup-audit-logs',\n  '0 0 * * *',\n  $$DELETE FROM audit_log WHERE created_at < NOW() - INTERVAL '90 days'$$\n);\n\n-- Refresh materialized view every 5 minutes\nSELECT cron.schedule(\n  'refresh-order-summary',\n  '*/5 * * * *',\n  'REFRESH MATERIALIZED VIEW CONCURRENTLY order_summary'\n);",
       "mysql": "-- Create a recurring event to clean up old logs\nCREATE EVENT evt_cleanup_audit_logs\nON SCHEDULE EVERY 1 DAY\nSTARTS CURRENT_TIMESTAMP\nDO\n  DELETE FROM audit_log WHERE created_at < NOW() - INTERVAL 90 DAY;\n\n-- One-time event\nCREATE EVENT evt_one_time_cleanup\nON SCHEDULE AT CURRENT_TIMESTAMP + INTERVAL 1 HOUR\nDO\n  DELETE FROM temp_data;\n\n-- Make sure the event scheduler is enabled\n-- SET GLOBAL event_scheduler = ON;",
@@ -116,15 +146,20 @@
       "sqlite": null
     },
     "vendorSupport": {
-      "postgresql": { "supported": true, "level": "partial", "notes": "PostgreSQL requires the pg_cron extension. It is not built-in but is widely available." },
-      "mysql": { "supported": true, "level": "full", "notes": "MySQL has built-in event scheduler. It must be enabled with SET GLOBAL event_scheduler = ON." },
-      "mariadb": { "supported": true, "level": "full", "notes": "MariaDB has built-in event scheduler. It must be enabled with SET GLOBAL event_scheduler = ON." },
-      "sqlite": { "supported": false, "level": "none", "notes": "SQLite does not support scheduled events. Use application-level schedulers (cron, Task Scheduler) instead." }
+      "postgresql": { "supported": true, "level": "partial", "notes": "PostgreSQL requires the pg_cron extension. It is not built-in but is widely available.", "notesKo": "PostgreSQL은 pg_cron 확장이 필요합니다. 내장 기능은 아니지만 널리 사용 가능합니다." },
+      "mysql": { "supported": true, "level": "full", "notes": "MySQL has built-in event scheduler. It must be enabled with SET GLOBAL event_scheduler = ON.", "notesKo": "MySQL은 내장 event scheduler를 제공합니다. SET GLOBAL event_scheduler = ON으로 활성화해야 합니다." },
+      "mariadb": { "supported": true, "level": "full", "notes": "MariaDB has built-in event scheduler. It must be enabled with SET GLOBAL event_scheduler = ON.", "notesKo": "MariaDB는 내장 event scheduler를 제공합니다. SET GLOBAL event_scheduler = ON으로 활성화해야 합니다." },
+      "sqlite": { "supported": false, "level": "none", "notes": "SQLite does not support scheduled events. Use application-level schedulers (cron, Task Scheduler) instead.", "notesKo": "SQLite는 scheduled event를 지원하지 않습니다. 대신 애플리케이션 수준의 스케줄러(cron, Task Scheduler)를 사용하세요." }
     },
     "tips": [
       "In MySQL/MariaDB, check that the event scheduler is enabled: SHOW VARIABLES LIKE 'event_scheduler';",
       "Use events for routine maintenance like purging old data, updating statistics, or refreshing cached views.",
       "Monitor event execution — a failing event can silently stop running without notifying you."
+    ],
+    "tipsKo": [
+      "MySQL/MariaDB에서는 event scheduler가 활성화되어 있는지 확인하세요: SHOW VARIABLES LIKE 'event_scheduler';",
+      "오래된 데이터 삭제, 통계 갱신, 캐시된 뷰 새로고침 같은 정기적인 유지보수 작업에 event를 활용하세요.",
+      "이벤트 실행 상태를 모니터링하세요 — 실패한 이벤트는 알림 없이 조용히 실행이 중단될 수 있습니다."
     ],
     "relatedItems": ["materialized-view", "procedure"],
     "seeAlso": []
