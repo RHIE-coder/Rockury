@@ -748,7 +748,6 @@ CREATE TRIGGER trg_orders_audit_update
 AFTER UPDATE ON orders
 FOR EACH ROW
 BEGIN
-    SET NEW.updated_at = NOW();
     INSERT INTO audit_logs (table_name, action, record_id, old_data, new_data, performed_at)
     VALUES ('orders', 'UPDATE', NEW.id, JSON_OBJECT(
         'id', OLD.id,

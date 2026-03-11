@@ -301,7 +301,7 @@ CREATE TABLE IF NOT EXISTS shipping_addresses (
 CREATE TABLE IF NOT EXISTS warehouses (
     id         CHAR(36) NOT NULL DEFAULT (UUID()),
     name       VARCHAR(200) NOT NULL,
-    location   POINT NOT NULL SRID 0,
+    location   POINT NOT NULL,
     addr_street      VARCHAR(255),
     addr_city        VARCHAR(100),
     addr_state       VARCHAR(100),
@@ -757,7 +757,6 @@ CREATE OR REPLACE TRIGGER trg_orders_audit_update
 AFTER UPDATE ON orders
 FOR EACH ROW
 BEGIN
-    SET NEW.updated_at = NOW();
     INSERT INTO audit_logs (table_name, action, record_id, old_data, new_data, performed_at)
     VALUES ('orders', 'UPDATE', NEW.id, JSON_OBJECT(
         'id', OLD.id,
