@@ -1,5 +1,5 @@
 import { execSync } from 'node:child_process';
-import { existsSync, mkdirSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync } from 'node:fs';
 import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { DatabaseSync } from 'node:sqlite';
@@ -38,34 +38,8 @@ if (existsSync(SQLITE_PATH)) {
   }
 
   const db = new DatabaseSync(SQLITE_PATH);
-  db.exec(`
-    CREATE TABLE IF NOT EXISTS sample_users (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      name TEXT NOT NULL,
-      email TEXT NOT NULL UNIQUE,
-      created_at TEXT DEFAULT (datetime('now'))
-    );
-
-    CREATE TABLE IF NOT EXISTS sample_posts (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      user_id INTEGER NOT NULL REFERENCES sample_users(id),
-      title TEXT NOT NULL,
-      body TEXT,
-      created_at TEXT DEFAULT (datetime('now'))
-    );
-  `);
-
-  const { cnt } = db.prepare('SELECT COUNT(*) AS cnt FROM sample_users').get();
-  if (cnt === 0) {
-    const insertUser = db.prepare('INSERT INTO sample_users (name, email) VALUES (?, ?)');
-    const insertPost = db.prepare('INSERT INTO sample_posts (user_id, title, body) VALUES (?, ?, ?)');
-
-    insertUser.run('Alice', 'alice@example.com');
-    insertUser.run('Bob', 'bob@example.com');
-    insertUser.run('Charlie', 'charlie@example.com');
-    insertPost.run(1, 'Hello World', 'First post content');
-    insertPost.run(2, 'Second Post', 'Another post content');
-  }
+  const initSql = readFileSync(resolve(__dirname, 'init/sqlite/init.sql'), 'utf-8');
+  db.exec(initSql);
   db.close();
   ok(`SQLite DB created at: ${chalk.dim(SQLITE_PATH)}`);
 }
