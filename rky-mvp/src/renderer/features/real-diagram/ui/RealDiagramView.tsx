@@ -1,15 +1,12 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import {
-  RefreshCw, ArrowDownToLine, Code, ChevronsUpDown, Check,
+  RefreshCw, ArrowDownToLine, Code,
 } from 'lucide-react';
 import { useMutation } from '@tanstack/react-query';
 import { Button } from '@/shared/components/ui/button';
-import { Popover, PopoverTrigger, PopoverContent } from '@/shared/components/ui/popover';
-import { Badge } from '@/shared/components/ui/badge';
 import type { ITable, IDiagram, IDiagramLayout, ISearchResult } from '~/shared/types/db';
 import { useConnections, useAutoTestConnections } from '@/features/db-connection';
 import { useConnectionStore } from '@/features/db-connection/model/connectionStore';
-import { ConnectionBadge } from '@/entities/connection';
 import { useDiagramStore, useCreateDiagram, useDiagramLayout, useSaveDiagramLayout, useCreateDiagramVersion } from '@/features/virtual-diagram';
 import { DiagramCanvas } from '@/features/virtual-diagram/ui/DiagramCanvas';
 import { CanvasToolbar } from '@/features/virtual-diagram/ui/CanvasToolbar';
@@ -37,8 +34,6 @@ export function RealDiagramView() {
     setFilterPreset,
     isLeftPanelOpen,
     isRightPanelOpen,
-    selectedConnectionId: storeConnectionId,
-    setSelectedConnectionId: setStoreConnectionId,
     viewMode,
     setViewMode,
     realTables: tables,
@@ -59,17 +54,12 @@ export function RealDiagramView() {
     clearCascadeSimulation,
   } = useDiagramStore();
 
-  const { statusMap } = useConnectionStore();
+  const { selectedConnectionId: globalConnectionId } = useConnectionStore();
   useAutoTestConnections();
 
-  const selectedConnectionId = storeConnectionId ?? '';
-  const selectedConnection = connections?.find((c) => c.id === selectedConnectionId);
-  function setSelectedConnectionId(id: string) {
-    setStoreConnectionId(id || null);
-  }
+  const selectedConnectionId = globalConnectionId ?? '';
 
   // Ephemeral UI state
-  const [isConnectionPickerOpen, setIsConnectionPickerOpen] = useState(false);
   const [fitViewTrigger, setFitViewTrigger] = useState(0);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -313,57 +303,6 @@ export function RealDiagramView() {
     <div className="flex h-full w-full flex-col">
       {/* Top Toolbar — Console-specific controls only (mirrors DiagramToolbar position) */}
       <div className="flex items-center gap-2 border-b border-border px-3 py-1.5">
-        {/* Connection Picker */}
-        <Popover open={isConnectionPickerOpen} onOpenChange={setIsConnectionPickerOpen}>
-          <PopoverTrigger asChild>
-            <Button variant="outline" size="xs" className="h-7 w-48 justify-between text-xs font-normal">
-              {selectedConnection ? (
-                <span className="flex items-center gap-1.5 truncate">
-                  <ConnectionBadge status={statusMap[selectedConnection.id] ?? (selectedConnection.ignored ? 'ignored' : 'disconnected')} />
-                  <span className="truncate">{selectedConnection.name}</span>
-                  <Badge variant="outline" className="text-[10px] px-1 py-0">{selectedConnection.dbType}</Badge>
-                </span>
-              ) : (
-                <span className="text-muted-foreground">Select connection...</span>
-              )}
-              <ChevronsUpDown className="size-3 shrink-0 text-muted-foreground" />
-            </Button>
-          </PopoverTrigger>
-          <PopoverContent align="start" className="w-56 p-1">
-            {connections && connections.length > 0 ? (
-              <div className="flex max-h-64 flex-col overflow-y-auto">
-                {connections.map((c) => {
-                  const connStatus = statusMap[c.id] ?? (c.ignored ? 'ignored' : 'disconnected');
-                  const isConnected = connStatus === 'connected';
-                  const isSelected = c.id === selectedConnectionId;
-                  return (
-                    <button
-                      key={c.id}
-                      type="button"
-                      disabled={!isConnected}
-                      className={`flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-xs ${
-                        isConnected ? 'hover:bg-accent cursor-pointer' : 'opacity-40 cursor-not-allowed'
-                      } ${isSelected ? 'bg-accent' : ''}`}
-                      onClick={() => {
-                        if (!isConnected) return;
-                        setSelectedConnectionId(c.id);
-                        setIsConnectionPickerOpen(false);
-                      }}
-                    >
-                      <ConnectionBadge status={connStatus} />
-                      <span className="flex-1 truncate text-left">{c.name}</span>
-                      <Badge variant="outline" className="text-[10px] px-1 py-0 shrink-0">{c.dbType}</Badge>
-                      {isSelected && <Check className="size-3 shrink-0 text-primary" />}
-                    </button>
-                  );
-                })}
-              </div>
-            ) : (
-              <p className="px-2 py-3 text-center text-xs text-muted-foreground">No connections</p>
-            )}
-          </PopoverContent>
-        </Popover>
-
         {/* Sync */}
         <Button
           variant="outline"

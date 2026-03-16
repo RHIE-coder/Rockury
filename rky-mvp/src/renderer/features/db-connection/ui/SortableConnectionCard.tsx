@@ -6,6 +6,8 @@ import { ConnectionCard } from './ConnectionCard';
 interface SortableConnectionCardProps {
   connection: IConnection;
   status?: TConnectionStatus;
+  isSelected?: boolean;
+  onSelect?: (id: string) => void;
   onEdit: (id: string) => void;
   onDelete: (id: string) => void;
   onTestConnection?: (id: string) => void;
@@ -15,6 +17,8 @@ interface SortableConnectionCardProps {
 export function SortableConnectionCard({
   connection,
   status,
+  isSelected,
+  onSelect,
   onEdit,
   onDelete,
   onTestConnection,
@@ -41,6 +45,8 @@ export function SortableConnectionCard({
       <ConnectionCard
         connection={connection}
         status={status}
+        isSelected={isSelected}
+        onSelect={onSelect}
         onEdit={onEdit}
         onDelete={onDelete}
         onTestConnection={onTestConnection}

@@ -1,4 +1,4 @@
-import { Trash2, PlugZap, BellOff, Bell, GripVertical } from 'lucide-react';
+import { Trash2, PlugZap, BellOff, Bell, GripVertical, Pencil } from 'lucide-react';
 import { Badge } from '@/shared/components/ui/badge';
 import { Button } from '@/shared/components/ui/button';
 import { ConnectionBadge } from '@/entities/connection';
@@ -7,6 +7,8 @@ import type { IConnection, TConnectionStatus } from '@/entities/connection';
 interface ConnectionCardProps {
   connection: IConnection;
   status?: TConnectionStatus;
+  isSelected?: boolean;
+  onSelect?: (id: string) => void;
   onEdit: (id: string) => void;
   onDelete: (id: string) => void;
   onTestConnection?: (id: string) => void;
@@ -19,6 +21,8 @@ interface ConnectionCardProps {
 export function ConnectionCard({
   connection,
   status = 'disconnected',
+  isSelected = false,
+  onSelect,
   onEdit,
   onDelete,
   onTestConnection,
@@ -32,9 +36,11 @@ export function ConnectionCard({
 
   return (
     <div
-      className="flex items-center gap-3 rounded-lg border bg-card px-3 py-2.5 transition-colors hover:bg-muted/50 cursor-pointer"
+      className={`flex items-center gap-3 rounded-lg border bg-card px-3 py-2.5 transition-colors hover:bg-muted/50 cursor-pointer ${
+        isSelected ? 'ring-2 ring-primary border-primary' : ''
+      }`}
       style={style}
-      onClick={() => onEdit(connection.id)}
+      onClick={() => onSelect?.(connection.id)}
     >
       {/* Drag handle */}
       <div
@@ -80,6 +86,17 @@ export function ConnectionCard({
 
       {/* Actions */}
       <div className="flex flex-shrink-0 items-center gap-0.5">
+        <Button
+          variant="ghost"
+          size="icon-xs"
+          onClick={(e) => {
+            e.stopPropagation();
+            onEdit(connection.id);
+          }}
+          title="Edit connection"
+        >
+          <Pencil className="size-3.5 text-muted-foreground hover:text-foreground" />
+        </Button>
         {onToggleIgnore && (
           <Button
             variant="ghost"

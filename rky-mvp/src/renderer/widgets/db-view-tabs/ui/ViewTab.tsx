@@ -21,6 +21,21 @@ export function ViewTab({ item, areaRoot }: ViewTabProps) {
     }
   }, [areaRoot, location.pathname, item.path, setLastTab]);
 
+  if (item.disabled) {
+    return (
+      <span
+        className={cn(
+          'relative flex items-center gap-1.5 px-3 py-2 text-xs font-medium',
+          'text-muted-foreground/40 cursor-not-allowed',
+        )}
+        title="Select a connection first"
+      >
+        <Icon className="size-3.5" />
+        <span>{item.label}</span>
+      </span>
+    );
+  }
+
   return (
     <NavLink
       to={item.path}

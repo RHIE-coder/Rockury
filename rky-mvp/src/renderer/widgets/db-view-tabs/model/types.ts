@@ -5,4 +5,5 @@ export interface IViewTabItem {
   label: string;
   icon: LucideIcon;
   path: string;
+  disabled?: boolean;
 }

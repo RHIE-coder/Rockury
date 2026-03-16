@@ -47,7 +47,7 @@ export function ConnectionList() {
   const updateConnection = useUpdateConnection();
   const deleteConnection = useDeleteConnection();
   const reorderConnections = useReorderConnections();
-  const { isFormOpen, editingConnectionId, openForm, closeForm, statusMap, setStatus } = useConnectionStore();
+  const { selectedConnectionId, setSelectedConnectionId, isFormOpen, editingConnectionId, openForm, closeForm, statusMap, setStatus } = useConnectionStore();
   const [deleteTarget, setDeleteTarget] = useState<{ id: string; name: string } | null>(null);
 
   // Auto-test all connections on mount (shared hook)
@@ -214,6 +214,8 @@ export function ConnectionList() {
                   key={conn.id}
                   connection={conn}
                   status={statusMap[conn.id] ?? (conn.ignored ? 'ignored' : 'disconnected')}
+                  isSelected={conn.id === selectedConnectionId}
+                  onSelect={setSelectedConnectionId}
                   onEdit={(id) => openForm(id)}
                   onDelete={handleDelete}
                   onTestConnection={handleTestFromCard}
