@@ -1,4 +1,4 @@
-import { Plus, Workflow, Search, SlidersHorizontal, Download } from 'lucide-react';
+import { Plus, Workflow, Search, SlidersHorizontal, Download, Undo2, Redo2 } from 'lucide-react';
 import { Button } from '@/shared/components/ui/button';
 
 interface CanvasToolbarProps {
@@ -11,6 +11,10 @@ interface CanvasToolbarProps {
   onToggleExport?: () => void;
   isExportOpen?: boolean;
   disabled?: boolean;
+  onUndo?: () => void;
+  onRedo?: () => void;
+  canUndo?: boolean;
+  canRedo?: boolean;
 }
 
 export function CanvasToolbar({
@@ -23,9 +27,26 @@ export function CanvasToolbar({
   onToggleExport,
   isExportOpen = false,
   disabled = false,
+  onUndo,
+  onRedo,
+  canUndo = false,
+  canRedo = false,
 }: CanvasToolbarProps) {
   return (
     <div className="absolute right-2 top-2 z-40 flex items-center gap-1 rounded-lg border border-border bg-background/90 px-2 py-1 shadow-sm backdrop-blur-sm">
+      {onUndo && (
+        <Button variant="ghost" size="xs" onClick={onUndo} disabled={!canUndo} title="Undo (Cmd+Z)">
+          <Undo2 className="size-3.5" />
+        </Button>
+      )}
+      {onRedo && (
+        <Button variant="ghost" size="xs" onClick={onRedo} disabled={!canRedo} title="Redo (Cmd+Shift+Z)">
+          <Redo2 className="size-3.5" />
+        </Button>
+      )}
+      {(onUndo || onRedo) && onAddTable && (
+        <div className="mx-0.5 h-4 w-px bg-border" />
+      )}
       {onAddTable && (
         <Button variant="ghost" size="xs" onClick={onAddTable} disabled={disabled} title="Add table">
           <Plus className="size-3.5" />

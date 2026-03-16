@@ -837,6 +837,9 @@ export function VirtualDiagramView() {
   const handleLayoutChange = useCallback(
     (layoutUpdate: Pick<IDiagramLayout, 'positions' | 'zoom' | 'viewport'>) => {
       if (!selectedDiagramId) return;
+      if (layoutUpdate.positions) {
+        useDiagramStore.getState().setLastKnownPositions(layoutUpdate.positions);
+      }
       saveLayout.mutate({
         diagramId: selectedDiagramId,
         ...layoutUpdate,
@@ -1000,6 +1003,10 @@ export function VirtualDiagramView() {
               onToggleExport={() => setIsExportOpen((v) => !v)}
               isExportOpen={isExportOpen}
               disabled={isDiagramLocked}
+              onUndo={undo}
+              onRedo={redo}
+              canUndo={undoStack.length > 0}
+              canRedo={redoStack.length > 0}
             />
           )}
 

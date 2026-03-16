@@ -94,6 +94,7 @@ interface DiagramStoreState {
   undoStack: UndoState[];
   redoStack: UndoState[];
   pendingLayoutRestore: Record<string, { x: number; y: number }> | null;
+  lastKnownPositions: Record<string, { x: number; y: number }> | null;
 
   // DDL filter
   ddlIncludedTableIds: string[] | null;
@@ -192,6 +193,7 @@ interface DiagramStoreActions {
   redo: () => void;
   clearHistory: () => void;
   clearPendingLayoutRestore: () => void;
+  setLastKnownPositions: (positions: Record<string, { x: number; y: number }>) => void;
 
   // DDL filter
   setDdlIncludedTableIds: (ids: string[] | null) => void;
@@ -251,6 +253,7 @@ export const useDiagramStore = create<DiagramStoreState & DiagramStoreActions>((
   undoStack: [],
   redoStack: [],
   pendingLayoutRestore: null,
+  lastKnownPositions: null,
 
   // DDL filter
   ddlIncludedTableIds: null,
@@ -361,7 +364,9 @@ export const useDiagramStore = create<DiagramStoreState & DiagramStoreActions>((
       const newUndo = [...state.undoStack];
       const prev = newUndo.pop()!;
       const currentEntry: UndoState = { tables: deepClone(state.localTables) };
-      // Positions for redo are captured by the caller when they detect pendingLayoutRestore
+      if (state.lastKnownPositions) {
+        currentEntry.positions = deepClone(state.lastKnownPositions);
+      }
       return {
         undoStack: newUndo,
         redoStack: [...state.redoStack, currentEntry],
@@ -376,6 +381,9 @@ export const useDiagramStore = create<DiagramStoreState & DiagramStoreActions>((
       const newRedo = [...state.redoStack];
       const next = newRedo.pop()!;
       const currentEntry: UndoState = { tables: deepClone(state.localTables) };
+      if (state.lastKnownPositions) {
+        currentEntry.positions = deepClone(state.lastKnownPositions);
+      }
       return {
         redoStack: newRedo,
         undoStack: [...state.undoStack, currentEntry],
@@ -386,6 +394,7 @@ export const useDiagramStore = create<DiagramStoreState & DiagramStoreActions>((
     }),
   clearHistory: () => set({ undoStack: [], redoStack: [] }),
   clearPendingLayoutRestore: () => set({ pendingLayoutRestore: null }),
+  setLastKnownPositions: (positions) => set({ lastKnownPositions: positions }),
 
   // DDL filter
   setDdlIncludedTableIds: (ids) => set({ ddlIncludedTableIds: ids }),
