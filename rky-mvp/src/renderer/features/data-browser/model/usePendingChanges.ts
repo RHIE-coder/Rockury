@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useMemo } from 'react';
 import { buildInsertQuery, buildUpdateQuery, buildDeleteQuery } from './sqlBuilder';
 
 type TDbType = 'mysql' | 'mariadb' | 'postgresql' | 'sqlite';
@@ -111,10 +111,22 @@ export function usePendingChanges(
     return statements;
   }, [changes, tableName, dbType, pkColumns, allColumns]);
 
+  // Collect inserted rows as TRow[] for the grid to display
+  const insertedRows = useMemo(() => {
+    const rows: Record<string, unknown>[] = [];
+    for (const [, change] of changes) {
+      if (change.type === 'insert') {
+        rows.push(change.modified);
+      }
+    }
+    return rows;
+  }, [changes]);
+
   return {
     changes,
     hasChanges: changes.size > 0,
     changeCount: changes.size,
+    insertedRows,
     updateCell,
     insertRow,
     deleteRow,

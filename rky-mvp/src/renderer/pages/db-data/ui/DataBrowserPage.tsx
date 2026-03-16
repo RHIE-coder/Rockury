@@ -240,9 +240,11 @@ export function DataBrowserPage() {
                 onColumnVisibilityChange={setColumnVisibility}
                 canEdit={canEdit}
                 pendingChanges={pending.changes}
+                insertedRows={pending.insertedRows}
                 getRowKey={pending.getRowKey}
                 onCellSave={(row, col, val) => pending.updateCell(row, col, val)}
                 onRowContextMenu={handleContextMenu}
+                columnMeta={selectedTableMeta?.columns}
               />
             ) : isLoading ? (
               <div className="flex flex-1 items-center justify-center text-muted-foreground">
