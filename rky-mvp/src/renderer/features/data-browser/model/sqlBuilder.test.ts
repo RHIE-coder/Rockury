@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { buildSelectQuery, quoteIdentifier, escapeValue } from './sqlBuilder';
+import { buildSelectQuery, quoteIdentifier, escapeValue, buildInsertQuery, buildUpdateQuery, buildDeleteQuery } from './sqlBuilder';
 
 describe('quoteIdentifier', () => {
   it('quotes with backtick for mysql', () => {
@@ -69,5 +69,58 @@ describe('buildSelectQuery', () => {
       table: 'users', dbType, limit: 50, offset: 0,
       filters: [{ column: 'deleted_at', operator: 'IS NULL', value: '' }],
     })).toBe('SELECT * FROM `users` WHERE `deleted_at` IS NULL LIMIT 50 OFFSET 0');
+  });
+});
+
+describe('buildInsertQuery', () => {
+  it('builds INSERT statement', () => {
+    expect(buildInsertQuery({
+      table: 'users',
+      dbType: 'mysql',
+      columns: ['name', 'age'],
+      values: { name: 'John', age: 30 },
+    })).toBe("INSERT INTO `users` (`name`, `age`) VALUES ('John', 30)");
+  });
+
+  it('handles NULL values', () => {
+    expect(buildInsertQuery({
+      table: 'users',
+      dbType: 'mysql',
+      columns: ['name', 'bio'],
+      values: { name: 'Jane', bio: null },
+    })).toBe("INSERT INTO `users` (`name`, `bio`) VALUES ('Jane', NULL)");
+  });
+});
+
+describe('buildUpdateQuery', () => {
+  it('builds UPDATE with PK WHERE', () => {
+    expect(buildUpdateQuery({
+      table: 'users',
+      dbType: 'mysql',
+      pkColumns: ['id'],
+      pkValues: { id: 1 },
+      changes: { name: 'Jane', age: 25 },
+    })).toBe("UPDATE `users` SET `name` = 'Jane', `age` = 25 WHERE `id` = 1");
+  });
+
+  it('handles composite PK', () => {
+    expect(buildUpdateQuery({
+      table: 'order_items',
+      dbType: 'mysql',
+      pkColumns: ['order_id', 'item_id'],
+      pkValues: { order_id: 1, item_id: 2 },
+      changes: { quantity: 5 },
+    })).toBe("UPDATE `order_items` SET `quantity` = 5 WHERE `order_id` = 1 AND `item_id` = 2");
+  });
+});
+
+describe('buildDeleteQuery', () => {
+  it('builds DELETE with PK WHERE', () => {
+    expect(buildDeleteQuery({
+      table: 'users',
+      dbType: 'mysql',
+      pkColumns: ['id'],
+      pkValues: { id: 42 },
+    })).toBe('DELETE FROM `users` WHERE `id` = 42');
   });
 });
