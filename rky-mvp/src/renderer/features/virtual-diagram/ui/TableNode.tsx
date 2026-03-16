@@ -30,9 +30,9 @@ function SingleKeyIcon({ keyType }: { keyType: string }) {
     case 'FK':
       return <span className="shrink-0 text-blue-500" title="Foreign Key">🔗</span>;
     case 'UK':
-      return <span className="shrink-0 text-green-500" title="Unique">🌐</span>;
+      return <span className="shrink-0 rounded bg-green-500/20 px-0.5 text-[8px] font-bold leading-none text-green-600 dark:text-green-400" title="Unique">U</span>;
     case 'IDX':
-      return <span className="shrink-0 text-purple-500" title="Index">📇</span>;
+      return <span className="shrink-0 text-purple-500" title="Index">⚡</span>;
     default:
       return null;
   }
@@ -186,10 +186,11 @@ function TableNodeComponent({ data }: NodeProps) {
 
   const isView = table.isView ?? false;
   const isMaterialized = table.isMaterialized ?? false;
+  const isPartition = table.isPartition ?? false;
 
   return (
     <div
-      className={`min-w-[200px] rounded-lg border bg-card shadow-sm transition-all duration-300 ${borderClasses} ${isView ? 'border-dashed' : ''}`}
+      className={`min-w-[200px] rounded-lg border bg-card shadow-sm transition-all duration-300 ${borderClasses} ${isView ? 'border-dashed' : ''} ${isPartition ? 'border-dashed' : ''}`}
       style={simVars}
     >
       {/* Target handle for incoming FK edges */}
@@ -206,11 +207,13 @@ function TableNodeComponent({ data }: NodeProps) {
             ? isMaterialized
               ? 'bg-teal-600 text-white'
               : 'bg-indigo-600 text-white'
-            : compareAction && compareAction !== 'unchanged' && COMPARE_HEADER_BG[compareAction]
-              ? `${COMPARE_HEADER_BG[compareAction]} text-white`
-              : color ? '' : 'bg-primary text-primary-foreground'
+            : isPartition
+              ? 'bg-orange-600 text-white'
+              : compareAction && compareAction !== 'unchanged' && COMPARE_HEADER_BG[compareAction]
+                ? `${COMPARE_HEADER_BG[compareAction]} text-white`
+                : color ? '' : 'bg-primary text-primary-foreground'
         }`}
-        style={!isView && (!compareAction || compareAction === 'unchanged') ? (color ? { backgroundColor: color, color: '#fff' } : undefined) : undefined}
+        style={!isView && !isPartition && (!compareAction || compareAction === 'unchanged') ? (color ? { backgroundColor: color, color: '#fff' } : undefined) : undefined}
         onDoubleClick={handleHeaderDoubleClick}
       >
         <div className="flex items-center gap-1">
@@ -231,6 +234,11 @@ function TableNodeComponent({ data }: NodeProps) {
           {isView && (
             <span className="shrink-0 rounded bg-white/20 px-1 py-0.5 text-[8px] font-bold leading-none tracking-wider">
               {isMaterialized ? 'MVIEW' : 'VIEW'}
+            </span>
+          )}
+          {isPartition && (
+            <span className="shrink-0 rounded bg-white/20 px-1 py-0.5 text-[8px] font-bold leading-none tracking-wider">
+              PARTITION
             </span>
           )}
           {compareAction && compareAction !== 'unchanged' && (
@@ -261,6 +269,11 @@ function TableNodeComponent({ data }: NodeProps) {
         {filter.showComments && (
           <p className="truncate text-xs opacity-75" title={table.comment || '(no comment)'}>
             {table.comment || '(no comment)'}
+          </p>
+        )}
+        {isPartition && table.parentTableName && (
+          <p className="truncate text-[10px] opacity-75">
+            ↑ {table.parentTableName}
           </p>
         )}
       </div>

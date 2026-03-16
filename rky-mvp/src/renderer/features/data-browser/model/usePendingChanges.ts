@@ -19,8 +19,11 @@ export function usePendingChanges(
   const [changes, setChanges] = useState<Map<string, IPendingChange>>(new Map());
 
   const getRowKey = useCallback(
-    (row: Record<string, unknown>) =>
-      pkColumns.map((pk) => String(row[pk] ?? '')).join('::'),
+    (row: Record<string, unknown>) => {
+      // Inserted rows carry a __tempKey marker — use it as the key
+      if (typeof row.__tempKey === 'string') return row.__tempKey;
+      return pkColumns.map((pk) => String(row[pk] ?? '')).join('::');
+    },
     [pkColumns],
   );
 
@@ -31,7 +34,11 @@ export function usePendingChanges(
         const next = new Map(prev);
         const existing = next.get(key);
         if (existing) {
-          existing.modified = { ...existing.modified, [column]: newValue };
+          // Create a new IPendingChange object (immutable update)
+          next.set(key, {
+            ...existing,
+            modified: { ...existing.modified, [column]: newValue },
+          });
         } else {
           next.set(key, {
             type: 'update',
@@ -48,7 +55,7 @@ export function usePendingChanges(
   const insertRow = useCallback(
     () => {
       const tempKey = `__new_${Date.now()}`;
-      const emptyRow: Record<string, unknown> = {};
+      const emptyRow: Record<string, unknown> = { __tempKey: tempKey };
       for (const col of allColumns) emptyRow[col] = null;
       setChanges((prev) => {
         const next = new Map(prev);
@@ -83,8 +90,10 @@ export function usePendingChanges(
     const statements: string[] = [];
     for (const [, change] of changes) {
       if (change.type === 'insert') {
+        // Strip internal __tempKey before generating SQL
+        const { __tempKey: _, ...values } = change.modified;
         statements.push(
-          buildInsertQuery({ table: tableName, dbType, columns: allColumns, values: change.modified }),
+          buildInsertQuery({ table: tableName, dbType, columns: allColumns, values }),
         );
       } else if (change.type === 'update' && change.original) {
         const changedCols: Record<string, unknown> = {};

@@ -1,8 +1,10 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import type { VisibilityState } from '@tanstack/react-table';
 import { useConnections } from '@/features/db-connection';
 import { useConnectionStore } from '@/features/db-connection/model/connectionStore';
 import { useDiagramStore } from '@/features/virtual-diagram';
+import { realDiagramApi } from '@/features/real-diagram/api/realDiagramApi';
+import { sanitizeImportedTables } from '@/features/real-diagram/lib/sanitizeImportedTables';
 import { queryApi } from '@/features/query-execution/api/queryApi';
 import {
   DataTableListPanel,
@@ -27,9 +29,19 @@ type TRow = Record<string, unknown>;
 export function DataBrowserPage() {
   const { data: connections } = useConnections();
   const { selectedConnectionId } = useConnectionStore();
-  const { realTables } = useDiagramStore();
+  const { realTables, setRealTables } = useDiagramStore();
 
   const connectionId = selectedConnectionId ?? '';
+
+  // Auto-load tables if not yet populated (e.g. user navigated to Data tab before Diagram tab)
+  useEffect(() => {
+    if (!connectionId || realTables.length > 0) return;
+    realDiagramApi.fetchReal(connectionId).then((result) => {
+      if (result.success && result.data && result.data.tables?.length > 0) {
+        setRealTables(sanitizeImportedTables(result.data.tables));
+      }
+    });
+  }, [connectionId, realTables.length, setRealTables]);
   const selectedConnection = connections?.find((c) => c.id === connectionId);
   const dbType: TDbType = (selectedConnection?.dbType as TDbType) ?? 'mysql';
 
@@ -245,6 +257,8 @@ export function DataBrowserPage() {
                 onCellSave={(row, col, val) => pending.updateCell(row, col, val)}
                 onRowContextMenu={handleContextMenu}
                 columnMeta={selectedTableMeta?.columns}
+                connectionId={connectionId}
+                dbType={dbType}
               />
             ) : isLoading ? (
               <div className="flex flex-1 items-center justify-center text-muted-foreground">

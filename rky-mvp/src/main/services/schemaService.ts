@@ -405,22 +405,39 @@ async function fetchPgSchema(connectionId: string): Promise<ITable[]> {
        ORDER BY c.table_name, c.ordinal_position`,
     );
 
-    // Fetch constraints
+    // Fetch constraints via pg_catalog (more reliable than information_schema)
     const constraintResult = await client.query<PgConstraintRow>(
-      `SELECT tc.table_name, tc.constraint_name, tc.constraint_type,
-              kcu.column_name,
-              ccu.table_name AS foreign_table_name,
-              ccu.column_name AS foreign_column_name,
-              rc.update_rule, rc.delete_rule
-       FROM information_schema.table_constraints tc
-       JOIN information_schema.key_column_usage kcu
-         ON tc.constraint_name = kcu.constraint_name AND tc.table_schema = kcu.table_schema
-       LEFT JOIN information_schema.constraint_column_usage ccu
-         ON tc.constraint_name = ccu.constraint_name AND tc.table_schema = ccu.table_schema
-       LEFT JOIN information_schema.referential_constraints rc
-         ON tc.constraint_name = rc.constraint_name AND tc.constraint_schema = rc.constraint_schema
-       WHERE tc.table_schema = 'public'
-       ORDER BY tc.table_name, tc.constraint_name`,
+      `SELECT
+         c.relname AS table_name,
+         con.conname AS constraint_name,
+         CASE con.contype
+           WHEN 'p' THEN 'PRIMARY KEY'
+           WHEN 'f' THEN 'FOREIGN KEY'
+           WHEN 'u' THEN 'UNIQUE'
+         END AS constraint_type,
+         a.attname AS column_name,
+         fc.relname AS foreign_table_name,
+         fa.attname AS foreign_column_name,
+         CASE con.confupdtype
+           WHEN 'a' THEN 'NO ACTION' WHEN 'r' THEN 'RESTRICT'
+           WHEN 'c' THEN 'CASCADE'   WHEN 'n' THEN 'SET NULL'
+           WHEN 'd' THEN 'SET DEFAULT'
+         END AS update_rule,
+         CASE con.confdeltype
+           WHEN 'a' THEN 'NO ACTION' WHEN 'r' THEN 'RESTRICT'
+           WHEN 'c' THEN 'CASCADE'   WHEN 'n' THEN 'SET NULL'
+           WHEN 'd' THEN 'SET DEFAULT'
+         END AS delete_rule
+       FROM pg_constraint con
+       JOIN pg_class c ON c.oid = con.conrelid
+       JOIN pg_namespace n ON n.oid = c.relnamespace
+       JOIN unnest(con.conkey) WITH ORDINALITY AS k(col, ord) ON TRUE
+       JOIN pg_attribute a ON a.attrelid = con.conrelid AND a.attnum = k.col
+       LEFT JOIN pg_class fc ON fc.oid = con.confrelid
+       LEFT JOIN unnest(con.confkey) WITH ORDINALITY AS fk(col, ord) ON fk.ord = k.ord
+       LEFT JOIN pg_attribute fa ON fa.attrelid = con.confrelid AND fa.attnum = fk.col
+       WHERE n.nspname = 'public' AND con.contype IN ('p', 'f', 'u')
+       ORDER BY c.relname, con.conname, k.ord`,
     );
 
     // Fetch non-constraint indexes
@@ -489,6 +506,21 @@ async function fetchPgSchema(connectionId: string): Promise<ITable[]> {
       viewMap.set(row.table_name, row.relkind as 'v' | 'm');
     }
 
+    // Fetch partition inheritance relationships
+    const inheritResult = await client.query<{ child_table: string; parent_table: string }>(
+      `SELECT c.relname AS child_table, p.relname AS parent_table
+       FROM pg_inherits i
+       JOIN pg_class c ON c.oid = i.inhrelid
+       JOIN pg_class p ON p.oid = i.inhparent
+       JOIN pg_namespace cn ON cn.oid = c.relnamespace
+       JOIN pg_namespace pn ON pn.oid = p.relnamespace
+       WHERE cn.nspname = 'public' AND pn.nspname = 'public'`,
+    );
+    const partitionMap = new Map<string, string>();
+    for (const row of inheritResult.rows) {
+      partitionMap.set(row.child_table, row.parent_table);
+    }
+
     return buildTablesFromPg(
       columnResult.rows,
       constraintResult.rows,
@@ -496,6 +528,7 @@ async function fetchPgSchema(connectionId: string): Promise<ITable[]> {
       checkResult.rows,
       indexResult.rows,
       viewMap,
+      partitionMap,
     );
   } finally {
     await closePgConnection(client);
@@ -509,6 +542,7 @@ function buildTablesFromPg(
   checkRows: PgCheckRow[] = [],
   indexRows: { table_name: string; index_name: string; column_name: string; is_unique: boolean }[] = [],
   viewMap: Map<string, 'v' | 'm'> = new Map(),
+  partitionMap: Map<string, string> = new Map(),
 ): ITable[] {
   const tableMap = new Map<string, { columns: IColumn[]; constraints: IConstraint[] }>();
 
@@ -663,6 +697,7 @@ function buildTablesFromPg(
   for (const [tableName, entry] of tableMap) {
     const tableComment = commentMap.get(tableName)?.get(null) ?? '';
     const relkind = viewMap.get(tableName);
+    const parentTableName = partitionMap.get(tableName);
     tables.push({
       id: crypto.randomUUID(),
       name: tableName,
@@ -671,6 +706,7 @@ function buildTablesFromPg(
       constraints: entry.constraints,
       isView: relkind === 'v' || relkind === 'm',
       isMaterialized: relkind === 'm',
+      ...(parentTableName ? { isPartition: true, parentTableName } : {}),
     });
   }
 

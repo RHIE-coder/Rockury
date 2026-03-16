@@ -1,6 +1,6 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, useMemo } from 'react';
 import { createPortal } from 'react-dom';
-import { Table2, Eye as EyeIcon, EyeOff, Trash2, Check, X, GripVertical, ChevronDown, ChevronRight } from 'lucide-react';
+import { Table2, Eye as EyeIcon, EyeOff, Trash2, Check, X, GripVertical, ChevronDown, ChevronRight, GitBranch } from 'lucide-react';
 import { DndContext, closestCenter, PointerSensor, useSensor, useSensors, type DragEndEvent, DragOverlay } from '@dnd-kit/core';
 import { SortableContext, verticalListSortingStrategy, useSortable, arrayMove } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
@@ -123,6 +123,11 @@ function SortableTableItem({
               {table.isMaterialized ? 'MV' : 'V'}
             </span>
           )}
+          {table.isPartition && (
+            <span className="shrink-0 rounded bg-orange-500/20 px-1 py-0.5 text-[8px] font-bold leading-none text-orange-600 dark:text-orange-400">
+              P
+            </span>
+          )}
           <span className="w-5 shrink-0 text-right text-[10px] text-muted-foreground">
             {table.columns.length}
           </span>
@@ -243,10 +248,23 @@ export function TableListPanel({
 
   const draggedTable = activeDragId ? tables.find((t) => t.id === activeDragId) : null;
 
-  const regularTables = tables.filter((t) => !t.isView);
+  const regularTables = tables.filter((t) => !t.isView && !t.isPartition);
+  const partitionTables = tables.filter((t) => t.isPartition);
   const viewTables = tables.filter((t) => t.isView);
 
+  const partitionGroups = useMemo(() => {
+    const groups = new Map<string, ITable[]>();
+    for (const t of partitionTables) {
+      const parent = t.parentTableName ?? 'unknown';
+      if (!groups.has(parent)) groups.set(parent, []);
+      groups.get(parent)!.push(t);
+    }
+    return groups;
+  }, [partitionTables]);
+
   const [tablesExpanded, setTablesExpanded] = useState(true);
+  const [partitionsExpanded, setPartitionsExpanded] = useState(true);
+  const [collapsedParents, setCollapsedParents] = useState<Set<string>>(new Set());
   const [viewsExpanded, setViewsExpanded] = useState(true);
 
   function renderTableItems(items: ITable[]) {
@@ -316,6 +334,51 @@ export function TableListPanel({
                   </div>
                 )}
               </div>
+
+              {/* Partitions section */}
+              {partitionTables.length > 0 && (
+                <div className="border-t border-border/50">
+                  <button
+                    type="button"
+                    className="flex w-full items-center gap-1.5 px-2 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground hover:bg-muted/50"
+                    onClick={() => setPartitionsExpanded((v) => !v)}
+                  >
+                    {partitionsExpanded ? <ChevronDown className="size-3" /> : <ChevronRight className="size-3" />}
+                    <GitBranch className="size-3" />
+                    <span className="flex-1 text-left">Partitions</span>
+                    <span className="rounded-full bg-muted px-1.5 py-0.5 text-[9px]">{partitionTables.length}</span>
+                  </button>
+                  {partitionsExpanded && (
+                    <div className="pb-1">
+                      {[...partitionGroups.entries()].map(([parentName, children]) => (
+                        <div key={parentName}>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setCollapsedParents((prev) => {
+                                const next = new Set(prev);
+                                if (next.has(parentName)) next.delete(parentName);
+                                else next.add(parentName);
+                                return next;
+                              });
+                            }}
+                            className="flex w-full items-center gap-1 px-2 py-1 text-[10px] text-muted-foreground hover:bg-muted/50"
+                          >
+                            {collapsedParents.has(parentName) ? (
+                              <ChevronRight className="size-2.5" />
+                            ) : (
+                              <ChevronDown className="size-2.5" />
+                            )}
+                            <span className="truncate font-medium">{parentName}</span>
+                            <span className="ml-auto text-[9px] text-muted-foreground/60">{children.length}</span>
+                          </button>
+                          {!collapsedParents.has(parentName) && renderTableItems(children)}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
 
               {/* Views section */}
               {viewTables.length > 0 && (

@@ -8,6 +8,8 @@ export { ExportMenu } from './ui/ExportMenu';
 export { PendingChangesPanel } from './ui/PendingChangesPanel';
 export { RowContextMenu } from './ui/RowContextMenu';
 export { JsonEditorModal } from './ui/JsonEditorModal';
+export { FkLookupModal } from './ui/FkLookupModal';
 export { useDataQuery } from './model/useDataQuery';
 export { usePendingChanges } from './model/usePendingChanges';
 export { toCsv, toJson, toSqlInsert } from './lib/exportData';
+export { generateUuid } from './lib/uuid';

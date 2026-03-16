@@ -343,6 +343,8 @@ export interface ITable {
   isView?: boolean;
   isMaterialized?: boolean;
   viewDefinition?: string;
+  isPartition?: boolean;
+  parentTableName?: string;
 }
 
 // ─── Diagram ───
