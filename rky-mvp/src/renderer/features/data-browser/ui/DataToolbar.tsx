@@ -1,4 +1,4 @@
-import { RefreshCw } from 'lucide-react';
+import { RefreshCw, Plus, Trash2, Check, Undo2 } from 'lucide-react';
 import { Button } from '@/shared/components/ui/button';
 
 interface DataToolbarProps {
@@ -6,9 +6,33 @@ interface DataToolbarProps {
   isLoading: boolean;
   onRefresh: () => void;
   hasPk: boolean;
+  // Phase 2
+  canEdit?: boolean;
+  hasChanges?: boolean;
+  changeCount?: number;
+  onAddRow?: () => void;
+  onDeleteSelectedRow?: () => void;
+  onApply?: () => void;
+  onDiscard?: () => void;
+  exportSlot?: React.ReactNode;
+  columnsSlot?: React.ReactNode;
 }
 
-export function DataToolbar({ tableName, isLoading, onRefresh, hasPk }: DataToolbarProps) {
+export function DataToolbar({
+  tableName,
+  isLoading,
+  onRefresh,
+  hasPk,
+  canEdit = false,
+  hasChanges = false,
+  changeCount = 0,
+  onAddRow,
+  onDeleteSelectedRow,
+  onApply,
+  onDiscard,
+  exportSlot,
+  columnsSlot,
+}: DataToolbarProps) {
   return (
     <div className="flex items-center gap-2 border-b border-border px-3 py-1.5">
       <span className="text-xs font-semibold truncate max-w-[200px]">{tableName}</span>
@@ -29,7 +53,36 @@ export function DataToolbar({ tableName, isLoading, onRefresh, hasPk }: DataTool
         <RefreshCw className={`size-3.5 ${isLoading ? 'animate-spin' : ''}`} />
       </Button>
 
+      {canEdit && (
+        <>
+          <div className="h-4 w-px bg-border" />
+          <Button variant="ghost" size="xs" onClick={onAddRow} title="Add Row">
+            <Plus className="size-3.5" />
+          </Button>
+          <Button variant="ghost" size="xs" onClick={onDeleteSelectedRow} title="Delete Row" disabled={!hasChanges}>
+            <Trash2 className="size-3.5" />
+          </Button>
+          <div className="h-4 w-px bg-border" />
+          <Button
+            variant={hasChanges ? 'default' : 'ghost'}
+            size="xs"
+            onClick={onApply}
+            disabled={!hasChanges || isLoading}
+            title="Apply Changes"
+          >
+            <Check className="size-3.5" />
+            {hasChanges && <span>{changeCount}</span>}
+          </Button>
+          <Button variant="ghost" size="xs" onClick={onDiscard} disabled={!hasChanges} title="Discard">
+            <Undo2 className="size-3.5" />
+          </Button>
+        </>
+      )}
+
       <div className="flex-1" />
+
+      {exportSlot}
+      {columnsSlot}
     </div>
   );
 }

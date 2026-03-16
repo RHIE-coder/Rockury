@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useMemo, useState, useCallback } from 'react';
 import {
   useReactTable,
   getCoreRowModel,
@@ -8,6 +8,8 @@ import {
 } from '@tanstack/react-table';
 import { ArrowUp, ArrowDown, ArrowUpDown } from 'lucide-react';
 import type { IQueryResult } from '~/shared/types/db';
+import { CellEditor } from './CellEditor';
+import type { IPendingChange } from '../model/usePendingChanges';
 
 type TRow = Record<string, unknown>;
 
@@ -18,6 +20,12 @@ interface DataGridProps {
   onToggleSort: (column: string) => void;
   columnVisibility: VisibilityState;
   onColumnVisibilityChange: (vis: VisibilityState) => void;
+  // Phase 2 props
+  canEdit?: boolean;
+  pendingChanges?: Map<string, IPendingChange>;
+  getRowKey?: (row: TRow) => string;
+  onCellSave?: (row: TRow, column: string, value: unknown) => void;
+  onRowContextMenu?: (e: React.MouseEvent, row: TRow, column: string) => void;
 }
 
 export function DataGrid({
@@ -27,7 +35,22 @@ export function DataGrid({
   onToggleSort,
   columnVisibility,
   onColumnVisibilityChange,
+  canEdit = false,
+  pendingChanges,
+  getRowKey,
+  onCellSave,
+  onRowContextMenu,
 }: DataGridProps) {
+  const [editingCell, setEditingCell] = useState<{ rowIndex: number; column: string } | null>(null);
+
+  const getRowChange = useCallback(
+    (row: TRow): IPendingChange | undefined => {
+      if (!pendingChanges || !getRowKey) return undefined;
+      return pendingChanges.get(getRowKey(row));
+    },
+    [pendingChanges, getRowKey],
+  );
+
   const columns = useMemo<ColumnDef<TRow>[]>(() => {
     const rowNumCol: ColumnDef<TRow> = {
       id: '__rowNum',
@@ -57,17 +80,33 @@ export function DataGrid({
           </button>
         );
       },
-      cell: ({ getValue }) => {
-        const val = getValue();
-        if (val === null) {
+      cell: ({ getValue, row }) => {
+        const change = getRowChange(row.original);
+        const displayVal = change ? change.modified[col] : getValue();
+
+        // Check if this cell is being edited
+        if (editingCell?.rowIndex === row.index && editingCell?.column === col) {
+          return (
+            <CellEditor
+              value={displayVal}
+              onSave={(newVal) => {
+                onCellSave?.(row.original, col, newVal);
+                setEditingCell(null);
+              }}
+              onCancel={() => setEditingCell(null)}
+            />
+          );
+        }
+
+        if (displayVal === null) {
           return <span className="italic text-muted-foreground/50">NULL</span>;
         }
-        return <span className="truncate">{String(val)}</span>;
+        return <span className="truncate">{String(displayVal)}</span>;
       },
     }));
 
     return [rowNumCol, ...dataCols];
-  }, [result.columns, pageOffset, orderBy, onToggleSort]);
+  }, [result.columns, pageOffset, orderBy, onToggleSort, editingCell, getRowChange, onCellSave]);
 
   const table = useReactTable({
     data: result.rows as TRow[],
@@ -99,18 +138,43 @@ export function DataGrid({
           ))}
         </thead>
         <tbody>
-          {table.getRowModel().rows.map((row) => (
-            <tr key={row.id} className="hover:bg-accent/50">
-              {row.getVisibleCells().map((cell) => (
-                <td
-                  key={cell.id}
-                  className="max-w-xs truncate border-b border-r border-border px-3 py-1 font-mono"
-                >
-                  {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                </td>
-              ))}
-            </tr>
-          ))}
+          {table.getRowModel().rows.map((row) => {
+            const change = getRowChange(row.original);
+            let rowClassName = 'hover:bg-accent/50';
+            if (change?.type === 'update') rowClassName = 'bg-yellow-500/10 hover:bg-yellow-500/20';
+            if (change?.type === 'insert') rowClassName = 'bg-green-500/10 hover:bg-green-500/20';
+            if (change?.type === 'delete') rowClassName = 'bg-red-500/10 line-through opacity-60';
+
+            return (
+              <tr key={row.id} className={rowClassName}>
+                {row.getVisibleCells().map((cell) => {
+                  const colId = cell.column.id;
+                  const isEditable = canEdit && colId !== '__rowNum' && change?.type !== 'delete';
+                  return (
+                    <td
+                      key={cell.id}
+                      className={`max-w-xs truncate border-b border-r border-border px-3 py-1 font-mono ${
+                        isEditable ? 'cursor-pointer' : ''
+                      }`}
+                      onDoubleClick={() => {
+                        if (isEditable) {
+                          setEditingCell({ rowIndex: row.index, column: colId });
+                        }
+                      }}
+                      onContextMenu={(e) => {
+                        if (onRowContextMenu) {
+                          e.preventDefault();
+                          onRowContextMenu(e, row.original, colId);
+                        }
+                      }}
+                    >
+                      {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                    </td>
+                  );
+                })}
+              </tr>
+            );
+          })}
         </tbody>
       </table>
     </div>
