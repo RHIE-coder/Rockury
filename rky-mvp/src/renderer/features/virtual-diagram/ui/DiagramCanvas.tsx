@@ -5,6 +5,7 @@ import {
   Background,
   Controls,
   MiniMap,
+  Panel,
   useNodesState,
   useEdgesState,
   useReactFlow,
@@ -16,6 +17,7 @@ import type { ICompareResult } from '../lib/compareVersions';
 import { schemaToNodes } from '../lib/schemaToNodes';
 import { TableNode } from './TableNode';
 import { RelationEdge } from './RelationEdge';
+import { DiagramLegend } from './DiagramLegend';
 
 const nodeTypes = { tableNode: TableNode };
 const edgeTypes = { relationEdge: RelationEdge };
@@ -303,6 +305,9 @@ function DiagramCanvasInner({
     >
       <Background gap={16} size={1} />
       <Controls showInteractive={false} />
+      <Panel position="bottom-left">
+        <DiagramLegend />
+      </Panel>
       <MiniMap
         zoomable
         pannable

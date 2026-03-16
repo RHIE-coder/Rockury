@@ -15,6 +15,15 @@ interface MysqlColumnRow {
   COLUMN_KEY: string;
   COLUMN_COMMENT: string;
   EXTRA: string;
+  GENERATION_EXPRESSION: string | null;
+}
+
+interface MysqlIndexRow {
+  TABLE_NAME: string;
+  INDEX_NAME: string;
+  COLUMN_NAME: string;
+  SEQ_IN_INDEX: number;
+  NON_UNIQUE: number;
 }
 
 interface MysqlConstraintRow {
@@ -39,6 +48,13 @@ interface PgColumnRow {
   data_type: string;
   udt_name: string;
   is_identity: string;
+}
+
+interface PgCheckRow {
+  table_name: string;
+  constraint_name: string;
+  check_expression: string;
+  column_names: string[];
 }
 
 interface PgConstraintRow {
@@ -93,7 +109,8 @@ async function fetchMysqlSchema(connectionId: string): Promise<ITable[]> {
     // Fetch columns
     const [columnRows] = await conn.query(
       `SELECT c.TABLE_NAME, c.COLUMN_NAME, c.ORDINAL_POSITION, c.COLUMN_DEFAULT,
-              c.IS_NULLABLE, c.DATA_TYPE, c.COLUMN_TYPE, c.COLUMN_KEY, c.COLUMN_COMMENT, c.EXTRA
+              c.IS_NULLABLE, c.DATA_TYPE, c.COLUMN_TYPE, c.COLUMN_KEY, c.COLUMN_COMMENT, c.EXTRA,
+              c.GENERATION_EXPRESSION
        FROM information_schema.COLUMNS c
        WHERE c.TABLE_SCHEMA = ?
        ORDER BY c.TABLE_NAME, c.ORDINAL_POSITION`,
@@ -117,9 +134,46 @@ async function fetchMysqlSchema(connectionId: string): Promise<ITable[]> {
       [config.database],
     );
 
+    // Fetch CHECK constraints (MySQL 8.0.16+ / MariaDB 10.2+)
+    let checkRows: { TABLE_NAME: string; CONSTRAINT_NAME: string; CHECK_CLAUSE: string }[] = [];
+    try {
+      const [rows] = await conn.query(
+        `SELECT cc.CONSTRAINT_NAME, tc.TABLE_NAME, cc.CHECK_CLAUSE
+         FROM information_schema.CHECK_CONSTRAINTS cc
+         JOIN information_schema.TABLE_CONSTRAINTS tc
+           ON cc.CONSTRAINT_NAME = tc.CONSTRAINT_NAME AND cc.CONSTRAINT_SCHEMA = tc.TABLE_SCHEMA
+         WHERE cc.CONSTRAINT_SCHEMA = ? AND tc.CONSTRAINT_TYPE = 'CHECK'`,
+        [config.database],
+      );
+      checkRows = rows as typeof checkRows;
+    } catch {
+      // CHECK_CONSTRAINTS not available (older MySQL/MariaDB)
+    }
+
+    // Fetch non-constraint indexes (regular indexes, not PK/FK/UNIQUE)
+    const [indexRows] = await conn.query(
+      `SELECT TABLE_NAME, INDEX_NAME, COLUMN_NAME, SEQ_IN_INDEX, NON_UNIQUE
+       FROM information_schema.STATISTICS
+       WHERE TABLE_SCHEMA = ?
+         AND INDEX_NAME != 'PRIMARY'
+       ORDER BY TABLE_NAME, INDEX_NAME, SEQ_IN_INDEX`,
+      [config.database],
+    );
+
+    // Fetch view names to distinguish from regular tables
+    const [viewRows] = await conn.query(
+      `SELECT TABLE_NAME FROM information_schema.TABLES
+       WHERE TABLE_SCHEMA = ? AND TABLE_TYPE = 'VIEW'`,
+      [config.database],
+    );
+    const viewNames = new Set((viewRows as { TABLE_NAME: string }[]).map((r) => r.TABLE_NAME));
+
     return buildTablesFromMysql(
       columnRows as MysqlColumnRow[],
       constraintRows as MysqlConstraintRow[],
+      checkRows,
+      indexRows as MysqlIndexRow[],
+      viewNames,
     );
   } finally {
     await closeMysqlConnection(conn);
@@ -129,6 +183,9 @@ async function fetchMysqlSchema(connectionId: string): Promise<ITable[]> {
 function buildTablesFromMysql(
   columnRows: MysqlColumnRow[],
   constraintRows: MysqlConstraintRow[],
+  checkRows: { TABLE_NAME: string; CONSTRAINT_NAME: string; CHECK_CLAUSE: string }[] = [],
+  indexRows: MysqlIndexRow[] = [],
+  viewNames: Set<string> = new Set(),
 ): ITable[] {
   const tableMap = new Map<string, { columns: IColumn[]; constraints: IConstraint[] }>();
 
@@ -169,12 +226,26 @@ function buildTablesFromMysql(
       }
     }
 
+    const isGenerated = row.EXTRA?.toLowerCase().includes('generated') ?? false;
+
+    // MariaDB stores JSON as longtext; use DATA_TYPE to detect and show 'json' instead
+    let dataType = row.COLUMN_TYPE;
+    if (row.DATA_TYPE === 'longtext' && row.COLUMN_TYPE === 'longtext') {
+      // Check if MariaDB JSON alias: json_valid CHECK is auto-added
+      const hasJsonCheck = checkRows.some(
+        (cr) => cr.TABLE_NAME === row.TABLE_NAME && cr.CHECK_CLAUSE.toLowerCase().includes(`json_valid`) && cr.CHECK_CLAUSE.includes(row.COLUMN_NAME),
+      );
+      if (hasJsonCheck) dataType = 'json';
+    }
+
     const column: IColumn = {
       id: crypto.randomUUID(),
       name: row.COLUMN_NAME,
-      dataType: row.COLUMN_TYPE,
+      dataType,
       keyTypes,
       isAutoIncrement: row.EXTRA?.toLowerCase().includes('auto_increment'),
+      isGenerated,
+      generationExpression: isGenerated ? (row.GENERATION_EXPRESSION ?? undefined) : undefined,
       defaultValue: row.COLUMN_DEFAULT,
       nullable: row.IS_NULLABLE === 'YES',
       comment: row.COLUMN_COMMENT ?? '',
@@ -227,6 +298,75 @@ function buildTablesFromMysql(
     }
   }
 
+  // Add CHECK constraints
+  for (const row of checkRows) {
+    const entry = tableMap.get(row.TABLE_NAME);
+    if (!entry) continue;
+    // MySQL CHECK expressions use backtick-quoted column names (e.g. `price` >= 0)
+    // Use word boundary regex for unquoted fallback to avoid false positives
+    // (e.g., "id" matching inside "json_valid")
+    const referencedCols = entry.columns
+      .filter((c) => {
+        if (row.CHECK_CLAUSE.includes(`\`${c.name}\``)) return true;
+        const escaped = c.name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        return new RegExp(`\\b${escaped}\\b`).test(row.CHECK_CLAUSE);
+      })
+      .map((c) => c.name);
+    entry.constraints.push({
+      type: 'CHECK',
+      name: row.CONSTRAINT_NAME,
+      columns: referencedCols,
+      checkExpression: row.CHECK_CLAUSE,
+    });
+    // Mark columns with CHECK constraint
+    for (const col of entry.columns) {
+      if (referencedCols.includes(col.name) && !col.constraints.some((c) => c.type === 'CHECK')) {
+        col.constraints.push({ type: 'CHECK', name: row.CONSTRAINT_NAME, columns: [col.name], checkExpression: row.CHECK_CLAUSE });
+      }
+    }
+  }
+
+  // Add non-constraint indexes (IDX)
+  console.log('[schemaService] indexRows count:', indexRows.length);
+  const idxGroupMap = new Map<string, Map<string, MysqlIndexRow[]>>();
+  for (const row of indexRows) {
+    if (!idxGroupMap.has(row.TABLE_NAME)) idxGroupMap.set(row.TABLE_NAME, new Map());
+    const tbl = idxGroupMap.get(row.TABLE_NAME)!;
+    if (!tbl.has(row.INDEX_NAME)) tbl.set(row.INDEX_NAME, []);
+    tbl.get(row.INDEX_NAME)!.push(row);
+  }
+  // Collect constraint names to skip (PK, FK, UK are already tracked)
+  const constraintNames = new Set(constraintRows.map((r) => r.CONSTRAINT_NAME));
+  console.log('[schemaService] constraintNames:', [...constraintNames]);
+  for (const [tableName, idxMap] of idxGroupMap) {
+    const entry = tableMap.get(tableName);
+    if (!entry) continue;
+    for (const [indexName, rows] of idxMap) {
+      // Skip if this index is already a constraint (PK, FK, UNIQUE)
+      if (constraintNames.has(indexName)) {
+        console.log(`[schemaService] IDX skip (constraint): ${tableName}.${indexName}`);
+        continue;
+      }
+      // Skip unique indexes — they're already captured as UK constraints
+      // mysql2 may return NON_UNIQUE as string/BigInt, so use Number()
+      if (Number(rows[0].NON_UNIQUE) === 0) {
+        console.log(`[schemaService] IDX skip (unique): ${tableName}.${indexName}, NON_UNIQUE=${rows[0].NON_UNIQUE} (type: ${typeof rows[0].NON_UNIQUE})`);
+        continue;
+      }
+      console.log(`[schemaService] IDX add: ${tableName}.${indexName}, cols=${rows.map(r => r.COLUMN_NAME).join(',')}`);
+      const sortedRows = [...rows].sort((a, b) => a.SEQ_IN_INDEX - b.SEQ_IN_INDEX);
+      const colNames = sortedRows.map((r) => r.COLUMN_NAME);
+      entry.constraints.push({ type: 'IDX', name: indexName, columns: colNames });
+      // Mark columns with IDX keyType
+      for (const colName of colNames) {
+        const col = entry.columns.find((c) => c.name === colName);
+        if (col && !col.keyTypes.includes('IDX')) {
+          col.keyTypes.push('IDX');
+        }
+      }
+    }
+  }
+
   // Build final ITable array
   const tables: ITable[] = [];
   for (const [tableName, entry] of tableMap) {
@@ -236,6 +376,7 @@ function buildTablesFromMysql(
       comment: '',
       columns: entry.columns,
       constraints: entry.constraints,
+      isView: viewNames.has(tableName),
     });
   }
 
@@ -282,7 +423,47 @@ async function fetchPgSchema(connectionId: string): Promise<ITable[]> {
        ORDER BY tc.table_name, tc.constraint_name`,
     );
 
-    // Fetch comments
+    // Fetch non-constraint indexes
+    const indexResult = await client.query<{ table_name: string; index_name: string; column_name: string; is_unique: boolean }>(
+      `SELECT
+         t.relname AS table_name,
+         i.relname AS index_name,
+         a.attname AS column_name,
+         ix.indisunique AS is_unique
+       FROM pg_index ix
+       JOIN pg_class t ON t.oid = ix.indrelid
+       JOIN pg_class i ON i.oid = ix.indexrelid
+       JOIN pg_namespace n ON n.oid = t.relnamespace
+       JOIN unnest(ix.indkey) WITH ORDINALITY AS k(attnum, ord) ON TRUE
+       JOIN pg_attribute a ON a.attrelid = t.oid AND a.attnum = k.attnum
+       WHERE n.nspname = 'public'
+         AND NOT ix.indisprimary
+         AND NOT EXISTS (
+           SELECT 1 FROM pg_constraint c
+           WHERE c.conindid = ix.indexrelid
+         )
+       ORDER BY t.relname, i.relname, k.ord`,
+    );
+
+    // Fetch CHECK constraints
+    const checkResult = await client.query<PgCheckRow>(
+      `SELECT
+         c.relname AS table_name,
+         con.conname AS constraint_name,
+         pg_get_constraintdef(con.oid) AS check_expression,
+         ARRAY(
+           SELECT a.attname
+           FROM unnest(con.conkey) AS k(col)
+           JOIN pg_attribute a ON a.attrelid = con.conrelid AND a.attnum = k.col
+         ) AS column_names
+       FROM pg_constraint con
+       JOIN pg_class c ON c.oid = con.conrelid
+       JOIN pg_namespace n ON n.oid = c.relnamespace
+       WHERE n.nspname = 'public' AND con.contype = 'c'
+       ORDER BY c.relname, con.conname`,
+    );
+
+    // Fetch comments (include views: relkind IN ('r','v','m'))
     const commentResult = await client.query<PgCommentRow>(
       `SELECT
          c.relname AS table_name,
@@ -292,14 +473,29 @@ async function fetchPgSchema(connectionId: string): Promise<ITable[]> {
        LEFT JOIN pg_catalog.pg_attribute a ON a.attrelid = c.oid AND a.attnum > 0
        LEFT JOIN pg_catalog.pg_description d ON d.objoid = c.oid AND d.objsubid = a.attnum
        LEFT JOIN pg_catalog.pg_namespace n ON n.oid = c.relnamespace
-       WHERE n.nspname = 'public' AND c.relkind = 'r'
+       WHERE n.nspname = 'public' AND c.relkind IN ('r', 'v', 'm')
        ORDER BY c.relname, a.attnum`,
     );
+
+    // Fetch view/materialized view names
+    const viewResult = await client.query<{ table_name: string; relkind: string }>(
+      `SELECT c.relname AS table_name, c.relkind
+       FROM pg_class c
+       JOIN pg_namespace n ON n.oid = c.relnamespace
+       WHERE n.nspname = 'public' AND c.relkind IN ('v', 'm')`,
+    );
+    const viewMap = new Map<string, 'v' | 'm'>();
+    for (const row of viewResult.rows) {
+      viewMap.set(row.table_name, row.relkind as 'v' | 'm');
+    }
 
     return buildTablesFromPg(
       columnResult.rows,
       constraintResult.rows,
       commentResult.rows,
+      checkResult.rows,
+      indexResult.rows,
+      viewMap,
     );
   } finally {
     await closePgConnection(client);
@@ -310,6 +506,9 @@ function buildTablesFromPg(
   columnRows: PgColumnRow[],
   constraintRows: PgConstraintRow[],
   commentRows: PgCommentRow[],
+  checkRows: PgCheckRow[] = [],
+  indexRows: { table_name: string; index_name: string; column_name: string; is_unique: boolean }[] = [],
+  viewMap: Map<string, 'v' | 'm'> = new Map(),
 ): ITable[] {
   const tableMap = new Map<string, { columns: IColumn[]; constraints: IConstraint[] }>();
 
@@ -411,16 +610,67 @@ function buildTablesFromPg(
     }
   }
 
+  // Add CHECK constraints
+  for (const row of checkRows) {
+    const entry = tableMap.get(row.table_name);
+    if (!entry) continue;
+    // Strip leading "CHECK " from pg_get_constraintdef output
+    const expr = row.check_expression.replace(/^CHECK\s*/i, '');
+    entry.constraints.push({
+      type: 'CHECK',
+      name: row.constraint_name,
+      columns: row.column_names ?? [],
+      checkExpression: expr,
+    });
+    // Mark columns with CHECK constraint
+    for (const colName of (row.column_names ?? [])) {
+      const col = entry.columns.find((c) => c.name === colName);
+      if (col) {
+        if (!col.constraints.some((c) => c.type === 'CHECK')) {
+          col.constraints.push({ type: 'CHECK', name: row.constraint_name, columns: [colName], checkExpression: expr });
+        }
+      }
+    }
+  }
+
+  // Add non-constraint indexes (IDX)
+  const pgIdxGroupMap = new Map<string, Map<string, { table_name: string; index_name: string; column_name: string; is_unique: boolean }[]>>();
+  for (const row of indexRows) {
+    if (!pgIdxGroupMap.has(row.table_name)) pgIdxGroupMap.set(row.table_name, new Map());
+    const tbl = pgIdxGroupMap.get(row.table_name)!;
+    if (!tbl.has(row.index_name)) tbl.set(row.index_name, []);
+    tbl.get(row.index_name)!.push(row);
+  }
+  for (const [tableName, idxMap] of pgIdxGroupMap) {
+    const entry = tableMap.get(tableName);
+    if (!entry) continue;
+    for (const [indexName, rows] of idxMap) {
+      // Skip unique indexes — they may already be captured as UK
+      if (rows[0].is_unique) continue;
+      const colNames = rows.map((r) => r.column_name);
+      entry.constraints.push({ type: 'IDX', name: indexName, columns: colNames });
+      for (const colName of colNames) {
+        const col = entry.columns.find((c) => c.name === colName);
+        if (col && !col.keyTypes.includes('IDX')) {
+          col.keyTypes.push('IDX');
+        }
+      }
+    }
+  }
+
   // Build final ITable array
   const tables: ITable[] = [];
   for (const [tableName, entry] of tableMap) {
     const tableComment = commentMap.get(tableName)?.get(null) ?? '';
+    const relkind = viewMap.get(tableName);
     tables.push({
       id: crypto.randomUUID(),
       name: tableName,
       comment: tableComment,
       columns: entry.columns,
       constraints: entry.constraints,
+      isView: relkind === 'v' || relkind === 'm',
+      isMaterialized: relkind === 'm',
     });
   }
 
@@ -460,11 +710,12 @@ function fetchSqliteSchema(connectionId: string): ITable[] {
   const db = createSqliteConnection({ database: config.database });
 
   try {
-    // Get all table names
+    // Get all table and view names
     const tableRows = db.prepare(
-      `SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' ORDER BY name`,
-    ).all() as { name: string }[];
+      `SELECT name, type FROM sqlite_master WHERE type IN ('table', 'view') AND name NOT LIKE 'sqlite_%' ORDER BY name`,
+    ).all() as { name: string; type: string }[];
 
+    const viewNames = new Set(tableRows.filter((r) => r.type === 'view').map((r) => r.name));
     const tables: ITable[] = [];
 
     for (const tableRow of tableRows) {
@@ -553,16 +804,75 @@ function fetchSqliteSchema(connectionId: string): ITable[] {
         });
       }
 
-      // Unique constraints
+      // Unique constraints & regular indexes
       for (const idx of indexes) {
+        const indexInfo = db.prepare(`PRAGMA index_info('${idx.name}')`).all() as SqliteIndexInfoRow[];
+        const colNames = indexInfo.map((c) => c.name);
         if (idx.unique) {
-          const indexInfo = db.prepare(`PRAGMA index_info('${idx.name}')`).all() as SqliteIndexInfoRow[];
-          constraints.push({
-            type: 'UK',
-            name: idx.name,
-            columns: indexInfo.map((c) => c.name),
-          });
+          constraints.push({ type: 'UK', name: idx.name, columns: colNames });
+        } else {
+          constraints.push({ type: 'IDX', name: idx.name, columns: colNames });
+          // Mark columns with IDX keyType
+          for (const colName of colNames) {
+            const col = tableColumns.find((c) => c.name === colName);
+            if (col && !col.keyTypes.includes('IDX')) {
+              col.keyTypes.push('IDX');
+            }
+          }
         }
+      }
+
+      // CHECK constraints (parse from DDL)
+      try {
+        const ddlRow = db.prepare(
+          `SELECT sql FROM sqlite_master WHERE type='table' AND name=?`,
+        ).get(tableName) as { sql: string } | undefined;
+        if (ddlRow?.sql) {
+          const checkRegex = /CONSTRAINT\s+(\w+)\s+CHECK\s*\(([^)]+)\)/gi;
+          let match: RegExpExecArray | null;
+          while ((match = checkRegex.exec(ddlRow.sql)) !== null) {
+            const cName = match[1];
+            const cExpr = match[2].trim();
+            const referencedCols = tableColumns
+              .filter((c) => {
+                const escaped = c.name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+                return new RegExp(`\\b${escaped}\\b`).test(cExpr);
+              })
+              .map((c) => c.name);
+            constraints.push({
+              type: 'CHECK',
+              name: cName,
+              columns: referencedCols,
+              checkExpression: cExpr,
+            });
+            for (const col of tableColumns) {
+              if (referencedCols.includes(col.name) && !col.constraints.some((c) => c.type === 'CHECK')) {
+                col.constraints.push({ type: 'CHECK', name: cName, columns: [col.name], checkExpression: cExpr });
+              }
+            }
+          }
+          // Also catch inline CHECK (without CONSTRAINT keyword)
+          const inlineCheckRegex = /CHECK\s*\(([^)]+)\)/gi;
+          let inlineMatch: RegExpExecArray | null;
+          while ((inlineMatch = inlineCheckRegex.exec(ddlRow.sql)) !== null) {
+            const expr = inlineMatch[1].trim();
+            // Skip if already captured by named constraint
+            if (constraints.some((c) => c.type === 'CHECK' && c.checkExpression === expr)) continue;
+            const refCols = tableColumns.filter((c) => {
+              const escaped = c.name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+              return new RegExp(`\\b${escaped}\\b`).test(expr);
+            }).map((c) => c.name);
+            const autoName = `chk_${tableName}_${constraints.filter((c) => c.type === 'CHECK').length + 1}`;
+            constraints.push({ type: 'CHECK', name: autoName, columns: refCols, checkExpression: expr });
+            for (const col of tableColumns) {
+              if (refCols.includes(col.name) && !col.constraints.some((c) => c.type === 'CHECK')) {
+                col.constraints.push({ type: 'CHECK', name: autoName, columns: [col.name], checkExpression: expr });
+              }
+            }
+          }
+        }
+      } catch {
+        // DDL parsing failed — skip CHECK extraction
       }
 
       tables.push({
@@ -571,6 +881,7 @@ function fetchSqliteSchema(connectionId: string): ITable[] {
         comment: '',
         columns: tableColumns,
         constraints,
+        isView: viewNames.has(tableName),
       });
     }
 

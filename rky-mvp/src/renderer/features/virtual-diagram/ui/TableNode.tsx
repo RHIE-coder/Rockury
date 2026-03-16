@@ -54,16 +54,21 @@ function ColumnBadges({ column }: { column: IColumn }) {
 }
 
 function KeyIcons({ keyTypes }: { keyTypes: string[] }) {
-  if (!keyTypes || keyTypes.length === 0) {
-    return <span className="inline-block w-4 shrink-0" />;
-  }
   return (
-    <span className="flex shrink-0 items-center">
-      {keyTypes.map((kt) => (
+    <span className="inline-flex w-8 shrink-0 items-center">
+      {keyTypes?.map((kt) => (
         <SingleKeyIcon key={kt} keyType={kt} />
       ))}
     </span>
   );
+}
+
+/** Shorten long data type strings like enum('a','b','c') → ENUM */
+function shortenDataType(dataType: string): { short: string; full: string } {
+  const lower = dataType.toLowerCase();
+  if (lower.startsWith('enum(')) return { short: 'ENUM', full: dataType };
+  if (lower.startsWith('set(')) return { short: 'SET', full: dataType };
+  return { short: dataType, full: dataType };
 }
 
 function NullableIcon({ nullable }: { nullable: boolean }) {
@@ -272,9 +277,12 @@ function TableNodeComponent({ data }: NodeProps) {
               {filter.showNullable && <NullableIcon nullable={column.nullable} />}
               <span className="flex-1 truncate font-medium" title={column.name}>{column.name}</span>
               {filter.showKeyIcons && <ColumnBadges column={column} />}
-              {filter.showDataTypes && (
-                <span className="shrink-0 text-muted-foreground">{column.dataType}</span>
-              )}
+              {filter.showDataTypes && (() => {
+                const { short, full } = shortenDataType(column.dataType);
+                return (
+                  <span className="shrink-0 text-muted-foreground" title={short !== full ? full : undefined}>{short}</span>
+                );
+              })()}
               {filter.showDefaults && column.defaultValue != null && (
                 <span className="shrink-0 max-w-[80px] truncate text-[10px] text-emerald-600 dark:text-emerald-400" title={`DEFAULT ${column.defaultValue}`}>
                   ={column.defaultValue}

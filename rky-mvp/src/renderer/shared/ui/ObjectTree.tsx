@@ -238,13 +238,13 @@ export function ObjectTree({
 
                     {/* Object names */}
                     {isTypeExpanded &&
-                      names.map((name) => {
+                      names.map((name, idx) => {
                         const isSelected =
                           selectedObject?.type === type && selectedObject?.name === name;
 
                         return (
                           <button
-                            key={name}
+                            key={`${name}-${idx}`}
                             type="button"
                             className={`flex w-full items-center truncate py-0.5 pl-12 pr-2 text-xs ${
                               isSelected

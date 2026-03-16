@@ -4,6 +4,7 @@ import { ReferenceSidebar } from './ReferenceSidebar';
 import { ReferenceDetail } from './ReferenceDetail';
 import type { IReferenceCategory, IReferenceItem, TLang } from '../model/types';
 
+import dataTypesData from '../data/data-types.json';
 import tableColumnData from '../data/table-column.json';
 import constraintsData from '../data/constraints.json';
 import indexesData from '../data/indexes.json';
@@ -16,6 +17,7 @@ import securityData from '../data/security.json';
 import advancedData from '../data/advanced.json';
 
 const CATEGORY_LABELS: Record<string, Record<TLang, string>> = {
+  'data-types': { en: '0. Data Types', ko: '0. 데이터 타입' },
   'table-column': { en: '1. Table & Column', ko: '1. 테이블 & 컬럼' },
   'constraints': { en: '2. Constraints', ko: '2. 제약 조건' },
   'indexes': { en: '3. Indexes', ko: '3. 인덱스' },
@@ -29,6 +31,7 @@ const CATEGORY_LABELS: Record<string, Record<TLang, string>> = {
 };
 
 const categoryData: { id: string; items: IReferenceItem[] }[] = [
+  { id: 'data-types', items: dataTypesData as IReferenceItem[] },
   { id: 'table-column', items: tableColumnData as IReferenceItem[] },
   { id: 'constraints', items: constraintsData as IReferenceItem[] },
   { id: 'indexes', items: indexesData as IReferenceItem[] },
@@ -44,6 +47,7 @@ const categoryData: { id: string; items: IReferenceItem[] }[] = [
 export function ReferencePage() {
   const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
   const [lang, setLang] = useState<TLang>('ko');
+  const [searchQuery, setSearchQuery] = useState('');
 
   const categories: IReferenceCategory[] = useMemo(
     () =>
@@ -86,6 +90,9 @@ export function ReferencePage() {
           categories={categories}
           selectedItemId={selectedItemId}
           onSelect={setSelectedItemId}
+          searchQuery={searchQuery}
+          onSearchChange={setSearchQuery}
+          lang={lang}
         />
         {selectedItem ? (
           <ReferenceDetail item={selectedItem} lang={lang} />
@@ -105,8 +112,8 @@ export function ReferencePage() {
               </p>
             </div>
             <div className="flex flex-wrap justify-center gap-1.5 mt-2 max-w-[300px]">
-              <span className="rounded-full bg-blue-500/15 px-2 py-0.5 text-[10px] text-blue-600 dark:text-blue-400">10 {lang === 'ko' ? '카테고리' : 'categories'}</span>
-              <span className="rounded-full bg-emerald-500/15 px-2 py-0.5 text-[10px] text-emerald-600 dark:text-emerald-400">67 {lang === 'ko' ? '항목' : 'items'}</span>
+              <span className="rounded-full bg-blue-500/15 px-2 py-0.5 text-[10px] text-blue-600 dark:text-blue-400">11 {lang === 'ko' ? '카테고리' : 'categories'}</span>
+              <span className="rounded-full bg-emerald-500/15 px-2 py-0.5 text-[10px] text-emerald-600 dark:text-emerald-400">{allItems.length} {lang === 'ko' ? '항목' : 'items'}</span>
               <span className="rounded-full bg-violet-500/15 px-2 py-0.5 text-[10px] text-violet-600 dark:text-violet-400">4 {lang === 'ko' ? '벤더' : 'vendors'}</span>
             </div>
           </div>

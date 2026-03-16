@@ -125,9 +125,9 @@ export function OverviewList({ connections, diagrams, seeds }: OverviewListProps
                     {row.usedBy.length === 0 ? (
                       <span className="text-[10px] text-muted-foreground">--</span>
                     ) : (
-                      row.usedBy.map((name) => (
+                      row.usedBy.map((name, idx) => (
                         <span
-                          key={name}
+                          key={`${name}-${idx}`}
                           className="rounded bg-accent px-1.5 py-0.5 text-[10px] text-muted-foreground"
                         >
                           {name}

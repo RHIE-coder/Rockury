@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { Table2, Eye, EyeOff, Trash2, Check, X, GripVertical } from 'lucide-react';
+import { Table2, Eye as EyeIcon, EyeOff, Trash2, Check, X, GripVertical, ChevronDown, ChevronRight } from 'lucide-react';
 import { DndContext, closestCenter, PointerSensor, useSensor, useSensors, type DragEndEvent, DragOverlay } from '@dnd-kit/core';
 import { SortableContext, verticalListSortingStrategy, useSortable, arrayMove } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
@@ -114,6 +114,15 @@ function SortableTableItem({
           <span className={`min-w-0 flex-1 truncate ${isHidden ? 'line-through' : ''}`}>
             {table.name}
           </span>
+          {table.isView && (
+            <span className={`shrink-0 rounded px-1 py-0.5 text-[8px] font-bold leading-none ${
+              table.isMaterialized
+                ? 'bg-teal-500/20 text-teal-600 dark:text-teal-400'
+                : 'bg-indigo-500/20 text-indigo-600 dark:text-indigo-400'
+            }`}>
+              {table.isMaterialized ? 'MV' : 'V'}
+            </span>
+          )}
           <span className="w-5 shrink-0 text-right text-[10px] text-muted-foreground">
             {table.columns.length}
           </span>
@@ -139,7 +148,7 @@ function SortableTableItem({
               {isHidden ? (
                 <EyeOff className="size-3" />
               ) : (
-                <Eye className="size-3" />
+                <EyeIcon className="size-3" />
               )}
             </button>
           )}
@@ -148,7 +157,13 @@ function SortableTableItem({
       {hoverRect && !isDragging && createPortal(
         <div
           className="pointer-events-none fixed z-[9999] rounded border border-border bg-popover px-2 py-1.5 shadow-lg"
-          style={{ left: hoverRect.left, top: hoverRect.top }}
+          style={{
+            left: hoverRect.left,
+            // Flip tooltip upward if it would overflow the viewport bottom
+            ...(hoverRect.top + 50 > window.innerHeight
+              ? { bottom: window.innerHeight - hoverRect.top }
+              : { top: hoverRect.top }),
+          }}
         >
           <p className="whitespace-nowrap text-xs font-medium">{table.name}</p>
           <p className="whitespace-nowrap text-[10px] text-muted-foreground">
@@ -228,18 +243,44 @@ export function TableListPanel({
 
   const draggedTable = activeDragId ? tables.find((t) => t.id === activeDragId) : null;
 
+  const regularTables = tables.filter((t) => !t.isView);
+  const viewTables = tables.filter((t) => t.isView);
+
+  const [tablesExpanded, setTablesExpanded] = useState(true);
+  const [viewsExpanded, setViewsExpanded] = useState(true);
+
+  function renderTableItems(items: ITable[]) {
+    return items.map((table) => (
+      <SortableTableItem
+        key={table.id}
+        table={table}
+        isSelected={table.id === selectedTableId}
+        isMatched={matchedTableIds.has(table.id)}
+        isHidden={hiddenSet.has(table.id)}
+        isDeleting={deletingId === table.id}
+        onSelect={() => onTableSelect(table.id)}
+        onStartDelete={onTableDelete ? () => setDeletingId(table.id) : undefined}
+        onConfirmDelete={() => confirmDelete(table.id)}
+        onCancelDelete={() => setDeletingId(null)}
+        onToggleVisibility={onToggleVisibility ? () => onToggleVisibility(table.id) : undefined}
+        hasVisibilityAction={!!onToggleVisibility}
+        itemRef={(el) => { itemRefs.current[table.id] = el; }}
+      />
+    ));
+  }
+
   return (
     <div className="flex h-full w-[200px] shrink-0 flex-col border-r border-border bg-background">
       {/* Header */}
       <div className="flex items-center justify-between border-b border-border px-3 py-2">
         <div className="flex items-center gap-1.5">
           <Table2 className="size-4 text-muted-foreground" />
-          <span className="text-xs font-semibold">Tables ({tables.length})</span>
+          <span className="text-xs font-semibold">Objects ({tables.length})</span>
         </div>
         <div className="flex items-center gap-0.5">
           {hasHidden && onShowAll && (
             <Button variant="ghost" size="xs" onClick={onShowAll} title="Show all tables">
-              <Eye className="size-3" />
+              <EyeIcon className="size-3" />
             </Button>
           )}
         </div>
@@ -250,40 +291,60 @@ export function TableListPanel({
         {tables.length === 0 ? (
           <p className="p-3 text-xs text-muted-foreground">No tables yet.</p>
         ) : (
-          <div className="py-1">
-            <DndContext
-              sensors={sensors}
-              collisionDetection={closestCenter}
-              onDragStart={(e) => setActiveDragId(String(e.active.id))}
-              onDragEnd={handleDragEnd}
-            >
-              <SortableContext items={tables.map((t) => t.id)} strategy={verticalListSortingStrategy}>
-                {tables.map((table) => (
-                  <SortableTableItem
-                    key={table.id}
-                    table={table}
-                    isSelected={table.id === selectedTableId}
-                    isMatched={matchedTableIds.has(table.id)}
-                    isHidden={hiddenSet.has(table.id)}
-                    isDeleting={deletingId === table.id}
-                    onSelect={() => onTableSelect(table.id)}
-                    onStartDelete={onTableDelete ? () => setDeletingId(table.id) : undefined}
-                    onConfirmDelete={() => confirmDelete(table.id)}
-                    onCancelDelete={() => setDeletingId(null)}
-                    onToggleVisibility={onToggleVisibility ? () => onToggleVisibility(table.id) : undefined}
-                    hasVisibilityAction={!!onToggleVisibility}
-                    itemRef={(el) => { itemRefs.current[table.id] = el; }}
-                  />
-                ))}
-              </SortableContext>
-              {createPortal(
-                <DragOverlay>
-                  {draggedTable ? <TableDragOverlay table={draggedTable} /> : null}
-                </DragOverlay>,
-                document.body,
+          <DndContext
+            sensors={sensors}
+            collisionDetection={closestCenter}
+            onDragStart={(e) => setActiveDragId(String(e.active.id))}
+            onDragEnd={handleDragEnd}
+          >
+            <SortableContext items={tables.map((t) => t.id)} strategy={verticalListSortingStrategy}>
+              {/* Tables section */}
+              <div>
+                <button
+                  type="button"
+                  className="flex w-full items-center gap-1.5 px-2 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground hover:bg-muted/50"
+                  onClick={() => setTablesExpanded((v) => !v)}
+                >
+                  {tablesExpanded ? <ChevronDown className="size-3" /> : <ChevronRight className="size-3" />}
+                  <Table2 className="size-3" />
+                  <span className="flex-1 text-left">Tables</span>
+                  <span className="rounded-full bg-muted px-1.5 py-0.5 text-[9px]">{regularTables.length}</span>
+                </button>
+                {tablesExpanded && (
+                  <div className="pb-1">
+                    {renderTableItems(regularTables)}
+                  </div>
+                )}
+              </div>
+
+              {/* Views section */}
+              {viewTables.length > 0 && (
+                <div className="border-t border-border/50">
+                  <button
+                    type="button"
+                    className="flex w-full items-center gap-1.5 px-2 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground hover:bg-muted/50"
+                    onClick={() => setViewsExpanded((v) => !v)}
+                  >
+                    {viewsExpanded ? <ChevronDown className="size-3" /> : <ChevronRight className="size-3" />}
+                    <EyeIcon className="size-3" />
+                    <span className="flex-1 text-left">Views</span>
+                    <span className="rounded-full bg-muted px-1.5 py-0.5 text-[9px]">{viewTables.length}</span>
+                  </button>
+                  {viewsExpanded && (
+                    <div className="pb-1">
+                      {renderTableItems(viewTables)}
+                    </div>
+                  )}
+                </div>
               )}
-            </DndContext>
-          </div>
+            </SortableContext>
+            {createPortal(
+              <DragOverlay>
+                {draggedTable ? <TableDragOverlay table={draggedTable} /> : null}
+              </DragOverlay>,
+              document.body,
+            )}
+          </DndContext>
         )}
       </div>
     </div>
