@@ -34,6 +34,7 @@ export function LiveConsoleLayout() {
     { id: 'sql', label: 'SQL', icon: FileCode, path: ROUTES.DB.LIVE_CONSOLE.SQL, disabled: !hasConnection },
     { id: 'explorer', label: 'Explorer', icon: Terminal, path: ROUTES.DB.LIVE_CONSOLE.EXPLORER, disabled: !hasConnection },
     { id: 'query-collection', label: 'Query Collection', icon: Library, path: ROUTES.DB.LIVE_CONSOLE.QUERY_COLLECTION, disabled: !hasConnection },
+    { id: 'query', label: 'Query', icon: Terminal, path: ROUTES.DB.LIVE_CONSOLE.QUERY, disabled: !hasConnection },
     { id: 'seed', label: 'Seed', icon: Sprout, path: ROUTES.DB.LIVE_CONSOLE.SEED, disabled: !hasConnection },
     { id: 'validation-run', label: 'Validation Run', icon: ShieldCheck, path: ROUTES.DB.LIVE_CONSOLE.VALIDATION_RUN, disabled: !hasConnection },
   ];

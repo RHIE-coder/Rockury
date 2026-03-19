@@ -17,6 +17,7 @@ import { DataBrowserPage } from '@/pages/db-data';
 import { SqlViewerPage } from '@/pages/db-sql-viewer';
 import { ExplorerPage } from '@/pages/db-explorer';
 import { QueryCollectionPage } from '@/pages/db-query-collection';
+import { QueryBrowserPage } from '@/pages/db-query';
 import { SeedCapturePage } from '@/pages/db-seed-capture';
 import { ValidationRunPage } from '@/pages/db-validation-run';
 import { DbReferencePage } from '@/pages/db-reference';
@@ -55,6 +56,7 @@ export function AppRouter() {
             <Route path="data" element={<DataBrowserPage />} />
             <Route path="sql" element={<SqlViewerPage />} />
             <Route path="explorer" element={<ExplorerPage />} />
+            <Route path="query" element={<QueryBrowserPage />} />
             <Route path="query-collection" element={<QueryCollectionPage />} />
             <Route path="seed" element={<SeedCapturePage />} />
             <Route path="validation-run" element={<ValidationRunPage />} />

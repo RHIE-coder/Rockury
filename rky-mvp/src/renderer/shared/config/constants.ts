@@ -23,6 +23,7 @@ export const ROUTES = {
       QUERY_COLLECTION: '/db/console/query-collection',
       SEED: '/db/console/seed',
       VALIDATION_RUN: '/db/console/validation-run',
+      QUERY: '/db/console/query',
     },
     REFERENCE: '/db/reference',
   },

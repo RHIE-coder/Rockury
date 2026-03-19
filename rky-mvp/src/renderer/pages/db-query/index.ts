@@ -1,1 +1,1 @@
-export { DbQueryPage } from './ui/DbQueryPage';
+export { QueryBrowserPage } from './ui/QueryBrowserPage';
