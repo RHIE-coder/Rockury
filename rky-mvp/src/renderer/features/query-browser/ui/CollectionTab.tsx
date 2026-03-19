@@ -375,6 +375,7 @@ export function CollectionTab({ connectionId, dbType }: CollectionTabProps) {
     name: c.name,
     folderId: c.folderId ?? null,
     sortOrder: c.sortOrder ?? 0,
+    description: c.description,
   }));
 
   /* -- Available queries for add picker -------------------------------- */

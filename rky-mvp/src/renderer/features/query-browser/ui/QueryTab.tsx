@@ -281,6 +281,7 @@ export function QueryTab({ connectionId, dbType }: QueryTabProps) {
     name: q.name,
     folderId: q.folderId ?? null,
     sortOrder: q.sortOrder ?? 0,
+    description: q.description,
   }));
 
   const treeFolders = queryTree.folders.map((f) => ({
