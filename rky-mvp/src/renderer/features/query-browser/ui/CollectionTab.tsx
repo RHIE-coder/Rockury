@@ -117,15 +117,17 @@ export function CollectionTab({ connectionId, dbType }: CollectionTabProps) {
       const newIndex = items.findIndex((i) => i.id === over.id);
       if (oldIndex !== -1 && newIndex !== -1) {
         const reordered = arrayMove(items, oldIndex, newIndex);
-        handleReorder(
-          reordered.map((item: ICollectionItem, idx: number) => ({
-            queryId: item.queryId,
-            sortOrder: idx,
-          })),
-        );
+        const reorderedPayload = reordered.map((item: ICollectionItem, idx: number) => ({
+          queryId: item.queryId,
+          sortOrder: idx,
+        }));
+        collectionTree.saveItems({
+          collectionId: collectionMeta.id,
+          items: reorderedPayload,
+        }).then(() => detail.refetch());
       }
     }
-  }, [items, collectionMeta, collectionTree, detail, handleReorder]);
+  }, [items, collectionMeta, collectionTree, detail]);
 
   /* -- Sync loaded detail into local state ----------------------------- */
   const detailCollectionId = detail.collection?.id ?? null;
