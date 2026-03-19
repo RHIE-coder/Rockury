@@ -104,3 +104,5 @@ docs/.pdca-snapshots/
 
 # Test DB data (SQLite files)
 scripts/test-db/data/
+.superpowers/
+.worktrees/
