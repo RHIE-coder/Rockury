@@ -43,7 +43,7 @@ export function CellEditor({ value, onSave, onCancel, extraAction }: CellEditorP
   );
 
   return (
-    <div ref={containerRef} className="absolute left-0 top-0 z-20 flex min-w-[220px] items-center gap-1 rounded border border-primary bg-background p-1 shadow-lg">
+    <div ref={containerRef} className="absolute left-0 top-0 z-20 flex w-max min-w-full flex-col gap-1 rounded border border-primary bg-background p-1 shadow-lg">
       <input
         ref={inputRef}
         type="text"
@@ -51,32 +51,34 @@ export function CellEditor({ value, onSave, onCancel, extraAction }: CellEditorP
         onChange={(e) => { setText(e.target.value); setIsNull(false); }}
         onKeyDown={handleKeyDown}
         disabled={isNull}
-        className={`w-full rounded border border-border bg-background px-1 py-0.5 text-xs font-mono outline-none focus:border-primary ${
+        className={`min-w-[200px] w-full rounded border border-border bg-background px-1.5 py-1 text-xs font-mono outline-none focus:border-primary ${
           isNull ? 'italic text-muted-foreground' : ''
         }`}
         placeholder={isNull ? 'NULL' : ''}
       />
-      {extraAction}
-      <button
-        type="button"
-        onMouseDown={(e) => e.preventDefault()}
-        onClick={() => { setText(generateUuid()); setIsNull(false); }}
-        className="shrink-0 rounded bg-muted px-1 py-0.5 text-[9px] font-bold text-muted-foreground/50 hover:text-muted-foreground"
-        title="Generate UUID"
-      >
-        UUID
-      </button>
-      <button
-        type="button"
-        onMouseDown={(e) => e.preventDefault()}
-        onClick={() => { setIsNull((v) => !v); if (!isNull) setText(''); }}
-        className={`shrink-0 rounded px-1 py-0.5 text-[9px] font-bold ${
-          isNull ? 'bg-muted-foreground/20 text-muted-foreground' : 'bg-muted text-muted-foreground/50'
-        }`}
-        title="Toggle NULL"
-      >
-        NULL
-      </button>
+      <div className="flex items-center gap-1">
+        {extraAction}
+        <button
+          type="button"
+          onMouseDown={(e) => e.preventDefault()}
+          onClick={() => { setText(generateUuid()); setIsNull(false); }}
+          className="shrink-0 rounded bg-muted px-1.5 py-0.5 text-[9px] font-bold text-muted-foreground/50 hover:text-muted-foreground"
+          title="Generate UUID"
+        >
+          UUID
+        </button>
+        <button
+          type="button"
+          onMouseDown={(e) => e.preventDefault()}
+          onClick={() => { setIsNull((v) => !v); if (!isNull) setText(''); }}
+          className={`shrink-0 rounded px-1.5 py-0.5 text-[9px] font-bold ${
+            isNull ? 'bg-muted-foreground/20 text-muted-foreground' : 'bg-muted text-muted-foreground/50'
+          }`}
+          title="Toggle NULL"
+        >
+          NULL
+        </button>
+      </div>
     </div>
   );
 }

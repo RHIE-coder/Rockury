@@ -108,6 +108,15 @@ interface DiagramStoreState {
 
   // Cascade simulation
   cascadeSimulation: ICascadeResult | null;
+
+  // Layout cache (survives tab-switch unmount; keyed by diagramId)
+  cachedViewports: Record<string, { x: number; y: number; zoom: number }>;
+  cachedPositions: Record<string, Record<string, { x: number; y: number }>>;
+
+  // Position-only undo/redo (for Real Diagram node dragging)
+  realPositionUndoStack: Record<string, { x: number; y: number }>[];
+  realPositionRedoStack: Record<string, { x: number; y: number }>[];
+  realPendingPositionRestore: Record<string, { x: number; y: number }> | null;
 }
 
 interface UndoState {
@@ -208,6 +217,17 @@ interface DiagramStoreActions {
   // Cascade simulation
   setCascadeSimulation: (result: ICascadeResult | null) => void;
   clearCascadeSimulation: () => void;
+
+  // Layout cache
+  setCachedViewport: (diagramId: string, viewport: { x: number; y: number; zoom: number }) => void;
+  setCachedPositions: (diagramId: string, positions: Record<string, { x: number; y: number }>) => void;
+
+  // Position-only undo/redo (for Real Diagram)
+  pushRealPositionUndo: (positions: Record<string, { x: number; y: number }>) => void;
+  realPositionUndo: () => void;
+  realPositionRedo: () => void;
+  clearRealPositionHistory: () => void;
+  clearRealPendingPositionRestore: () => void;
 }
 
 export const useDiagramStore = create<DiagramStoreState & DiagramStoreActions>((set) => ({
@@ -267,6 +287,15 @@ export const useDiagramStore = create<DiagramStoreState & DiagramStoreActions>((
 
   // Cascade simulation
   cascadeSimulation: null,
+
+  // Layout cache
+  cachedViewports: {},
+  cachedPositions: {},
+
+  // Position-only undo/redo
+  realPositionUndoStack: [],
+  realPositionRedoStack: [],
+  realPendingPositionRestore: null,
 
   setSelectedDiagramId: (id) => set({ selectedDiagramId: id }),
   setSelectedTableId: (id) =>
@@ -409,4 +438,57 @@ export const useDiagramStore = create<DiagramStoreState & DiagramStoreActions>((
   // Cascade simulation
   setCascadeSimulation: (result) => set({ cascadeSimulation: result }),
   clearCascadeSimulation: () => set({ cascadeSimulation: null }),
+
+  // Layout cache
+  setCachedViewport: (diagramId, viewport) =>
+    set((state) => ({
+      cachedViewports: { ...state.cachedViewports, [diagramId]: viewport },
+    })),
+  setCachedPositions: (diagramId, positions) =>
+    set((state) => ({
+      cachedPositions: { ...state.cachedPositions, [diagramId]: positions },
+    })),
+
+  // Position-only undo/redo (for Real Diagram)
+  pushRealPositionUndo: (positions) =>
+    set((state) => {
+      const newStack = [...state.realPositionUndoStack, deepClone(positions)];
+      if (newStack.length > MAX_UNDO_STACK) newStack.shift();
+      return { realPositionUndoStack: newStack, realPositionRedoStack: [] };
+    }),
+  realPositionUndo: () =>
+    set((state) => {
+      if (state.realPositionUndoStack.length === 0) return state;
+      const newUndo = [...state.realPositionUndoStack];
+      const prev = newUndo.pop()!;
+      // Current positions from cachedPositions (latest saved)
+      const currentDiagramId = state.realDiagramId;
+      const currentPositions = currentDiagramId
+        ? deepClone(state.cachedPositions[currentDiagramId] ?? {})
+        : {};
+      return {
+        realPositionUndoStack: newUndo,
+        realPositionRedoStack: [...state.realPositionRedoStack, currentPositions],
+        realPendingPositionRestore: prev,
+      };
+    }),
+  realPositionRedo: () =>
+    set((state) => {
+      if (state.realPositionRedoStack.length === 0) return state;
+      const newRedo = [...state.realPositionRedoStack];
+      const next = newRedo.pop()!;
+      const currentDiagramId = state.realDiagramId;
+      const currentPositions = currentDiagramId
+        ? deepClone(state.cachedPositions[currentDiagramId] ?? {})
+        : {};
+      return {
+        realPositionRedoStack: newRedo,
+        realPositionUndoStack: [...state.realPositionUndoStack, currentPositions],
+        realPendingPositionRestore: next,
+      };
+    }),
+  clearRealPositionHistory: () =>
+    set({ realPositionUndoStack: [], realPositionRedoStack: [], realPendingPositionRestore: null }),
+  clearRealPendingPositionRestore: () =>
+    set({ realPendingPositionRestore: null }),
 }));

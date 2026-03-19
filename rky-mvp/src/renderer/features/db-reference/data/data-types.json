@@ -1,0 +1,398 @@
+[
+  {
+    "id": "dt-integer",
+    "category": "data-types",
+    "name": "Integer Types",
+    "summary": "Whole number types of varying sizes (TINYINT, SMALLINT, INT, BIGINT).",
+    "summaryKo": "크기별 정수 타입입니다 (TINYINT, SMALLINT, INT, BIGINT).",
+    "description": "Integer types store whole numbers without decimal points. Different sizes are available depending on how large your numbers need to be. Choosing the right size matters for storage efficiency and performance. INT (4 bytes) is the most commonly used, while BIGINT (8 bytes) handles very large numbers like auto-incrementing IDs in high-volume systems.",
+    "descriptionKo": "정수 타입은 소수점 없는 정수를 저장합니다. 저장할 숫자의 크기에 따라 다양한 크기를 선택할 수 있습니다. 적절한 크기를 선택하면 저장 공간과 성능에 도움이 됩니다. INT(4바이트)가 가장 일반적이며, BIGINT(8바이트)는 대용량 시스템의 자동 증가 ID처럼 매우 큰 숫자를 처리합니다.",
+    "syntax": {
+      "postgresql": "-- SMALLINT: 2 bytes, -32768 ~ 32767\n-- INTEGER:  4 bytes, -2.1B ~ 2.1B\n-- BIGINT:   8 bytes, -9.2E18 ~ 9.2E18\n\nCREATE TABLE example (\n  id         BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,\n  quantity   INTEGER NOT NULL DEFAULT 0,\n  small_val  SMALLINT\n);",
+      "mysql": "-- TINYINT:   1 byte,  -128 ~ 127\n-- SMALLINT:  2 bytes, -32768 ~ 32767\n-- MEDIUMINT: 3 bytes, -8M ~ 8M\n-- INT:       4 bytes, -2.1B ~ 2.1B\n-- BIGINT:    8 bytes, -9.2E18 ~ 9.2E18\n\nCREATE TABLE example (\n  id         BIGINT AUTO_INCREMENT PRIMARY KEY,\n  quantity   INT NOT NULL DEFAULT 0,\n  small_val  SMALLINT,\n  flag       TINYINT(1)\n);",
+      "mariadb": "-- TINYINT:   1 byte,  -128 ~ 127\n-- SMALLINT:  2 bytes, -32768 ~ 32767\n-- MEDIUMINT: 3 bytes, -8M ~ 8M\n-- INT:       4 bytes, -2.1B ~ 2.1B\n-- BIGINT:    8 bytes, -9.2E18 ~ 9.2E18\n\nCREATE TABLE example (\n  id         BIGINT AUTO_INCREMENT PRIMARY KEY,\n  quantity   INT NOT NULL DEFAULT 0,\n  small_val  SMALLINT,\n  flag       TINYINT(1)\n);",
+      "sqlite": "-- SQLite uses dynamic typing\n-- INTEGER: 1, 2, 3, 4, 6, or 8 bytes (auto-sized)\n\nCREATE TABLE example (\n  id         INTEGER PRIMARY KEY AUTOINCREMENT,\n  quantity   INTEGER NOT NULL DEFAULT 0,\n  small_val  INTEGER\n);"
+    },
+    "vendorSupport": {
+      "postgresql": { "supported": true, "level": "full", "notes": "No TINYINT or MEDIUMINT. Use SMALLINT as minimum.", "notesKo": "TINYINT, MEDIUMINT 없음. 최소 SMALLINT 사용." },
+      "mysql": { "supported": true, "level": "full", "notes": "UNSIGNED modifier available to double positive range.", "notesKo": "UNSIGNED 수식어로 양수 범위를 2배로 확장 가능." },
+      "mariadb": { "supported": true, "level": "full", "notes": "Same as MySQL. UNSIGNED supported.", "notesKo": "MySQL과 동일. UNSIGNED 지원." },
+      "sqlite": { "supported": true, "level": "full", "notes": "All integers stored as INTEGER with dynamic sizing.", "notesKo": "모든 정수는 INTEGER로 동적 크기 조정." }
+    },
+    "tips": [
+      "Use INT for most cases. Switch to BIGINT only when values can exceed 2.1 billion.",
+      "TINYINT(1) in MySQL is commonly used as a boolean substitute (0/1).",
+      "Prefer UNSIGNED in MySQL/MariaDB when values are always non-negative (e.g., counts, ages)."
+    ],
+    "tipsKo": [
+      "대부분의 경우 INT를 사용하세요. 값이 21억을 초과할 수 있을 때만 BIGINT로 전환하세요.",
+      "MySQL에서 TINYINT(1)은 boolean 대체용으로 자주 사용됩니다 (0/1).",
+      "MySQL/MariaDB에서 항상 음수가 아닌 값(개수, 나이 등)에는 UNSIGNED를 사용하세요."
+    ],
+    "relatedItems": ["dt-decimal", "dt-boolean", "column"],
+    "seeAlso": []
+  },
+  {
+    "id": "dt-decimal",
+    "category": "data-types",
+    "name": "Decimal / Numeric",
+    "summary": "Exact-precision numeric types for financial and scientific data.",
+    "summaryKo": "금융/과학 데이터용 정밀 소수점 타입입니다.",
+    "description": "DECIMAL (also called NUMERIC) stores numbers with exact precision. Unlike floating-point types, DECIMAL does not have rounding errors, making it essential for financial calculations where every cent matters. You specify precision (total digits) and scale (digits after decimal point), e.g., DECIMAL(10,2) can store up to 99999999.99.",
+    "descriptionKo": "DECIMAL(NUMERIC)은 정확한 정밀도의 숫자를 저장합니다. 부동소수점 타입과 달리 반올림 오류가 없어서, 1원 단위까지 정확해야 하는 금융 계산에 필수적입니다. 전체 자릿수(precision)와 소수점 이하 자릿수(scale)를 지정합니다. 예: DECIMAL(10,2)는 최대 99999999.99까지 저장합니다.",
+    "syntax": {
+      "postgresql": "CREATE TABLE products (\n  price      DECIMAL(10, 2) NOT NULL,\n  tax_rate   NUMERIC(5, 4),\n  weight_kg  NUMERIC(8, 3)\n);",
+      "mysql": "CREATE TABLE products (\n  price      DECIMAL(10, 2) NOT NULL,\n  tax_rate   DECIMAL(5, 4),\n  weight_kg  DECIMAL(8, 3)\n);",
+      "mariadb": "CREATE TABLE products (\n  price      DECIMAL(10, 2) NOT NULL,\n  tax_rate   DECIMAL(5, 4),\n  weight_kg  DECIMAL(8, 3)\n);",
+      "sqlite": "-- SQLite has no native DECIMAL.\n-- REAL (8-byte float) or TEXT for exact storage.\n\nCREATE TABLE products (\n  price      REAL NOT NULL,\n  tax_rate   REAL,\n  weight_kg  REAL\n);"
+    },
+    "vendorSupport": {
+      "postgresql": { "supported": true, "level": "full", "notes": "DECIMAL and NUMERIC are identical.", "notesKo": "DECIMAL과 NUMERIC은 완전히 동일합니다." },
+      "mysql": { "supported": true, "level": "full", "notes": "Max precision: 65 digits.", "notesKo": "최대 정밀도: 65자리." },
+      "mariadb": { "supported": true, "level": "full", "notes": "Max precision: 65 digits.", "notesKo": "최대 정밀도: 65자리." },
+      "sqlite": { "supported": false, "level": "none", "notes": "No native DECIMAL. Use REAL or store as TEXT.", "notesKo": "네이티브 DECIMAL 없음. REAL 또는 TEXT로 저장." }
+    },
+    "tips": [
+      "Always use DECIMAL for money — never FLOAT or DOUBLE, which cause rounding errors.",
+      "DECIMAL(10,2) is the standard choice for most currency fields.",
+      "In SQLite, consider storing monetary amounts as integer cents to avoid floating-point issues."
+    ],
+    "tipsKo": [
+      "금액에는 반드시 DECIMAL을 사용하세요. FLOAT/DOUBLE은 반올림 오류가 발생합니다.",
+      "DECIMAL(10,2)는 대부분의 통화 필드에 적합한 표준 선택입니다.",
+      "SQLite에서는 부동소수점 문제를 피하기 위해 금액을 '원' 단위 정수로 저장하는 것도 방법입니다."
+    ],
+    "relatedItems": ["dt-float", "dt-integer"],
+    "seeAlso": []
+  },
+  {
+    "id": "dt-float",
+    "category": "data-types",
+    "name": "Float / Double / Real",
+    "summary": "Approximate floating-point numbers for scientific and non-critical calculations.",
+    "summaryKo": "과학 계산 등에 사용하는 근사치 부동소수점 타입입니다.",
+    "description": "Floating-point types (FLOAT, DOUBLE, REAL) store approximate numeric values using IEEE 754 standard. FLOAT uses 4 bytes (single precision, ~7 decimal digits), DOUBLE/DOUBLE PRECISION uses 8 bytes (~15 decimal digits). They are fast for calculations but inherently imprecise — 0.1 + 0.2 may not equal exactly 0.3. Use for scientific data, coordinates, and measurements where tiny rounding errors are acceptable.",
+    "descriptionKo": "부동소수점 타입(FLOAT, DOUBLE, REAL)은 IEEE 754 표준으로 근사치 숫자를 저장합니다. FLOAT는 4바이트(단정밀도, ~7자리), DOUBLE은 8바이트(배정밀도, ~15자리)입니다. 계산이 빠르지만 본질적으로 정확하지 않습니다 — 0.1 + 0.2가 정확히 0.3이 아닐 수 있습니다. 미세한 반올림 오류가 허용되는 과학 데이터, 좌표, 측정값에 사용합니다.",
+    "syntax": {
+      "postgresql": "-- REAL:             4 bytes, ~6 decimal digits\n-- DOUBLE PRECISION: 8 bytes, ~15 decimal digits\n\nCREATE TABLE measurements (\n  temperature  REAL,\n  latitude     DOUBLE PRECISION,\n  longitude    DOUBLE PRECISION\n);",
+      "mysql": "-- FLOAT:  4 bytes, ~7 decimal digits\n-- DOUBLE: 8 bytes, ~15 decimal digits\n\nCREATE TABLE measurements (\n  temperature  FLOAT,\n  latitude     DOUBLE,\n  longitude    DOUBLE\n);",
+      "mariadb": "-- FLOAT:  4 bytes, ~7 decimal digits\n-- DOUBLE: 8 bytes, ~15 decimal digits\n\nCREATE TABLE measurements (\n  temperature  FLOAT,\n  latitude     DOUBLE,\n  longitude    DOUBLE\n);",
+      "sqlite": "-- REAL: 8-byte IEEE floating point\n\nCREATE TABLE measurements (\n  temperature  REAL,\n  latitude     REAL,\n  longitude    REAL\n);"
+    },
+    "vendorSupport": {
+      "postgresql": { "supported": true, "level": "full", "notes": "REAL = FLOAT4, DOUBLE PRECISION = FLOAT8.", "notesKo": "REAL = FLOAT4, DOUBLE PRECISION = FLOAT8." },
+      "mysql": { "supported": true, "level": "full", "notes": "FLOAT(p) syntax available; p > 24 becomes DOUBLE.", "notesKo": "FLOAT(p) 구문 사용 가능; p > 24이면 DOUBLE로 변환." },
+      "mariadb": { "supported": true, "level": "full", "notes": "Same as MySQL.", "notesKo": "MySQL과 동일." },
+      "sqlite": { "supported": true, "level": "full", "notes": "Only REAL (8-byte) available. No single-precision FLOAT.", "notesKo": "REAL(8바이트)만 존재. 단정밀도 FLOAT 없음." }
+    },
+    "tips": [
+      "Never use FLOAT/DOUBLE for money — use DECIMAL instead.",
+      "DOUBLE is preferred over FLOAT for most use cases due to higher precision.",
+      "For GPS coordinates, DOUBLE PRECISION provides sub-meter accuracy."
+    ],
+    "tipsKo": [
+      "금액에 절대 FLOAT/DOUBLE을 사용하지 마세요 — DECIMAL을 쓰세요.",
+      "정밀도가 높은 DOUBLE이 대부분의 경우 FLOAT보다 권장됩니다.",
+      "GPS 좌표에는 DOUBLE PRECISION이 미터 이하 정확도를 제공합니다."
+    ],
+    "relatedItems": ["dt-decimal", "dt-integer"],
+    "seeAlso": []
+  },
+  {
+    "id": "dt-char-varchar",
+    "category": "data-types",
+    "name": "CHAR / VARCHAR",
+    "summary": "Fixed-length and variable-length character string types.",
+    "summaryKo": "고정 길이/가변 길이 문자열 타입입니다.",
+    "description": "CHAR(n) stores fixed-length strings padded with spaces — always uses exactly n characters of storage. VARCHAR(n) stores variable-length strings up to n characters, using only as much space as needed. CHAR is slightly faster for fixed-size data (country codes, status flags), while VARCHAR is better for most string data where lengths vary. In PostgreSQL, VARCHAR without a length limit is equivalent to TEXT.",
+    "descriptionKo": "CHAR(n)은 고정 길이 문자열을 저장하며 남은 공간은 공백으로 채웁니다 — 항상 정확히 n자를 사용합니다. VARCHAR(n)은 최대 n자까지의 가변 길이 문자열을 저장하며, 필요한 만큼만 공간을 씁니다. CHAR는 고정 크기 데이터(국가 코드, 상태 플래그)에 약간 빠르고, VARCHAR는 길이가 다양한 일반 문자열 데이터에 적합합니다. PostgreSQL에서 길이 제한 없는 VARCHAR는 TEXT와 동일합니다.",
+    "syntax": {
+      "postgresql": "CREATE TABLE users (\n  country_code  CHAR(2) NOT NULL,        -- 고정: 'KR', 'US'\n  username      VARCHAR(50) NOT NULL,     -- 가변: 최대 50자\n  bio           VARCHAR(500),             -- 가변: 최대 500자\n  email         VARCHAR(255) UNIQUE       -- 이메일은 255자 표준\n);",
+      "mysql": "CREATE TABLE users (\n  country_code  CHAR(2) NOT NULL,        -- 고정: 'KR', 'US'\n  username      VARCHAR(50) NOT NULL,     -- 가변: 최대 50자\n  bio           VARCHAR(500),             -- 가변: 최대 500자\n  email         VARCHAR(255) UNIQUE       -- 이메일은 255자 표준\n);\n-- VARCHAR max: 65,535 bytes (shared across all columns in a row)",
+      "mariadb": "CREATE TABLE users (\n  country_code  CHAR(2) NOT NULL,\n  username      VARCHAR(50) NOT NULL,\n  bio           VARCHAR(500),\n  email         VARCHAR(255) UNIQUE\n);\n-- VARCHAR max: 65,535 bytes (shared across all columns in a row)",
+      "sqlite": "-- SQLite treats CHAR, VARCHAR, TEXT all as TEXT\nCREATE TABLE users (\n  country_code  TEXT NOT NULL,\n  username      TEXT NOT NULL,\n  bio           TEXT,\n  email         TEXT UNIQUE\n);\n-- Length constraints are not enforced natively"
+    },
+    "vendorSupport": {
+      "postgresql": { "supported": true, "level": "full", "notes": "VARCHAR without length = TEXT. Max ~1GB.", "notesKo": "길이 없는 VARCHAR = TEXT. 최대 약 1GB." },
+      "mysql": { "supported": true, "level": "full", "notes": "CHAR max 255. VARCHAR max 65,535 bytes per row.", "notesKo": "CHAR 최대 255. VARCHAR 행당 최대 65,535바이트." },
+      "mariadb": { "supported": true, "level": "full", "notes": "Same as MySQL.", "notesKo": "MySQL과 동일." },
+      "sqlite": { "supported": true, "level": "partial", "notes": "All strings are TEXT. Length limits not enforced.", "notesKo": "모든 문자열은 TEXT. 길이 제한 미적용." }
+    },
+    "tips": [
+      "Use CHAR only for truly fixed-length data: country codes (2), currency codes (3), UUIDs (36).",
+      "VARCHAR(255) is a common default for strings — but always set meaningful limits based on your data.",
+      "In MySQL, the total row size limit is 65,535 bytes, shared across all VARCHAR columns."
+    ],
+    "tipsKo": [
+      "CHAR는 정말 고정 길이인 데이터에만 사용하세요: 국가 코드(2), 통화 코드(3), UUID(36).",
+      "VARCHAR(255)는 일반적인 기본값이지만, 데이터에 맞는 의미 있는 제한을 설정하세요.",
+      "MySQL에서 행 전체 크기 제한은 65,535바이트이며, 모든 VARCHAR 컬럼이 이를 공유합니다."
+    ],
+    "relatedItems": ["dt-text", "column"],
+    "seeAlso": []
+  },
+  {
+    "id": "dt-text",
+    "category": "data-types",
+    "name": "TEXT / CLOB",
+    "summary": "Large text storage types for long content like articles, logs, or HTML.",
+    "summaryKo": "기사, 로그, HTML 등 긴 텍스트를 저장하는 대용량 문자열 타입입니다.",
+    "description": "TEXT types store large amounts of character data without a specific length limit. They are ideal for blog posts, log messages, HTML content, and any data that can grow beyond VARCHAR limits. In MySQL/MariaDB, there are size variants: TINYTEXT (~255 bytes), TEXT (~65KB), MEDIUMTEXT (~16MB), LONGTEXT (~4GB). PostgreSQL's TEXT has no practical size limit. TEXT columns usually cannot be fully indexed — only prefix indexes are possible in MySQL.",
+    "descriptionKo": "TEXT 타입은 특정 길이 제한 없이 대량의 문자 데이터를 저장합니다. 블로그 글, 로그 메시지, HTML 콘텐츠 등 VARCHAR 제한을 넘는 데이터에 적합합니다. MySQL/MariaDB에는 크기별 변종이 있습니다: TINYTEXT(~255바이트), TEXT(~65KB), MEDIUMTEXT(~16MB), LONGTEXT(~4GB). PostgreSQL의 TEXT는 실질적 크기 제한이 없습니다. TEXT 컬럼은 보통 전체 인덱싱이 불가하며 — MySQL에서는 접두사 인덱스만 가능합니다.",
+    "syntax": {
+      "postgresql": "CREATE TABLE posts (\n  id       SERIAL PRIMARY KEY,\n  title    VARCHAR(200) NOT NULL,\n  content  TEXT NOT NULL,\n  html     TEXT\n);",
+      "mysql": "CREATE TABLE posts (\n  id       INT AUTO_INCREMENT PRIMARY KEY,\n  title    VARCHAR(200) NOT NULL,\n  content  MEDIUMTEXT NOT NULL,  -- up to 16MB\n  html     LONGTEXT              -- up to 4GB\n);",
+      "mariadb": "CREATE TABLE posts (\n  id       INT AUTO_INCREMENT PRIMARY KEY,\n  title    VARCHAR(200) NOT NULL,\n  content  MEDIUMTEXT NOT NULL,\n  html     LONGTEXT\n);",
+      "sqlite": "-- TEXT is the universal string type in SQLite\nCREATE TABLE posts (\n  id       INTEGER PRIMARY KEY AUTOINCREMENT,\n  title    TEXT NOT NULL,\n  content  TEXT NOT NULL,\n  html     TEXT\n);"
+    },
+    "vendorSupport": {
+      "postgresql": { "supported": true, "level": "full", "notes": "TEXT = unlimited length. Same performance as VARCHAR.", "notesKo": "TEXT = 무제한 길이. VARCHAR와 동일한 성능." },
+      "mysql": { "supported": true, "level": "full", "notes": "4 sizes: TINYTEXT, TEXT, MEDIUMTEXT, LONGTEXT.", "notesKo": "4가지 크기: TINYTEXT, TEXT, MEDIUMTEXT, LONGTEXT." },
+      "mariadb": { "supported": true, "level": "full", "notes": "Same as MySQL.", "notesKo": "MySQL과 동일." },
+      "sqlite": { "supported": true, "level": "full", "notes": "All strings are TEXT. Max size ~1GB (configurable).", "notesKo": "모든 문자열은 TEXT. 최대 약 1GB(설정 가능)." }
+    },
+    "tips": [
+      "In PostgreSQL, TEXT and VARCHAR have identical performance — use TEXT when you don't need a length check.",
+      "In MySQL, prefer VARCHAR when data fits within 65,535 bytes per row for better index support.",
+      "Use MEDIUMTEXT in MySQL for content that could exceed 65KB (blog posts, email bodies)."
+    ],
+    "tipsKo": [
+      "PostgreSQL에서 TEXT와 VARCHAR는 성능이 동일합니다 — 길이 체크가 필요 없으면 TEXT를 쓰세요.",
+      "MySQL에서 행당 65,535바이트 이내면 인덱스 지원이 더 좋은 VARCHAR를 사용하세요.",
+      "MySQL에서 65KB를 넘을 수 있는 콘텐츠(블로그 글, 이메일 본문)에는 MEDIUMTEXT를 쓰세요."
+    ],
+    "relatedItems": ["dt-char-varchar", "dt-blob"],
+    "seeAlso": []
+  },
+  {
+    "id": "dt-boolean",
+    "category": "data-types",
+    "name": "Boolean",
+    "summary": "TRUE/FALSE logical type for flags and toggles.",
+    "summaryKo": "TRUE/FALSE 논리값 타입입니다.",
+    "description": "BOOLEAN stores logical values: TRUE or FALSE. In PostgreSQL, it's a native 1-byte type. MySQL and MariaDB don't have a true BOOLEAN — BOOLEAN is an alias for TINYINT(1), where 0 = FALSE and 1 = TRUE. SQLite also has no native boolean; it uses INTEGER 0/1. Despite these differences, all four databases support boolean-like behavior.",
+    "descriptionKo": "BOOLEAN은 논리값 TRUE 또는 FALSE를 저장합니다. PostgreSQL에서는 네이티브 1바이트 타입입니다. MySQL/MariaDB에는 진정한 BOOLEAN이 없으며 — BOOLEAN은 TINYINT(1)의 별칭으로, 0 = FALSE, 1 = TRUE입니다. SQLite도 네이티브 boolean이 없어 INTEGER 0/1을 사용합니다.",
+    "syntax": {
+      "postgresql": "CREATE TABLE users (\n  is_active   BOOLEAN NOT NULL DEFAULT TRUE,\n  is_verified BOOLEAN DEFAULT FALSE\n);\n\nSELECT * FROM users WHERE is_active;  -- no '= TRUE' needed",
+      "mysql": "-- BOOLEAN = TINYINT(1)\nCREATE TABLE users (\n  is_active   BOOLEAN NOT NULL DEFAULT TRUE,\n  is_verified BOOLEAN DEFAULT FALSE\n);\n\nSELECT * FROM users WHERE is_active = 1;",
+      "mariadb": "-- BOOLEAN = TINYINT(1)\nCREATE TABLE users (\n  is_active   BOOLEAN NOT NULL DEFAULT TRUE,\n  is_verified BOOLEAN DEFAULT FALSE\n);\n\nSELECT * FROM users WHERE is_active = 1;",
+      "sqlite": "-- No native BOOLEAN. Use INTEGER 0/1.\nCREATE TABLE users (\n  is_active   INTEGER NOT NULL DEFAULT 1,\n  is_verified INTEGER DEFAULT 0\n);"
+    },
+    "vendorSupport": {
+      "postgresql": { "supported": true, "level": "full", "notes": "Native BOOLEAN type. Supports TRUE, FALSE, NULL.", "notesKo": "네이티브 BOOLEAN. TRUE, FALSE, NULL 지원." },
+      "mysql": { "supported": true, "level": "partial", "notes": "BOOLEAN is alias for TINYINT(1). Stores 0-255.", "notesKo": "BOOLEAN은 TINYINT(1) 별칭. 0-255 저장 가능." },
+      "mariadb": { "supported": true, "level": "partial", "notes": "Same as MySQL.", "notesKo": "MySQL과 동일." },
+      "sqlite": { "supported": false, "level": "none", "notes": "No BOOLEAN type. Use INTEGER 0/1 convention.", "notesKo": "BOOLEAN 타입 없음. INTEGER 0/1 관례 사용." }
+    },
+    "tips": [
+      "Name boolean columns with is_, has_, can_, should_ prefixes for clarity.",
+      "In MySQL, TINYINT(1) can technically hold values 0-255, not just 0/1 — be careful.",
+      "PostgreSQL can use 'WHERE is_active' directly; MySQL requires 'WHERE is_active = 1'."
+    ],
+    "tipsKo": [
+      "boolean 컬럼은 is_, has_, can_, should_ 접두어를 붙여 명확하게 네이밍하세요.",
+      "MySQL에서 TINYINT(1)은 실제로 0-255까지 저장 가능합니다 — 0/1만 넣도록 주의하세요.",
+      "PostgreSQL은 'WHERE is_active'로 직접 사용 가능하지만, MySQL은 'WHERE is_active = 1'이 필요합니다."
+    ],
+    "relatedItems": ["dt-integer"],
+    "seeAlso": []
+  },
+  {
+    "id": "dt-date-time",
+    "category": "data-types",
+    "name": "Date & Time",
+    "summary": "DATE, TIME, DATETIME, TIMESTAMP types for temporal data.",
+    "summaryKo": "날짜, 시간, 타임스탬프 등 시간 데이터 타입입니다.",
+    "description": "Date/time types store temporal information. DATE stores only dates (YYYY-MM-DD). TIME stores only time (HH:MM:SS). DATETIME/TIMESTAMP store both date and time together. The key difference between DATETIME and TIMESTAMP: TIMESTAMP is timezone-aware and stored as UTC internally, while DATETIME stores the literal value without timezone conversion. PostgreSQL offers TIMESTAMPTZ for timezone-aware timestamps.",
+    "descriptionKo": "날짜/시간 타입은 시간 정보를 저장합니다. DATE는 날짜만(YYYY-MM-DD), TIME은 시간만(HH:MM:SS), DATETIME/TIMESTAMP는 날짜와 시간을 함께 저장합니다. DATETIME과 TIMESTAMP의 핵심 차이: TIMESTAMP는 타임존을 인식하여 내부적으로 UTC로 저장하지만, DATETIME은 타임존 변환 없이 값을 그대로 저장합니다. PostgreSQL은 타임존 인식 타임스탬프로 TIMESTAMPTZ를 제공합니다.",
+    "syntax": {
+      "postgresql": "CREATE TABLE events (\n  event_date   DATE NOT NULL,\n  start_time   TIME,\n  created_at   TIMESTAMPTZ DEFAULT NOW(),  -- timezone-aware\n  scheduled_at TIMESTAMP                    -- no timezone\n);\n\n-- INTERVAL for durations\nSELECT created_at + INTERVAL '30 days' FROM events;",
+      "mysql": "CREATE TABLE events (\n  event_date   DATE NOT NULL,\n  start_time   TIME,\n  created_at   TIMESTAMP DEFAULT CURRENT_TIMESTAMP,\n  scheduled_at DATETIME\n);\n\n-- TIMESTAMP range: 1970-2038\n-- DATETIME range: 1000-9999",
+      "mariadb": "CREATE TABLE events (\n  event_date   DATE NOT NULL,\n  start_time   TIME,\n  created_at   TIMESTAMP DEFAULT CURRENT_TIMESTAMP,\n  scheduled_at DATETIME\n);",
+      "sqlite": "-- No native date types. Use TEXT (ISO 8601), REAL, or INTEGER.\nCREATE TABLE events (\n  event_date   TEXT NOT NULL,  -- '2024-12-25'\n  start_time   TEXT,           -- '14:30:00'\n  created_at   TEXT DEFAULT (datetime('now')),\n  scheduled_at TEXT\n);\n\n-- Use date functions: date(), time(), datetime(), julianday()"
+    },
+    "vendorSupport": {
+      "postgresql": { "supported": true, "level": "full", "notes": "TIMESTAMPTZ recommended. INTERVAL type for durations.", "notesKo": "TIMESTAMPTZ 권장. 기간 표현용 INTERVAL 타입." },
+      "mysql": { "supported": true, "level": "full", "notes": "TIMESTAMP has Y2038 limit. DATETIME range: 1000-9999.", "notesKo": "TIMESTAMP는 2038년 제한. DATETIME 범위: 1000-9999년." },
+      "mariadb": { "supported": true, "level": "full", "notes": "Same as MySQL. Also supports temporal data versioning.", "notesKo": "MySQL과 동일. 시간 버전 관리도 지원." },
+      "sqlite": { "supported": true, "level": "partial", "notes": "No native types. Use TEXT as ISO 8601 strings.", "notesKo": "네이티브 타입 없음. ISO 8601 TEXT 문자열 사용." }
+    },
+    "tips": [
+      "Always use TIMESTAMPTZ (PostgreSQL) or TIMESTAMP (MySQL) for created_at/updated_at columns.",
+      "MySQL TIMESTAMP has Y2038 problem — use DATETIME for dates beyond 2038.",
+      "Store all timestamps in UTC and convert to local time in the application layer."
+    ],
+    "tipsKo": [
+      "created_at/updated_at에는 항상 TIMESTAMPTZ(PG) 또는 TIMESTAMP(MySQL)를 사용하세요.",
+      "MySQL TIMESTAMP는 2038년 문제가 있습니다 — 2038년 이후 날짜는 DATETIME을 쓰세요.",
+      "모든 타임스탬프를 UTC로 저장하고, 로컬 시간 변환은 애플리케이션 레이어에서 하세요."
+    ],
+    "relatedItems": ["column"],
+    "seeAlso": []
+  },
+  {
+    "id": "dt-json",
+    "category": "data-types",
+    "name": "JSON / JSONB",
+    "summary": "Structured JSON data storage with query and indexing support.",
+    "summaryKo": "쿼리와 인덱싱을 지원하는 구조화된 JSON 데이터 저장 타입입니다.",
+    "description": "JSON types store structured data in JSON format inside a relational column. PostgreSQL offers both JSON (stores raw text) and JSONB (binary format, faster queries, indexable). MySQL/MariaDB have a native JSON type that validates JSON on insert. SQLite stores JSON as TEXT but provides json_*() functions for querying. JSONB in PostgreSQL is the gold standard — it supports GIN indexes, containment operators, and path-based queries.",
+    "descriptionKo": "JSON 타입은 관계형 컬럼 안에 JSON 형식의 구조화된 데이터를 저장합니다. PostgreSQL은 JSON(원시 텍스트 저장)과 JSONB(바이너리 형식, 빠른 쿼리, 인덱싱 가능) 두 가지를 제공합니다. MySQL/MariaDB는 삽입 시 JSON을 검증하는 네이티브 JSON 타입이 있습니다. SQLite는 JSON을 TEXT로 저장하지만 json_*() 함수로 쿼리할 수 있습니다. PostgreSQL의 JSONB가 최고 수준으로 — GIN 인덱스, 포함 연산자, 경로 기반 쿼리를 지원합니다.",
+    "syntax": {
+      "postgresql": "CREATE TABLE products (\n  metadata JSONB DEFAULT '{}'\n);\n\n-- Indexing for fast queries\nCREATE INDEX idx_metadata ON products USING GIN (metadata);\n\n-- Query JSON paths\nSELECT * FROM products\nWHERE metadata->>'color' = 'red'\n  AND (metadata->>'weight')::numeric > 5;",
+      "mysql": "CREATE TABLE products (\n  metadata JSON DEFAULT (JSON_OBJECT())\n);\n\n-- Functional index (MySQL 8.0+)\nCREATE INDEX idx_color\n  ON products ((CAST(metadata->>'$.color' AS CHAR(50))));\n\n-- Query JSON paths\nSELECT * FROM products\nWHERE JSON_EXTRACT(metadata, '$.color') = 'red';",
+      "mariadb": "CREATE TABLE products (\n  metadata JSON DEFAULT (JSON_OBJECT())\n);\n\n-- Query JSON paths\nSELECT * FROM products\nWHERE JSON_VALUE(metadata, '$.color') = 'red';",
+      "sqlite": "-- JSON stored as TEXT with json functions\nCREATE TABLE products (\n  metadata TEXT DEFAULT '{}'\n);\n\n-- Query JSON paths\nSELECT * FROM products\nWHERE json_extract(metadata, '$.color') = 'red';"
+    },
+    "vendorSupport": {
+      "postgresql": { "supported": true, "level": "full", "notes": "JSONB is best-in-class: GIN index, containment, path ops.", "notesKo": "JSONB 최상급: GIN 인덱스, 포함 연산자, 경로 연산 지원." },
+      "mysql": { "supported": true, "level": "full", "notes": "Native JSON with validation. Functional indexes from 8.0.", "notesKo": "검증 기능 내장 JSON. 8.0부터 함수형 인덱스." },
+      "mariadb": { "supported": true, "level": "partial", "notes": "JSON is alias for LONGTEXT. JSON_VALUE for queries.", "notesKo": "JSON은 LONGTEXT 별칭. JSON_VALUE로 쿼리." },
+      "sqlite": { "supported": true, "level": "partial", "notes": "JSON stored as TEXT. json_extract() for queries.", "notesKo": "JSON을 TEXT로 저장. json_extract()로 쿼리." }
+    },
+    "tips": [
+      "Use JSONB (not JSON) in PostgreSQL — it's faster for reads and supports indexes.",
+      "Don't store everything as JSON. Use proper columns for frequently queried fields.",
+      "JSON is great for flexible metadata, settings, or attributes that vary between rows."
+    ],
+    "tipsKo": [
+      "PostgreSQL에서는 JSON이 아닌 JSONB를 사용하세요 — 읽기가 빠르고 인덱스를 지원합니다.",
+      "모든 것을 JSON으로 저장하지 마세요. 자주 쿼리하는 필드는 정규 컬럼으로 만드세요.",
+      "JSON은 유연한 메타데이터, 설정, 행마다 다른 속성에 적합합니다."
+    ],
+    "relatedItems": ["dt-text"],
+    "seeAlso": []
+  },
+  {
+    "id": "dt-uuid",
+    "category": "data-types",
+    "name": "UUID",
+    "summary": "Universally Unique Identifier — 128-bit ID type.",
+    "summaryKo": "128비트 범용 고유 식별자(UUID) 타입입니다.",
+    "description": "UUID (Universally Unique Identifier) is a 128-bit value formatted as 32 hex digits with hyphens (e.g., 550e8400-e29b-41d4-a716-446655440000). UUIDs are globally unique without requiring a central authority, making them ideal for distributed systems, public API identifiers, and merge-safe primary keys. PostgreSQL has a native UUID type; MySQL/MariaDB store UUIDs as CHAR(36) or BINARY(16).",
+    "descriptionKo": "UUID(범용 고유 식별자)는 128비트 값으로 32개 16진수 문자와 하이픈으로 표현됩니다 (예: 550e8400-e29b-41d4-a716-446655440000). 중앙 관리 없이 전역적으로 고유하므로, 분산 시스템, 공개 API 식별자, 병합 안전한 기본키에 적합합니다. PostgreSQL은 네이티브 UUID 타입이 있고, MySQL/MariaDB는 CHAR(36) 또는 BINARY(16)로 저장합니다.",
+    "syntax": {
+      "postgresql": "CREATE TABLE users (\n  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,\n  name VARCHAR(100) NOT NULL\n);\n\n-- gen_random_uuid() is built-in since PG 13",
+      "mysql": "CREATE TABLE users (\n  id CHAR(36) DEFAULT (UUID()) PRIMARY KEY,\n  name VARCHAR(100) NOT NULL\n);\n\n-- Or for better performance:\n-- id BINARY(16) DEFAULT (UUID_TO_BIN(UUID(), 1)) PRIMARY KEY",
+      "mariadb": "CREATE TABLE users (\n  id CHAR(36) DEFAULT (UUID()) PRIMARY KEY,\n  name VARCHAR(100) NOT NULL\n);\n\n-- UUID() built-in function",
+      "sqlite": "-- No native UUID. Generate in application layer.\nCREATE TABLE users (\n  id TEXT PRIMARY KEY,  -- store as text\n  name TEXT NOT NULL\n);"
+    },
+    "vendorSupport": {
+      "postgresql": { "supported": true, "level": "full", "notes": "Native UUID type. 16 bytes storage. Indexable.", "notesKo": "네이티브 UUID 타입. 16바이트. 인덱싱 가능." },
+      "mysql": { "supported": true, "level": "partial", "notes": "No native type. Use CHAR(36) or BINARY(16).", "notesKo": "네이티브 타입 없음. CHAR(36) 또는 BINARY(16) 사용." },
+      "mariadb": { "supported": true, "level": "partial", "notes": "Has UUID type since 10.7. Otherwise CHAR(36).", "notesKo": "10.7부터 UUID 타입 지원. 그 외 CHAR(36)." },
+      "sqlite": { "supported": false, "level": "none", "notes": "No native UUID. Store as TEXT.", "notesKo": "네이티브 UUID 없음. TEXT로 저장." }
+    },
+    "tips": [
+      "UUIDv7 (time-ordered) is preferred over UUIDv4 for primary keys — it's index-friendly.",
+      "In MySQL, BINARY(16) is 2.5x more space-efficient than CHAR(36) and faster for indexes.",
+      "UUIDs are safe to expose publicly (unlike auto-increment IDs that reveal record counts)."
+    ],
+    "tipsKo": [
+      "기본키에는 UUIDv4보다 UUIDv7(시간 정렬)이 권장됩니다 — 인덱스 친화적입니다.",
+      "MySQL에서 BINARY(16)은 CHAR(36)보다 2.5배 공간 효율적이고 인덱스가 빠릅니다.",
+      "UUID는 공개해도 안전합니다 (자동 증가 ID와 달리 레코드 수를 노출하지 않습니다)."
+    ],
+    "relatedItems": ["dt-char-varchar", "dt-integer"],
+    "seeAlso": []
+  },
+  {
+    "id": "dt-blob",
+    "category": "data-types",
+    "name": "BLOB / BYTEA",
+    "summary": "Binary Large Object for storing files, images, and raw binary data.",
+    "summaryKo": "파일, 이미지, 바이너리 데이터를 저장하는 대용량 바이너리 타입입니다.",
+    "description": "BLOB (Binary Large Object) stores raw binary data such as images, documents, encrypted data, or serialized objects. PostgreSQL uses BYTEA for binary data. MySQL/MariaDB offer TINYBLOB, BLOB, MEDIUMBLOB, and LONGBLOB with increasing size limits. While databases can store binary files, it's generally better practice to store files in object storage (S3) and keep only the file path or URL in the database.",
+    "descriptionKo": "BLOB(Binary Large Object)은 이미지, 문서, 암호화 데이터, 직렬화된 객체 등 원시 바이너리 데이터를 저장합니다. PostgreSQL은 BYTEA를 사용합니다. MySQL/MariaDB는 TINYBLOB, BLOB, MEDIUMBLOB, LONGBLOB으로 크기별 변종을 제공합니다. DB에 바이너리 파일을 저장할 수 있지만, 일반적으로 파일은 오브젝트 스토리지(S3)에 저장하고 DB에는 파일 경로나 URL만 저장하는 것이 좋습니다.",
+    "syntax": {
+      "postgresql": "CREATE TABLE attachments (\n  id      SERIAL PRIMARY KEY,\n  name    VARCHAR(255) NOT NULL,\n  data    BYTEA NOT NULL,\n  mime    VARCHAR(100)\n);\n\n-- Insert binary data\nINSERT INTO attachments (name, data, mime)\nVALUES ('logo.png', '\\x89504E47...', 'image/png');",
+      "mysql": "CREATE TABLE attachments (\n  id      INT AUTO_INCREMENT PRIMARY KEY,\n  name    VARCHAR(255) NOT NULL,\n  data    MEDIUMBLOB NOT NULL,  -- up to 16MB\n  mime    VARCHAR(100)\n);",
+      "mariadb": "CREATE TABLE attachments (\n  id      INT AUTO_INCREMENT PRIMARY KEY,\n  name    VARCHAR(255) NOT NULL,\n  data    MEDIUMBLOB NOT NULL,\n  mime    VARCHAR(100)\n);",
+      "sqlite": "CREATE TABLE attachments (\n  id      INTEGER PRIMARY KEY AUTOINCREMENT,\n  name    TEXT NOT NULL,\n  data    BLOB NOT NULL,\n  mime    TEXT\n);"
+    },
+    "vendorSupport": {
+      "postgresql": { "supported": true, "level": "full", "notes": "BYTEA up to 1GB. Also supports Large Objects (lo) API.", "notesKo": "BYTEA 최대 1GB. Large Objects(lo) API도 지원." },
+      "mysql": { "supported": true, "level": "full", "notes": "4 sizes: TINYBLOB(255B), BLOB(64KB), MEDIUMBLOB(16MB), LONGBLOB(4GB).", "notesKo": "4가지: TINYBLOB(255B), BLOB(64KB), MEDIUMBLOB(16MB), LONGBLOB(4GB)." },
+      "mariadb": { "supported": true, "level": "full", "notes": "Same as MySQL.", "notesKo": "MySQL과 동일." },
+      "sqlite": { "supported": true, "level": "full", "notes": "BLOB with dynamic sizing. Max ~1GB.", "notesKo": "동적 크기 BLOB. 최대 약 1GB." }
+    },
+    "tips": [
+      "Avoid storing large files in the database — use S3/GCS and store the URL instead.",
+      "BLOBs increase backup size and slow down table scans. Keep them in separate tables.",
+      "For small binary data (hashes, tokens, thumbnails), BLOB/BYTEA is perfectly fine."
+    ],
+    "tipsKo": [
+      "큰 파일은 DB에 저장하지 마세요 — S3/GCS에 저장하고 URL만 저장하세요.",
+      "BLOB은 백업 크기를 늘리고 테이블 스캔을 느리게 합니다. 별도 테이블에 분리하세요.",
+      "작은 바이너리 데이터(해시, 토큰, 썸네일)에는 BLOB/BYTEA가 적합합니다."
+    ],
+    "relatedItems": ["dt-text"],
+    "seeAlso": []
+  },
+  {
+    "id": "dt-enum",
+    "category": "data-types",
+    "name": "ENUM / SET",
+    "summary": "Predefined value list types for status codes and categories.",
+    "summaryKo": "상태 코드, 카테고리 등 미리 정의된 값 목록 타입입니다.",
+    "description": "ENUM allows a column to hold one value from a predefined list (e.g., 'active', 'inactive', 'suspended'). SET allows multiple values from the list. They enforce data integrity at the schema level. However, adding or removing values requires ALTER TABLE, which can be slow on large tables. An alternative is using a reference/lookup table with a foreign key, which is more flexible.",
+    "descriptionKo": "ENUM은 미리 정의된 목록에서 하나의 값만 허용합니다 (예: 'active', 'inactive', 'suspended'). SET은 목록에서 여러 값을 허용합니다. 스키마 수준에서 데이터 무결성을 보장합니다. 그러나 값 추가/삭제 시 ALTER TABLE이 필요하며, 대용량 테이블에서는 느릴 수 있습니다. 더 유연한 대안은 외래키로 연결된 참조/룩업 테이블을 사용하는 것입니다.",
+    "syntax": {
+      "postgresql": "-- PostgreSQL uses CREATE TYPE for enums\nCREATE TYPE user_status AS ENUM ('active', 'inactive', 'suspended');\n\nCREATE TABLE users (\n  status user_status NOT NULL DEFAULT 'active'\n);\n\n-- Adding values:\nALTER TYPE user_status ADD VALUE 'banned';",
+      "mysql": "CREATE TABLE users (\n  status ENUM('active', 'inactive', 'suspended')\n    NOT NULL DEFAULT 'active'\n);\n\n-- SET allows multiple values\nCREATE TABLE products (\n  tags SET('sale', 'new', 'featured', 'clearance')\n);",
+      "mariadb": "CREATE TABLE users (\n  status ENUM('active', 'inactive', 'suspended')\n    NOT NULL DEFAULT 'active'\n);\n\nCREATE TABLE products (\n  tags SET('sale', 'new', 'featured', 'clearance')\n);",
+      "sqlite": "-- No native ENUM. Use CHECK constraint.\nCREATE TABLE users (\n  status TEXT NOT NULL DEFAULT 'active'\n    CHECK (status IN ('active', 'inactive', 'suspended'))\n);"
+    },
+    "vendorSupport": {
+      "postgresql": { "supported": true, "level": "full", "notes": "CREATE TYPE ... AS ENUM. Can add but not remove values.", "notesKo": "CREATE TYPE ... AS ENUM. 값 추가 가능, 삭제 불가." },
+      "mysql": { "supported": true, "level": "full", "notes": "ENUM and SET both supported. Stored as integers internally.", "notesKo": "ENUM과 SET 모두 지원. 내부적으로 정수로 저장." },
+      "mariadb": { "supported": true, "level": "full", "notes": "Same as MySQL.", "notesKo": "MySQL과 동일." },
+      "sqlite": { "supported": false, "level": "none", "notes": "No ENUM. Use TEXT + CHECK constraint as workaround.", "notesKo": "ENUM 없음. TEXT + CHECK 제약조건으로 대체." }
+    },
+    "tips": [
+      "Consider using a reference table instead of ENUM if values change frequently.",
+      "ENUM values are stored as integers (1, 2, 3…) — more storage-efficient than VARCHAR.",
+      "In PostgreSQL, you can add new ENUM values but cannot remove them without recreating the type."
+    ],
+    "tipsKo": [
+      "값이 자주 변경되면 ENUM 대신 참조 테이블 사용을 고려하세요.",
+      "ENUM 값은 내부적으로 정수(1, 2, 3…)로 저장되어 VARCHAR보다 저장 효율적입니다.",
+      "PostgreSQL에서 ENUM 값 추가는 가능하지만, 삭제는 타입을 재생성해야 합니다."
+    ],
+    "relatedItems": ["dt-char-varchar", "check-constraint"],
+    "seeAlso": []
+  },
+  {
+    "id": "dt-array",
+    "category": "data-types",
+    "name": "Array",
+    "summary": "Store multiple values of the same type in a single column.",
+    "summaryKo": "같은 타입의 여러 값을 하나의 컬럼에 저장하는 배열 타입입니다.",
+    "description": "Array types let you store multiple values of the same data type in a single column. PostgreSQL has robust native array support with indexing (GIN), array operators, and functions. MySQL and MariaDB have no native array type — use JSON arrays or normalized tables instead. Arrays are useful for tags, permissions, or small lists, but for large or frequently queried collections, a separate table with foreign keys is generally better.",
+    "descriptionKo": "배열 타입은 같은 데이터 타입의 여러 값을 하나의 컬럼에 저장합니다. PostgreSQL은 인덱싱(GIN), 배열 연산자, 함수 등 강력한 네이티브 배열을 지원합니다. MySQL/MariaDB는 네이티브 배열 타입이 없어 JSON 배열이나 정규화 테이블을 사용합니다. 태그, 권한, 작은 목록에 유용하지만, 크거나 자주 쿼리하는 컬렉션에는 외래키로 연결된 별도 테이블이 더 좋습니다.",
+    "syntax": {
+      "postgresql": "CREATE TABLE articles (\n  tags TEXT[] DEFAULT '{}',\n  scores INTEGER[]\n);\n\n-- Insert\nINSERT INTO articles (tags, scores)\nVALUES ('{\"sql\", \"database\"}', '{95, 87, 92}');\n\n-- Query: contains\nSELECT * FROM articles WHERE 'sql' = ANY(tags);\n\n-- GIN index for fast lookups\nCREATE INDEX idx_tags ON articles USING GIN (tags);",
+      "mysql": "-- No native array type. Use JSON array.\nCREATE TABLE articles (\n  tags JSON DEFAULT (JSON_ARRAY())\n);\n\nINSERT INTO articles (tags)\nVALUES (JSON_ARRAY('sql', 'database'));\n\n-- Query\nSELECT * FROM articles\nWHERE JSON_CONTAINS(tags, '\"sql\"');",
+      "mariadb": "-- No native array type. Use JSON array.\nCREATE TABLE articles (\n  tags JSON DEFAULT (JSON_ARRAY())\n);\n\nSELECT * FROM articles\nWHERE JSON_CONTAINS(tags, '\"sql\"');",
+      "sqlite": "-- No native array type. Use JSON array.\nCREATE TABLE articles (\n  tags TEXT DEFAULT '[]'\n);\n\n-- Query with json_each()\nSELECT * FROM articles, json_each(articles.tags)\nWHERE json_each.value = 'sql';"
+    },
+    "vendorSupport": {
+      "postgresql": { "supported": true, "level": "full", "notes": "Native arrays with GIN indexing, ANY/ALL operators.", "notesKo": "GIN 인덱싱, ANY/ALL 연산자 지원 네이티브 배열." },
+      "mysql": { "supported": false, "level": "none", "notes": "No array type. Use JSON arrays instead.", "notesKo": "배열 타입 없음. JSON 배열로 대체." },
+      "mariadb": { "supported": false, "level": "none", "notes": "No array type. Use JSON arrays instead.", "notesKo": "배열 타입 없음. JSON 배열로 대체." },
+      "sqlite": { "supported": false, "level": "none", "notes": "No array type. Use JSON arrays with json_each().", "notesKo": "배열 타입 없음. json_each()와 JSON 배열 사용." }
+    },
+    "tips": [
+      "Arrays are a PostgreSQL superpower — combine with GIN indexes for fast tag/permission lookups.",
+      "For MySQL/MariaDB, JSON_TABLE() can 'unnest' a JSON array into rows for joins.",
+      "If you query array elements frequently, a junction table (many-to-many) may perform better."
+    ],
+    "tipsKo": [
+      "배열은 PostgreSQL의 강점입니다 — GIN 인덱스와 조합하면 태그/권한 검색이 매우 빠릅니다.",
+      "MySQL/MariaDB에서 JSON_TABLE()로 JSON 배열을 행으로 '풀어서' 조인할 수 있습니다.",
+      "배열 요소를 자주 쿼리한다면, 다대다 중간 테이블이 더 나은 성능을 낼 수 있습니다."
+    ],
+    "relatedItems": ["dt-json"],
+    "seeAlso": []
+  }
+]

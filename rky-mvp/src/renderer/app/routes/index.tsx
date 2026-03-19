@@ -14,11 +14,6 @@ import { DbMockingPage } from '@/pages/db-mocking';
 import { DbDocumentingPage } from '@/pages/db-documenting';
 import { DbValidationPage } from '@/pages/db-validation';
 import { DataBrowserPage } from '@/pages/db-data';
-import { SqlViewerPage } from '@/pages/db-sql-viewer';
-import { ExplorerPage } from '@/pages/db-explorer';
-import { QueryCollectionPage } from '@/pages/db-query-collection';
-import { SeedCapturePage } from '@/pages/db-seed-capture';
-import { ValidationRunPage } from '@/pages/db-validation-run';
 import { DbReferencePage } from '@/pages/db-reference';
 import { PlaceholderPage } from '@/pages/placeholder';
 import { NotFoundPage } from '@/pages/not-found';
@@ -53,11 +48,6 @@ export function AppRouter() {
             <Route path="connection" element={<DbConnectionPage />} />
             <Route path="diagram" element={<ConsoleDiagramPage />} />
             <Route path="data" element={<DataBrowserPage />} />
-            <Route path="sql" element={<SqlViewerPage />} />
-            <Route path="explorer" element={<ExplorerPage />} />
-            <Route path="query-collection" element={<QueryCollectionPage />} />
-            <Route path="seed" element={<SeedCapturePage />} />
-            <Route path="validation-run" element={<ValidationRunPage />} />
           </Route>
 
           {/* Reference */}

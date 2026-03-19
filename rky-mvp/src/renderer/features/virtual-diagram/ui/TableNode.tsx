@@ -6,6 +6,7 @@ import type { ITable, IColumn, IDiagramFilter } from '~/shared/types/db';
 import type { TSimulationNodeRole } from '../lib/schemaToNodes';
 import type { TSimulationType } from '../lib/cascadeTraversal';
 import type { TDiffAction } from '../lib/compareVersions';
+import { HighlightedSql } from '@/shared/lib/sqlHighlight';
 
 export interface TableNodeData {
   table: ITable;
@@ -357,6 +358,18 @@ function TableNodeComponent({ data }: NodeProps) {
               </div>
             );
           })}
+        </div>
+      )}
+
+      {/* View SQL Definition */}
+      {isView && table.viewDefinition && (
+        <div className="border-t border-border/50 px-2 py-1">
+          <p className="mb-0.5 text-[9px] font-semibold uppercase tracking-wider text-muted-foreground">SQL</p>
+          <pre
+            className="nodrag nowheel max-h-[120px] overflow-auto whitespace-pre-wrap break-all rounded bg-muted/50 px-1.5 py-1 text-[10px] leading-relaxed"
+          >
+            <HighlightedSql sql={table.viewDefinition} />
+          </pre>
         </div>
       )}
 

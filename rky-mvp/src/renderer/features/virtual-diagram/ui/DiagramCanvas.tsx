@@ -49,6 +49,10 @@ interface DiagramCanvasProps {
   compareResult?: ICompareResult | null;
   /** Increment to trigger fitView (e.g., on compare mode entry) */
   fitViewTrigger?: number;
+  /** Cached viewport for instant restore on tab switch (bypasses debounce gap) */
+  cachedViewport?: { x: number; y: number; zoom: number } | null;
+  /** Called immediately on viewport change (no debounce) for caching */
+  onViewportChange?: (viewport: { x: number; y: number; zoom: number }) => void;
 }
 
 function DiagramCanvasInner({
@@ -72,10 +76,13 @@ function DiagramCanvasInner({
   cascadeSimulation = null,
   compareResult = null,
   fitViewTrigger = 0,
+  cachedViewport = null,
+  onViewportChange,
 }: DiagramCanvasProps) {
   const reactFlowInstance = useReactFlow();
   const layoutSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isInitialViewportApplied = useRef(false);
+  const isInitialMount = useRef(true);
 
   // Use ref for onTableUpdate to keep useMemo deps stable (callback doesn't affect node structure)
   const onTableUpdateRef = useRef(onTableUpdate);
@@ -168,6 +175,8 @@ function DiagramCanvasInner({
         positions[node.id] = { x: node.position.x, y: node.position.y };
       }
       const viewport = reactFlowInstance.getViewport();
+      // Also cache viewport immediately
+      onViewportChangeRef.current?.({ x: viewport.x, y: viewport.y, zoom: viewport.zoom });
       onLayoutChange({
         positions,
         zoom: viewport.zoom,
@@ -199,10 +208,22 @@ function DiagramCanvasInner({
     [diagram.tables],
   );
 
-  // Restore saved viewport on initial load
+  // Compute initial viewport for defaultViewport prop (applied synchronously on first render)
+  const resolvedViewport = useMemo(() => {
+    if (cachedViewport) return { x: cachedViewport.x, y: cachedViewport.y, zoom: cachedViewport.zoom };
+    if (layout?.viewport && layout?.zoom) return { x: layout.viewport.x, y: layout.viewport.y, zoom: layout.zoom };
+    return undefined;
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Only compute on mount — subsequent changes handled by effects
+
+  // Fallback: fitView when no saved viewport exists (e.g., first-ever load)
   useEffect(() => {
     if (isInitialViewportApplied.current) return;
-    if (layout?.viewport && layout?.zoom) {
+    if (resolvedViewport) {
+      // defaultViewport already applied it synchronously
+      isInitialViewportApplied.current = true;
+    } else if (layout?.viewport && layout?.zoom) {
+      // Layout loaded asynchronously after mount
       reactFlowInstance.setViewport(
         { x: layout.viewport.x, y: layout.viewport.y, zoom: layout.zoom },
         { duration: 0 },
@@ -216,7 +237,12 @@ function DiagramCanvasInner({
   }, [layout, nodes.length]);
 
   // Re-fit when table IDs change but saved positions are stale (e.g., after real schema sync)
+  // Skip on initial mount — the viewport restore effect above handles that case
   useEffect(() => {
+    if (isInitialMount.current) {
+      isInitialMount.current = false;
+      return;
+    }
     if (!isInitialViewportApplied.current) return;
     if (diagram.tables.length === 0) return;
 
@@ -256,9 +282,16 @@ function DiagramCanvasInner({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedTableId]);
 
+  // Use ref for onViewportChange to avoid invalidating handleMoveEnd
+  const onViewportChangeRef = useRef(onViewportChange);
+  onViewportChangeRef.current = onViewportChange;
+
   // Save viewport on pan/zoom changes
   const handleMoveEnd = useCallback(
     (_event: unknown, viewport: Viewport) => {
+      // Immediately cache viewport (survives tab-switch unmount)
+      onViewportChangeRef.current?.({ x: viewport.x, y: viewport.y, zoom: viewport.zoom });
+
       if (readOnly || !onLayoutChange) return;
       if (layoutSaveTimer.current) {
         clearTimeout(layoutSaveTimer.current);
@@ -302,9 +335,10 @@ function DiagramCanvasInner({
       deleteKeyCode={null}
       defaultEdgeOptions={{ type: 'smoothstep', animated: true }}
       proOptions={{ hideAttribution: true }}
+      {...(resolvedViewport ? { defaultViewport: resolvedViewport } : {})}
     >
       <Background gap={16} size={1} />
-      <Controls showInteractive={false} />
+      <Controls showInteractive={false} position="top-left" />
       <Panel position="bottom-left">
         <DiagramLegend />
       </Panel>

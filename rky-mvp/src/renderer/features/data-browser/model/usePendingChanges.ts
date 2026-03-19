@@ -1,5 +1,6 @@
 import { useState, useCallback, useMemo } from 'react';
 import { buildInsertQuery, buildUpdateQuery, buildDeleteQuery } from './sqlBuilder';
+import type { IColumn } from '~/shared/types/db';
 
 type TDbType = 'mysql' | 'mariadb' | 'postgresql' | 'sqlite';
 type TChangeType = 'insert' | 'update' | 'delete';
@@ -15,7 +16,15 @@ export function usePendingChanges(
   dbType: TDbType,
   pkColumns: string[],
   allColumns: string[],
+  columnMeta?: IColumn[],
 ) {
+  // Build column name → dataType map for type-aware SQL generation
+  const columnTypes = useMemo(() => {
+    if (!columnMeta) return undefined;
+    const map: Record<string, string> = {};
+    for (const col of columnMeta) map[col.name] = col.dataType;
+    return map;
+  }, [columnMeta]);
   const [changes, setChanges] = useState<Map<string, IPendingChange>>(new Map());
 
   const getRowKey = useCallback(
@@ -93,7 +102,7 @@ export function usePendingChanges(
         // Strip internal __tempKey before generating SQL
         const { __tempKey: _, ...values } = change.modified;
         statements.push(
-          buildInsertQuery({ table: tableName, dbType, columns: allColumns, values }),
+          buildInsertQuery({ table: tableName, dbType, columns: allColumns, values, columnTypes }),
         );
       } else if (change.type === 'update' && change.original) {
         const changedCols: Record<string, unknown> = {};
@@ -106,7 +115,7 @@ export function usePendingChanges(
           const pkValues: Record<string, unknown> = {};
           for (const pk of pkColumns) pkValues[pk] = change.original[pk];
           statements.push(
-            buildUpdateQuery({ table: tableName, dbType, pkColumns, pkValues, changes: changedCols }),
+            buildUpdateQuery({ table: tableName, dbType, pkColumns, pkValues, changes: changedCols, columnTypes }),
           );
         }
       } else if (change.type === 'delete' && change.original) {
@@ -118,7 +127,7 @@ export function usePendingChanges(
       }
     }
     return statements;
-  }, [changes, tableName, dbType, pkColumns, allColumns]);
+  }, [changes, tableName, dbType, pkColumns, allColumns, columnTypes]);
 
   // Collect inserted rows as TRow[] for the grid to display
   const insertedRows = useMemo(() => {

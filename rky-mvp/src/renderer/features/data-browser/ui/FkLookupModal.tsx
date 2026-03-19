@@ -21,9 +21,10 @@ interface FkLookupModalProps {
   connectionId: string;
   dbType: TDbType;
   refTable: string;
-  refColumn: string;
+  refColumns: string[];
+  activeRefColumn: string;
   columnName: string;
-  onSelect: (value: unknown) => void;
+  onSelect: (row: TRow | null) => void;
   onClose: () => void;
 }
 
@@ -32,7 +33,8 @@ export function FkLookupModal({
   connectionId,
   dbType,
   refTable,
-  refColumn,
+  refColumns,
+  activeRefColumn,
   columnName,
   onSelect,
   onClose,
@@ -48,13 +50,13 @@ export function FkLookupModal({
 
   // Fetch rows with pagination and search
   useEffect(() => {
-    if (!open || !connectionId || !refTable || !refColumn) return;
+    if (!open || !connectionId || !refTable || !activeRefColumn) return;
 
     setIsLoading(true);
     setError(null);
 
     const qt = quoteIdentifier(refTable, dbType);
-    const qc = quoteIdentifier(refColumn, dbType);
+    const qc = quoteIdentifier(activeRefColumn, dbType);
     const offset = page * PAGE_SIZE;
 
     let where = '';
@@ -88,7 +90,7 @@ export function FkLookupModal({
       setError('Failed to load reference data');
       setIsLoading(false);
     });
-  }, [open, connectionId, dbType, refTable, refColumn, page, search]);
+  }, [open, connectionId, dbType, refTable, activeRefColumn, page, search]);
 
   // Reset page when search changes
   useEffect(() => {
@@ -109,7 +111,7 @@ export function FkLookupModal({
 
   const handleApply = () => {
     if (!selectedRow) return;
-    onSelect(selectedRow[refColumn]);
+    onSelect(selectedRow);
     onClose();
   };
 
@@ -123,18 +125,18 @@ export function FkLookupModal({
 
   return (
     <Dialog open={open} onOpenChange={(v) => { if (!v) onClose(); }}>
-      <DialogContent className="sm:max-w-3xl">
+      <DialogContent className="sm:max-w-3xl overflow-hidden">
         <DialogHeader>
           <DialogTitle className="text-sm">
             Select FK Value —{' '}
             <span className="font-mono text-muted-foreground">{columnName}</span>
             <span className="ml-2 text-xs font-normal text-muted-foreground">
-              → {refTable}.{refColumn}
+              → {refTable}.{refColumns.join(', ')}
             </span>
           </DialogTitle>
         </DialogHeader>
 
-        <div className="flex flex-col gap-2" style={{ height: 380 }}>
+        <div className="flex min-w-0 flex-col gap-2" style={{ height: 380 }}>
           {/* Search */}
           <div className="flex items-center gap-2 rounded-md border border-border px-2 py-1">
             <Search className="size-3.5 shrink-0 text-muted-foreground" />
@@ -142,7 +144,7 @@ export function FkLookupModal({
               type="text"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder={`Search by ${refColumn}...`}
+              placeholder={`Search by ${activeRefColumn}...`}
               autoFocus
               className="w-full bg-transparent text-xs outline-none"
             />
@@ -159,14 +161,14 @@ export function FkLookupModal({
                 {error}
               </div>
             ) : (
-              <table className="w-full text-xs">
+              <table className="text-xs">
                 <thead className="sticky top-0 z-10 bg-muted">
                   <tr>
                     {columns.map((col) => (
                       <th
                         key={col}
                         className={`whitespace-nowrap border-b border-r border-border px-2 py-1 text-left text-[10px] font-medium ${
-                          col === refColumn ? 'bg-blue-500/10 text-blue-600 dark:text-blue-400' : ''
+                          col === activeRefColumn ? 'bg-blue-500/10 text-blue-600 dark:text-blue-400' : ''
                         }`}
                       >
                         {col}
@@ -195,18 +197,18 @@ export function FkLookupModal({
                           }`}
                         >
                           {columns.map((col) => (
-                            <td
-                              key={col}
-                              className={`max-w-[160px] truncate border-b border-r border-border px-2 py-1 font-mono ${
-                                col === refColumn ? 'font-semibold' : ''
-                              }`}
-                            >
-                              {row[col] === null ? (
-                                <span className="italic text-muted-foreground/50">NULL</span>
-                              ) : (
-                                formatValue(row[col])
-                              )}
-                            </td>
+                              <td
+                                key={col}
+                                className={`whitespace-nowrap border-b border-r border-border px-2 py-1 font-mono ${
+                                  col === activeRefColumn ? 'font-semibold' : ''
+                                }`}
+                              >
+                                {row[col] === null ? (
+                                  <span className="italic text-muted-foreground/50">NULL</span>
+                                ) : (
+                                  formatValue(row[col])
+                                )}
+                              </td>
                           ))}
                         </tr>
                       );
@@ -250,7 +252,7 @@ export function FkLookupModal({
               <div className="rounded-md bg-blue-500/10 px-2 py-1">
                 <span className="text-[10px] text-muted-foreground">Selected:</span>
                 <span className="ml-1 font-mono text-xs font-semibold">
-                  {formatValue(selectedRow[refColumn])}
+                  {formatValue(selectedRow[activeRefColumn])}
                 </span>
               </div>
             )}
@@ -274,6 +276,7 @@ export function FkLookupModal({
           </Button>
         </DialogFooter>
       </DialogContent>
+
     </Dialog>
   );
 }

@@ -1,4 +1,4 @@
-import { RefreshCw, Plus, Trash2, Check, Undo2 } from 'lucide-react';
+import { RefreshCw, Plus, Trash2, Check, Undo2, Pencil } from 'lucide-react';
 import { Button } from '@/shared/components/ui/button';
 
 interface DataToolbarProps {
@@ -6,7 +6,9 @@ interface DataToolbarProps {
   isLoading: boolean;
   onRefresh: () => void;
   hasPk: boolean;
-  // Phase 2
+  // Edit mode
+  editMode?: boolean;
+  onToggleEditMode?: () => void;
   canEdit?: boolean;
   hasChanges?: boolean;
   changeCount?: number;
@@ -15,6 +17,7 @@ interface DataToolbarProps {
   onApply?: () => void;
   onDiscard?: () => void;
   exportSlot?: React.ReactNode;
+  timezoneSlot?: React.ReactNode;
   columnsSlot?: React.ReactNode;
 }
 
@@ -23,6 +26,8 @@ export function DataToolbar({
   isLoading,
   onRefresh,
   hasPk,
+  editMode = false,
+  onToggleEditMode,
   canEdit = false,
   hasChanges = false,
   changeCount = 0,
@@ -31,6 +36,7 @@ export function DataToolbar({
   onApply,
   onDiscard,
   exportSlot,
+  timezoneSlot,
   columnsSlot,
 }: DataToolbarProps) {
   return (
@@ -54,6 +60,21 @@ export function DataToolbar({
       </Button>
 
       {canEdit && (
+        <>
+          <div className="h-4 w-px bg-border" />
+          <Button
+            variant={editMode ? 'secondary' : 'ghost'}
+            size="xs"
+            onClick={onToggleEditMode}
+            title={editMode ? 'Exit Edit Mode' : 'Enter Edit Mode'}
+          >
+            <Pencil className={`size-3.5 ${editMode ? 'text-primary' : ''}`} />
+            <span className={editMode ? 'text-primary' : ''}>Edit</span>
+          </Button>
+        </>
+      )}
+
+      {canEdit && editMode && (
         <>
           <div className="h-4 w-px bg-border" />
           <Button variant="ghost" size="xs" onClick={onAddRow} title="Add Row">
@@ -81,6 +102,7 @@ export function DataToolbar({
 
       <div className="flex-1" />
 
+      {timezoneSlot}
       {exportSlot}
       {columnsSlot}
     </div>

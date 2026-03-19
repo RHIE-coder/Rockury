@@ -1,6 +1,8 @@
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useMemo } from 'react';
 import type { VisibilityState } from '@tanstack/react-table';
 import { useConnections } from '@/features/db-connection';
+import { HighlightedSql } from '@/shared/lib/sqlHighlight';
+import { useDataBrowserStore } from '@/features/data-browser/model/dataBrowserStore';
 import { useConnectionStore } from '@/features/db-connection/model/connectionStore';
 import { useDiagramStore } from '@/features/virtual-diagram';
 import { realDiagramApi } from '@/features/real-diagram/api/realDiagramApi';
@@ -15,16 +17,62 @@ import {
   ColumnVisibility,
   ExportMenu,
   PendingChangesPanel,
+  TableConstraintsPanel,
+  ConstraintEditorModal,
   RowContextMenu,
+  FkLookupModal,
+  TimezoneSelector,
   useDataQuery,
   usePendingChanges,
   toCsv,
   toJson,
   toSqlInsert,
+  getLocalTimezone,
+  getTimezoneOptions,
+  DATE_DISPLAY_CYCLE,
+  DATE_DISPLAY_LABELS,
 } from '@/features/data-browser';
-import type { TDbType } from '~/shared/types/db';
+import type { TDateDisplayMode, TConstraintEditMode, IConstraintExecResult } from '@/features/data-browser';
+import { buildFkSelectionValues, resolveFkLookupConfig } from '@/features/data-browser/lib/fkLookup';
+import type { TDbType, TConstraintType } from '~/shared/types/db';
 
 type TRow = Record<string, unknown>;
+
+function ViewSqlBanner({ sql, isMaterialized }: { sql: string; isMaterialized?: boolean }) {
+  const [expanded, setExpanded] = useState(false);
+
+  const label = isMaterialized ? 'Materialized View' : 'View';
+  const badgeColor = isMaterialized
+    ? 'bg-teal-500/20 text-teal-700 dark:text-teal-400'
+    : 'bg-indigo-500/20 text-indigo-700 dark:text-indigo-400';
+
+  return (
+    <div className="border-b border-border bg-muted/30 px-3 py-1.5">
+      <div className="flex items-center gap-2">
+        <span className={`shrink-0 rounded px-1.5 py-0.5 text-[9px] font-bold leading-none ${badgeColor}`}>
+          {label}
+        </span>
+        {!expanded && (
+          <span className="min-w-0 flex-1 truncate font-mono text-[11px] text-muted-foreground">
+            <HighlightedSql sql={sql.replace(/\s+/g, ' ').slice(0, 120) + (sql.length > 120 ? '...' : '')} />
+          </span>
+        )}
+        <button
+          type="button"
+          onClick={() => setExpanded((v) => !v)}
+          className="shrink-0 text-[10px] text-muted-foreground underline hover:text-foreground"
+        >
+          {expanded ? 'Hide' : 'Show SQL'}
+        </button>
+      </div>
+      {expanded && (
+        <pre className="mt-1.5 max-h-[160px] overflow-auto whitespace-pre-wrap break-all rounded bg-muted px-2 py-1.5 font-mono text-[11px] leading-relaxed">
+          <HighlightedSql sql={sql} />
+        </pre>
+      )}
+    </div>
+  );
+}
 
 export function DataBrowserPage() {
   const { data: connections } = useConnections();
@@ -59,7 +107,7 @@ export function DataBrowserPage() {
     dismissError,
   } = useDataQuery(connectionId, dbType);
 
-  const [columnVisibility, setColumnVisibility] = useState<VisibilityState>({});
+  const { columnVisibility, setColumnVisibility } = useDataBrowserStore();
 
   // Find selected table metadata
   const selectedTableMeta = realTables.find((t) => t.name === state.tableName);
@@ -69,8 +117,105 @@ export function DataBrowserPage() {
   const allColumns = result?.columns ?? [];
 
   // Pending changes
-  const pending = usePendingChanges(state.tableName, dbType, pkColumns, allColumns);
+  const pending = usePendingChanges(state.tableName, dbType, pkColumns, allColumns, selectedTableMeta?.columns);
   const [isApplying, setIsApplying] = useState(false);
+  const [editMode, setEditMode] = useState(false);
+
+  // Timezone
+  const tzOptions = useMemo(() => getTimezoneOptions(), []);
+  const [timezone, setTimezone] = useState(() => getLocalTimezone());
+  const [dateDisplayMode, setDateDisplayMode] = useState<TDateDisplayMode>('utc');
+
+  const cycleDateDisplayMode = useCallback(() => {
+    setDateDisplayMode((prev) => {
+      const idx = DATE_DISPLAY_CYCLE.indexOf(prev);
+      return DATE_DISPLAY_CYCLE[(idx + 1) % DATE_DISPLAY_CYCLE.length];
+    });
+  }, []);
+
+  // Constraints panel (bottom)
+  const [constraintsOpen, setConstraintsOpen] = useState(true);
+
+  // Constraint editor state
+  const [constraintEditMode, setConstraintEditMode] = useState<TConstraintEditMode | null>(null);
+
+  const handleConstraintExecute = useCallback(async (sqlStatements: string[], rollbackSql?: string): Promise<IConstraintExecResult> => {
+    let executedCount = 0;
+
+    for (const sql of sqlStatements) {
+      try {
+        const res = await queryApi.execute({ connectionId, sql });
+        if (res.success) {
+          executedCount++;
+        } else {
+          const errorMsg = (res as any).error ?? 'Unknown error';
+
+          // If this is a multi-statement op (DROP+ADD) and DROP succeeded but ADD failed,
+          // attempt rollback to restore the original constraint
+          if (executedCount > 0 && rollbackSql) {
+            try {
+              const rollbackRes = await queryApi.execute({ connectionId, sql: rollbackSql });
+              if (rollbackRes.success) {
+                return { success: false, error: `${errorMsg}\n\nSQL: ${sql}`, rolledBack: true };
+              }
+              return { success: false, error: `${errorMsg}\n\nSQL: ${sql}`, rolledBack: false, rollbackError: (rollbackRes as any).error ?? 'Unknown error' };
+            } catch (re) {
+              return { success: false, error: `${errorMsg}\n\nSQL: ${sql}`, rolledBack: false, rollbackError: (re as Error).message };
+            }
+          }
+
+          return { success: false, error: `${errorMsg}\n\nSQL: ${sql}` };
+        }
+      } catch (e) {
+        const errorMsg = (e as Error).message;
+
+        if (executedCount > 0 && rollbackSql) {
+          try {
+            const rollbackRes = await queryApi.execute({ connectionId, sql: rollbackSql });
+            if (rollbackRes.success) {
+              return { success: false, error: `${errorMsg}\n\nSQL: ${sql}`, rolledBack: true };
+            }
+            return { success: false, error: `${errorMsg}\n\nSQL: ${sql}`, rolledBack: false, rollbackError: (rollbackRes as any).error ?? 'Unknown error' };
+          } catch (re) {
+            return { success: false, error: `${errorMsg}\n\nSQL: ${sql}`, rolledBack: false, rollbackError: (re as Error).message };
+          }
+        }
+
+        return { success: false, error: `${errorMsg}\n\nSQL: ${sql}` };
+      }
+    }
+
+    // Re-sync schema to pick up constraint changes
+    realDiagramApi.fetchReal(connectionId).then((res) => {
+      if (res.success && res.data && res.data.tables?.length > 0) {
+        setRealTables(sanitizeImportedTables(res.data.tables));
+      }
+    });
+    refresh();
+    return { success: true };
+  }, [connectionId, refresh, setRealTables]);
+
+  const handleConstraintValidate = useCallback(async (sql: string) => {
+    try {
+      const res = await queryApi.execute({ connectionId, sql });
+      if (res.success && res.data) {
+        return { rows: (res.data as any).rows ?? [], columns: (res.data as any).columns ?? [] };
+      }
+      return null;
+    } catch {
+      return null;
+    }
+  }, [connectionId]);
+
+  // FK lookup state
+  const [fkLookup, setFkLookup] = useState<{
+    row: TRow;
+    column: string;
+    refTable: string;
+    refColumns: string[];
+    sourceColumns: string[];
+    activeRefColumn: string;
+  } | null>(null);
 
   // Context menu state
   const [contextMenu, setContextMenu] = useState<{
@@ -87,7 +232,7 @@ export function DataBrowserPage() {
         if (!confirmed) return;
         pending.discard();
       }
-      setColumnVisibility({});
+      setEditMode(false);
       selectTable(name);
     },
     [pending, selectTable],
@@ -100,7 +245,7 @@ export function DataBrowserPage() {
 
     setIsApplying(true);
     let successCount = 0;
-    const failures: string[] = [];
+    const failures: { sql: string; error: string }[] = [];
 
     for (const sql of statements) {
       try {
@@ -108,10 +253,10 @@ export function DataBrowserPage() {
         if (res.success) {
           successCount++;
         } else {
-          failures.push(sql);
+          failures.push({ sql, error: (res as any).error ?? 'Unknown error' });
         }
-      } catch {
-        failures.push(sql);
+      } catch (e) {
+        failures.push({ sql, error: (e as Error).message });
       }
     }
 
@@ -119,11 +264,13 @@ export function DataBrowserPage() {
 
     if (failures.length > 0) {
       window.alert(
-        `${successCount} succeeded, ${failures.length} failed.\n\nFailed:\n${failures.join('\n')}`,
+        `${successCount} succeeded, ${failures.length} failed.\n\n${failures.map((f) => `Error: ${f.error}\nSQL: ${f.sql}`).join('\n\n')}`,
       );
     }
 
-    pending.discard();
+    if (failures.length === 0) {
+      pending.discard();
+    }
     refresh();
   }, [pending, connectionId, refresh]);
 
@@ -200,6 +347,15 @@ export function DataBrowserPage() {
               isLoading={isLoading}
               onRefresh={refresh}
               hasPk={hasPk}
+              editMode={editMode}
+              onToggleEditMode={() => {
+                if (editMode && pending.hasChanges) {
+                  const confirmed = window.confirm('You have unsaved changes. Discard and exit edit mode?');
+                  if (!confirmed) return;
+                  pending.discard();
+                }
+                setEditMode((v) => !v);
+              }}
               canEdit={canEdit}
               hasChanges={pending.hasChanges}
               changeCount={pending.changeCount}
@@ -207,6 +363,27 @@ export function DataBrowserPage() {
               onApply={handleApply}
               onDiscard={pending.discard}
               exportSlot={result && <ExportMenu onExport={handleExport} />}
+              timezoneSlot={
+                <div className="flex items-center gap-1">
+                  <button
+                    type="button"
+                    onClick={cycleDateDisplayMode}
+                    className={`rounded px-1.5 py-0.5 text-[10px] font-bold leading-none ${
+                      dateDisplayMode === 'utc'
+                        ? 'bg-blue-500/20 text-blue-600 dark:text-blue-400'
+                        : dateDisplayMode === 'local'
+                          ? 'bg-green-500/20 text-green-600 dark:text-green-400'
+                          : 'bg-orange-500/20 text-orange-600 dark:text-orange-400'
+                    }`}
+                    title={`Date display: ${DATE_DISPLAY_LABELS[dateDisplayMode]} (click to cycle)`}
+                  >
+                    {DATE_DISPLAY_LABELS[dateDisplayMode]}
+                  </button>
+                  {dateDisplayMode === 'local' && (
+                    <TimezoneSelector options={tzOptions} value={timezone} onChange={setTimezone} />
+                  )}
+                </div>
+              }
               columnsSlot={
                 result && (
                   <ColumnVisibility
@@ -232,6 +409,11 @@ export function DataBrowserPage() {
               </div>
             )}
 
+            {/* View SQL Definition Banner */}
+            {selectedTableMeta?.isView && selectedTableMeta.viewDefinition && (
+              <ViewSqlBanner sql={selectedTableMeta.viewDefinition} isMaterialized={selectedTableMeta.isMaterialized} />
+            )}
+
             {/* Filter Row */}
             {result && (
               <FilterRow
@@ -250,7 +432,7 @@ export function DataBrowserPage() {
                 onToggleSort={toggleSort}
                 columnVisibility={columnVisibility}
                 onColumnVisibilityChange={setColumnVisibility}
-                canEdit={canEdit}
+                canEdit={editMode && canEdit}
                 pendingChanges={pending.changes}
                 insertedRows={pending.insertedRows}
                 getRowKey={pending.getRowKey}
@@ -259,12 +441,37 @@ export function DataBrowserPage() {
                 columnMeta={selectedTableMeta?.columns}
                 connectionId={connectionId}
                 dbType={dbType}
+                onFkLookup={(row, col) => {
+                  if (!selectedTableMeta) return;
+                  const config = resolveFkLookupConfig(selectedTableMeta, col);
+                  if (!config) return;
+                  setFkLookup({
+                    row,
+                    column: col,
+                    refTable: config.refTable,
+                    refColumns: config.refColumns,
+                    sourceColumns: config.sourceColumns,
+                    activeRefColumn: config.activeRefColumn,
+                  });
+                }}
+                timezone={timezone}
+                dateDisplayMode={dateDisplayMode}
               />
             ) : isLoading ? (
               <div className="flex flex-1 items-center justify-center text-muted-foreground">
                 <span className="text-sm">Loading...</span>
               </div>
             ) : null}
+
+            {/* Table Constraints Panel */}
+            {selectedTableMeta && (
+              <TableConstraintsPanel
+                constraints={selectedTableMeta.constraints}
+                open={constraintsOpen}
+                onToggle={() => setConstraintsOpen((v) => !v)}
+                onEditConstraint={setConstraintEditMode}
+              />
+            )}
 
             {/* Pending Changes Panel */}
             <PendingChangesPanel
@@ -319,6 +526,57 @@ export function DataBrowserPage() {
           </div>
         )}
       </div>
+
+      {/* Constraint Editor Modal */}
+      {constraintEditMode && selectedTableMeta && (
+        <ConstraintEditorModal
+          open
+          mode={constraintEditMode}
+          tableName={state.tableName}
+          dbType={dbType}
+          tableColumns={selectedTableMeta.columns.map((c) => c.name)}
+          allTables={realTables}
+          onExecute={handleConstraintExecute}
+          onValidate={handleConstraintValidate}
+          onClose={() => setConstraintEditMode(null)}
+        />
+      )}
+
+      {/* FK Lookup Modal (rendered at page level for clean stacking) */}
+      {fkLookup && (
+        <FkLookupModal
+          open
+          connectionId={connectionId}
+          dbType={dbType}
+          refTable={fkLookup.refTable}
+          refColumns={fkLookup.refColumns}
+          activeRefColumn={fkLookup.activeRefColumn}
+          columnName={fkLookup.column}
+          onSelect={(selectedRow) => {
+            if (selectedRow === null) {
+              for (const sourceColumn of fkLookup.sourceColumns) {
+                pending.updateCell(fkLookup.row, sourceColumn, null);
+              }
+              return;
+            }
+
+            const updates = buildFkSelectionValues(
+              {
+                refTable: fkLookup.refTable,
+                sourceColumns: fkLookup.sourceColumns,
+                refColumns: fkLookup.refColumns,
+                activeSourceColumn: fkLookup.column,
+                activeRefColumn: fkLookup.activeRefColumn,
+              },
+              selectedRow,
+            );
+            for (const [sourceColumn, value] of Object.entries(updates)) {
+              pending.updateCell(fkLookup.row, sourceColumn, value);
+            }
+          }}
+          onClose={() => setFkLookup(null)}
+        />
+      )}
     </div>
   );
 }

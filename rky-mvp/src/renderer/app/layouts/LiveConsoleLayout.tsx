@@ -3,11 +3,6 @@ import {
   Plug,
   GitBranch,
   Table,
-  FileCode,
-  Terminal,
-  Library,
-  Sprout,
-  ShieldCheck,
 } from 'lucide-react';
 import { ROUTES } from '@/shared/config/constants';
 import { ViewTabs } from '@/widgets/db-view-tabs';
@@ -31,11 +26,6 @@ export function LiveConsoleLayout() {
     { id: 'connection', label: 'Connection', icon: Plug, path: ROUTES.DB.LIVE_CONSOLE.CONNECTION },
     { id: 'diagram', label: 'Diagram', icon: GitBranch, path: ROUTES.DB.LIVE_CONSOLE.DIAGRAM, disabled: !hasConnection },
     { id: 'data', label: 'Data', icon: Table, path: ROUTES.DB.LIVE_CONSOLE.DATA, disabled: !hasConnection },
-    { id: 'sql', label: 'SQL', icon: FileCode, path: ROUTES.DB.LIVE_CONSOLE.SQL, disabled: !hasConnection },
-    { id: 'explorer', label: 'Explorer', icon: Terminal, path: ROUTES.DB.LIVE_CONSOLE.EXPLORER, disabled: !hasConnection },
-    { id: 'query-collection', label: 'Query Collection', icon: Library, path: ROUTES.DB.LIVE_CONSOLE.QUERY_COLLECTION, disabled: !hasConnection },
-    { id: 'seed', label: 'Seed', icon: Sprout, path: ROUTES.DB.LIVE_CONSOLE.SEED, disabled: !hasConnection },
-    { id: 'validation-run', label: 'Validation Run', icon: ShieldCheck, path: ROUTES.DB.LIVE_CONSOLE.VALIDATION_RUN, disabled: !hasConnection },
   ];
 
   return (

@@ -1,10 +1,13 @@
 import dagre from '@dagrejs/dagre';
 import type { Node, Edge } from '@xyflow/react';
+import type { ITable } from '~/shared/types/db';
 
 interface AutoLayoutOptions {
   direction?: 'TB' | 'LR';
   rankSep?: number;
   nodeSep?: number;
+  /** Pass tables to enable smart grouping (partition→parent, view→related) */
+  tables?: ITable[];
 }
 
 interface BBox {
@@ -115,12 +118,99 @@ const ISOLATED_GAP_X = 400;
 const ISOLATED_GAP_Y = 60;
 
 /**
+ * Extract table names referenced in a SQL view definition (FROM / JOIN clauses).
+ * Handles: FROM tbl, JOIN tbl, schema.tbl, "quoted_tbl", and aliases.
+ */
+function extractReferencedTables(sql: string): string[] {
+  const names = new Set<string>();
+  // Match FROM/JOIN followed by optional schema prefix and table name
+  // Handles: FROM users, JOIN public.orders, LEFT JOIN "my_table" AS t
+  const pattern = /(?:FROM|JOIN)\s+(?:"([^"]+)"|(\w+)\.(?:"([^"]+)"|(\w+))|"([^"]+)"|(\w+))/gi;
+  let match: RegExpExecArray | null;
+  while ((match = pattern.exec(sql)) !== null) {
+    // Pick the first non-undefined capture group
+    const name = match[1] ?? match[3] ?? match[4] ?? match[5] ?? match[6];
+    if (name) names.add(name);
+  }
+  return [...names];
+}
+
+/**
+ * Generate virtual edges to group related tables:
+ * - Partition tables → parent table
+ * - Views → tables referenced in their SQL definition (FROM/JOIN)
+ * - Views fallback → tables referenced via column FKs
+ */
+function buildVirtualEdges(tables: ITable[], nodeIds: Set<string>): Edge[] {
+  const virtualEdges: Edge[] = [];
+  const tableNameToId = new Map<string, string>();
+  for (const t of tables) {
+    if (nodeIds.has(t.id)) tableNameToId.set(t.name, t.id);
+  }
+
+  for (const table of tables) {
+    if (!nodeIds.has(table.id)) continue;
+
+    // Partition → parent
+    if (table.isPartition && table.parentTableName) {
+      const parentId = tableNameToId.get(table.parentTableName);
+      if (parentId) {
+        virtualEdges.push({
+          id: `__virtual_partition_${table.id}`,
+          source: parentId,
+          target: table.id,
+        });
+      }
+    }
+
+    // View → referenced tables
+    if (table.isView) {
+      const linked = new Set<string>();
+
+      // Primary: parse SQL definition for FROM/JOIN tables
+      if (table.viewDefinition) {
+        const refNames = extractReferencedTables(table.viewDefinition);
+        for (const refName of refNames) {
+          const refId = tableNameToId.get(refName);
+          if (refId && refId !== table.id && !linked.has(refId)) {
+            linked.add(refId);
+            virtualEdges.push({
+              id: `__virtual_view_${table.id}_${refId}`,
+              source: refId,
+              target: table.id,
+            });
+          }
+        }
+      }
+
+      // Fallback: column FK references
+      for (const col of table.columns) {
+        if (col.reference) {
+          const refId = tableNameToId.get(col.reference.table);
+          if (refId && !linked.has(refId)) {
+            linked.add(refId);
+            virtualEdges.push({
+              id: `__virtual_view_${table.id}_${refId}`,
+              source: refId,
+              target: table.id,
+            });
+          }
+        }
+      }
+    }
+  }
+
+  return virtualEdges;
+}
+
+/**
  * Smart auto-layout: handles disconnected subgraphs and isolated nodes.
  *
- * 1. Find connected components
- * 2. Apply dagre to each connected subgraph
- * 3. Arrange isolated nodes (no FK) in a compact grid
- * 4. Pack all groups together using column-based bin packing
+ * 1. Inject virtual edges for partition/view grouping
+ * 2. Find connected components
+ * 3. Apply dagre to each connected subgraph
+ * 4. Arrange isolated nodes (no FK) in a compact grid
+ * 5. Pack all groups together using column-based bin packing
  */
 export function applyDagreLayout(
   nodes: Node[],
@@ -129,10 +219,15 @@ export function applyDagreLayout(
 ): Node[] {
   if (nodes.length === 0) return [];
 
-  const { direction = 'LR', rankSep = 220, nodeSep = 100 } = options;
+  const { direction = 'LR', rankSep = 220, nodeSep = 100, tables } = options;
   const fullOptions = { direction, rankSep, nodeSep };
 
-  const components = findConnectedComponents(nodes, edges);
+  // Inject virtual edges for partition→parent and view→related grouping
+  const nodeIds = new Set(nodes.map((n) => n.id));
+  const virtualEdges = tables ? buildVirtualEdges(tables, nodeIds) : [];
+  const allEdges = [...edges, ...virtualEdges];
+
+  const components = findConnectedComponents(nodes, allEdges);
 
   // Separate isolated (single-node) vs connected components
   const isolatedNodes: Node[] = [];
@@ -143,7 +238,7 @@ export function applyDagreLayout(
       isolatedNodes.push(comp[0]);
     } else {
       const ids = new Set(comp.map((n) => n.id));
-      const compEdges = edges.filter((e) => ids.has(e.source) && ids.has(e.target));
+      const compEdges = allEdges.filter((e) => ids.has(e.source) && ids.has(e.target));
       connectedGroups.push({ nodes: comp, edges: compEdges });
     }
   }

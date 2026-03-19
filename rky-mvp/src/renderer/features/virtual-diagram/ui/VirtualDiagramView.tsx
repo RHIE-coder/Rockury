@@ -154,6 +154,30 @@ export function VirtualDiagramView() {
   const { data: diagramVersions } = useDiagramVersions(selectedDiagramId ?? '');
   // Removed: allDiagrams was used for diagram-based compare, now version-based
   const { data: layout } = useDiagramLayout(selectedDiagramId ?? '');
+
+  // Layout cache for instant restore on tab switch
+  const virtualStoreState = useDiagramStore.getState();
+  const virtualCachedViewport = selectedDiagramId
+    ? virtualStoreState.cachedViewports[selectedDiagramId] ?? null
+    : null;
+  const virtualCachedPositions = selectedDiagramId
+    ? virtualStoreState.cachedPositions[selectedDiagramId] ?? null
+    : null;
+  const effectiveLayout = layout ?? (virtualCachedPositions ? {
+    diagramId: selectedDiagramId ?? '',
+    positions: virtualCachedPositions,
+    zoom: virtualCachedViewport?.zoom ?? 1,
+    viewport: virtualCachedViewport ? { x: virtualCachedViewport.x, y: virtualCachedViewport.y } : { x: 0, y: 0 },
+  } : undefined);
+  const handleViewportChange = useCallback(
+    (viewport: { x: number; y: number; zoom: number }) => {
+      if (selectedDiagramId) {
+        useDiagramStore.getState().setCachedViewport(selectedDiagramId, viewport);
+      }
+    },
+    [selectedDiagramId],
+  );
+
   // Version-based compare (no separate diagram fetch needed)
   const updateDiagram = useUpdateDiagram();
   const createDiagram = useCreateDiagram();
@@ -818,12 +842,13 @@ export function VirtualDiagramView() {
   function handleAutoLayout() {
     if (!diagram) return;
     const { nodes, edges } = schemaToNodes(localTables, { filter });
-    const layoutedNodes = applyDagreLayout(nodes, edges);
+    const layoutedNodes = applyDagreLayout(nodes, edges, { tables: localTables });
     const positions: Record<string, { x: number; y: number }> = {};
     for (const node of layoutedNodes) {
       positions[node.id] = { x: node.position.x, y: node.position.y };
     }
     if (selectedDiagramId) {
+      useDiagramStore.getState().setCachedPositions(selectedDiagramId, positions);
       saveLayout.mutate({
         diagramId: selectedDiagramId,
         positions,
@@ -839,6 +864,7 @@ export function VirtualDiagramView() {
       if (!selectedDiagramId) return;
       if (layoutUpdate.positions) {
         useDiagramStore.getState().setLastKnownPositions(layoutUpdate.positions);
+        useDiagramStore.getState().setCachedPositions(selectedDiagramId, layoutUpdate.positions);
       }
       saveLayout.mutate({
         diagramId: selectedDiagramId,
@@ -1062,7 +1088,7 @@ export function VirtualDiagramView() {
             {diagramWithLocal ? (
               <DiagramCanvas
                 diagram={diagramWithLocal}
-                layout={layout}
+                layout={effectiveLayout}
                 filter={filter}
                 highlightedTableIds={highlightedTableIds}
                 selectedTableId={viewMode === 'canvas' ? selectedTableId : null}
@@ -1081,6 +1107,8 @@ export function VirtualDiagramView() {
                 cascadeSimulation={cascadeSimulation}
                 compareResult={compareResult}
                 fitViewTrigger={fitViewTrigger}
+                cachedViewport={virtualCachedViewport}
+                onViewportChange={handleViewportChange}
               />
             ) : (
               <div className="flex h-full items-center justify-center bg-muted/30">

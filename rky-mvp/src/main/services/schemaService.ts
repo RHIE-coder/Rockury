@@ -74,6 +74,54 @@ interface PgCommentRow {
   description: string | null;
 }
 
+function normalizePgConstraintRows(
+  constraintRows: PgConstraintRow[],
+  partitionMap: Map<string, string>,
+): PgConstraintRow[] {
+  const grouped = new Map<string, PgConstraintRow[]>();
+  for (const row of constraintRows) {
+    const key = `${row.table_name}::${row.constraint_name}`;
+    const existing = grouped.get(key);
+    if (existing) {
+      existing.push(row);
+    } else {
+      grouped.set(key, [row]);
+    }
+  }
+
+  const seenFkSignatures = new Set<string>();
+  const normalized: PgConstraintRow[] = [];
+
+  for (const rows of grouped.values()) {
+    const orderedRows = rows.map((row) => ({
+      ...row,
+      foreign_table_name: row.foreign_table_name ? (partitionMap.get(row.foreign_table_name) ?? row.foreign_table_name) : null,
+    }));
+    const first = orderedRows[0];
+
+    if (first.constraint_type !== 'FOREIGN KEY') {
+      normalized.push(...orderedRows);
+      continue;
+    }
+
+    const signature = JSON.stringify({
+      table: first.table_name,
+      type: first.constraint_type,
+      sourceColumns: orderedRows.map((row) => row.column_name),
+      refTable: first.foreign_table_name,
+      refColumns: orderedRows.map((row) => row.foreign_column_name),
+      updateRule: first.update_rule,
+      deleteRule: first.delete_rule,
+    });
+
+    if (seenFkSignatures.has(signature)) continue;
+    seenFkSignatures.add(signature);
+    normalized.push(...orderedRows);
+  }
+
+  return normalized;
+}
+
 function resolveKeyType(constraintType: string): TKeyType | null {
   switch (constraintType) {
     case 'PRIMARY KEY': return 'PK';
@@ -160,20 +208,23 @@ async function fetchMysqlSchema(connectionId: string): Promise<ITable[]> {
       [config.database],
     );
 
-    // Fetch view names to distinguish from regular tables
+    // Fetch view names and definitions
     const [viewRows] = await conn.query(
-      `SELECT TABLE_NAME FROM information_schema.TABLES
-       WHERE TABLE_SCHEMA = ? AND TABLE_TYPE = 'VIEW'`,
+      `SELECT TABLE_NAME, VIEW_DEFINITION FROM information_schema.VIEWS
+       WHERE TABLE_SCHEMA = ?`,
       [config.database],
     );
-    const viewNames = new Set((viewRows as { TABLE_NAME: string }[]).map((r) => r.TABLE_NAME));
+    const viewDefMap = new Map<string, string | null>();
+    for (const row of viewRows as { TABLE_NAME: string; VIEW_DEFINITION: string | null }[]) {
+      viewDefMap.set(row.TABLE_NAME, row.VIEW_DEFINITION);
+    }
 
     return buildTablesFromMysql(
       columnRows as MysqlColumnRow[],
       constraintRows as MysqlConstraintRow[],
       checkRows,
       indexRows as MysqlIndexRow[],
-      viewNames,
+      viewDefMap,
     );
   } finally {
     await closeMysqlConnection(conn);
@@ -185,7 +236,7 @@ function buildTablesFromMysql(
   constraintRows: MysqlConstraintRow[],
   checkRows: { TABLE_NAME: string; CONSTRAINT_NAME: string; CHECK_CLAUSE: string }[] = [],
   indexRows: MysqlIndexRow[] = [],
-  viewNames: Set<string> = new Set(),
+  viewDefMap: Map<string, string | null> = new Map(),
 ): ITable[] {
   const tableMap = new Map<string, { columns: IColumn[]; constraints: IConstraint[] }>();
 
@@ -370,13 +421,15 @@ function buildTablesFromMysql(
   // Build final ITable array
   const tables: ITable[] = [];
   for (const [tableName, entry] of tableMap) {
+    const viewDef = viewDefMap.get(tableName);
     tables.push({
       id: crypto.randomUUID(),
       name: tableName,
       comment: '',
       columns: entry.columns,
       constraints: entry.constraints,
-      isView: viewNames.has(tableName),
+      isView: viewDefMap.has(tableName),
+      viewDefinition: viewDef ?? undefined,
     });
   }
 
@@ -494,16 +547,20 @@ async function fetchPgSchema(connectionId: string): Promise<ITable[]> {
        ORDER BY c.relname, a.attnum`,
     );
 
-    // Fetch view/materialized view names
-    const viewResult = await client.query<{ table_name: string; relkind: string }>(
-      `SELECT c.relname AS table_name, c.relkind
+    // Fetch view/materialized view names and definitions
+    const viewResult = await client.query<{ table_name: string; relkind: string; view_definition: string | null }>(
+      `SELECT c.relname AS table_name, c.relkind,
+              CASE c.relkind
+                WHEN 'v' THEN pg_get_viewdef(c.oid, true)
+                WHEN 'm' THEN pg_get_viewdef(c.oid, true)
+              END AS view_definition
        FROM pg_class c
        JOIN pg_namespace n ON n.oid = c.relnamespace
        WHERE n.nspname = 'public' AND c.relkind IN ('v', 'm')`,
     );
-    const viewMap = new Map<string, 'v' | 'm'>();
+    const viewMap = new Map<string, { relkind: 'v' | 'm'; definition: string | null }>();
     for (const row of viewResult.rows) {
-      viewMap.set(row.table_name, row.relkind as 'v' | 'm');
+      viewMap.set(row.table_name, { relkind: row.relkind as 'v' | 'm', definition: row.view_definition });
     }
 
     // Fetch partition inheritance relationships
@@ -541,10 +598,12 @@ function buildTablesFromPg(
   commentRows: PgCommentRow[],
   checkRows: PgCheckRow[] = [],
   indexRows: { table_name: string; index_name: string; column_name: string; is_unique: boolean }[] = [],
-  viewMap: Map<string, 'v' | 'm'> = new Map(),
+  viewMap: Map<string, { relkind: 'v' | 'm'; definition: string | null }> = new Map(),
   partitionMap: Map<string, string> = new Map(),
 ): ITable[] {
   const tableMap = new Map<string, { columns: IColumn[]; constraints: IConstraint[] }>();
+
+  const normalizedConstraintRows = normalizePgConstraintRows(constraintRows, partitionMap);
 
   // Build comment lookup
   const commentMap = new Map<string, Map<string | null, string>>();
@@ -557,7 +616,7 @@ function buildTablesFromPg(
 
   // Build constraint lookup
   const constraintLookup = new Map<string, Map<string, PgConstraintRow[]>>();
-  for (const row of constraintRows) {
+  for (const row of normalizedConstraintRows) {
     if (!constraintLookup.has(row.table_name)) constraintLookup.set(row.table_name, new Map());
     const tbl = constraintLookup.get(row.table_name)!;
     if (!tbl.has(row.column_name)) tbl.set(row.column_name, []);
@@ -612,7 +671,7 @@ function buildTablesFromPg(
 
   // Build table-level constraints
   const constraintGroupMap = new Map<string, Map<string, PgConstraintRow[]>>();
-  for (const row of constraintRows) {
+  for (const row of normalizedConstraintRows) {
     if (!constraintGroupMap.has(row.table_name)) constraintGroupMap.set(row.table_name, new Map());
     const tbl = constraintGroupMap.get(row.table_name)!;
     if (!tbl.has(row.constraint_name)) tbl.set(row.constraint_name, []);
@@ -634,7 +693,10 @@ function buildTablesFromPg(
       if (first.constraint_type === 'FOREIGN KEY' && first.foreign_table_name) {
         constraint.reference = {
           table: first.foreign_table_name,
-          column: first.foreign_column_name!,
+          column: rows
+            .map((row) => row.foreign_column_name)
+            .filter((name): name is string => Boolean(name))
+            .join(', '),
           onDelete: resolveRefAction(first.delete_rule),
           onUpdate: resolveRefAction(first.update_rule),
         };
@@ -696,7 +758,7 @@ function buildTablesFromPg(
   const tables: ITable[] = [];
   for (const [tableName, entry] of tableMap) {
     const tableComment = commentMap.get(tableName)?.get(null) ?? '';
-    const relkind = viewMap.get(tableName);
+    const viewInfo = viewMap.get(tableName);
     const parentTableName = partitionMap.get(tableName);
     tables.push({
       id: crypto.randomUUID(),
@@ -704,8 +766,9 @@ function buildTablesFromPg(
       comment: tableComment,
       columns: entry.columns,
       constraints: entry.constraints,
-      isView: relkind === 'v' || relkind === 'm',
-      isMaterialized: relkind === 'm',
+      isView: !!viewInfo,
+      isMaterialized: viewInfo?.relkind === 'm',
+      viewDefinition: viewInfo?.definition ?? undefined,
       ...(parentTableName ? { isPartition: true, parentTableName } : {}),
     });
   }
@@ -746,12 +809,15 @@ function fetchSqliteSchema(connectionId: string): ITable[] {
   const db = createSqliteConnection({ database: config.database });
 
   try {
-    // Get all table and view names
+    // Get all table and view names with SQL definitions
     const tableRows = db.prepare(
-      `SELECT name, type FROM sqlite_master WHERE type IN ('table', 'view') AND name NOT LIKE 'sqlite_%' ORDER BY name`,
-    ).all() as { name: string; type: string }[];
+      `SELECT name, type, sql FROM sqlite_master WHERE type IN ('table', 'view') AND name NOT LIKE 'sqlite_%' ORDER BY name`,
+    ).all() as { name: string; type: string; sql: string | null }[];
 
-    const viewNames = new Set(tableRows.filter((r) => r.type === 'view').map((r) => r.name));
+    const viewDefMap = new Map<string, string | null>();
+    for (const r of tableRows) {
+      if (r.type === 'view') viewDefMap.set(r.name, r.sql);
+    }
     const tables: ITable[] = [];
 
     for (const tableRow of tableRows) {
@@ -911,13 +977,15 @@ function fetchSqliteSchema(connectionId: string): ITable[] {
         // DDL parsing failed — skip CHECK extraction
       }
 
+      const isView = viewDefMap.has(tableName);
       tables.push({
         id: crypto.randomUUID(),
         name: tableName,
         comment: '',
         columns: tableColumns,
         constraints,
-        isView: viewNames.has(tableName),
+        isView,
+        viewDefinition: isView ? (viewDefMap.get(tableName) ?? undefined) : undefined,
       });
     }
 

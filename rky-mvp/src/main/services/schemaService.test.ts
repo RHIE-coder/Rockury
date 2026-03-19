@@ -162,7 +162,10 @@ describe('schemaService.fetchRealSchema (mysql)', () => {
           CONSTRAINT_ORDINAL: 2,
           REFERENCED_ORDINAL: 2,
         },
-      ], undefined]);
+      ], undefined])
+      .mockResolvedValueOnce([[], undefined])
+      .mockResolvedValueOnce([[], undefined])
+      .mockResolvedValueOnce([[], undefined]);
 
     mocks.createMysqlConnection.mockResolvedValue({ query });
     mocks.closeMysqlConnection.mockResolvedValue(undefined);
@@ -177,5 +180,152 @@ describe('schemaService.fetchRealSchema (mysql)', () => {
 
     const fk = detail!.constraints.find((c) => c.name === 'FK_operation_record_self_measurement_detail');
     expect(fk?.reference?.column).toBe('biz_site_code, measured_date');
+  });
+});
+
+describe('schemaService.fetchRealSchema (postgresql)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mocks.getConnectionConfig.mockReturnValue({
+      dbType: 'postgresql',
+      host: 'localhost',
+      port: 5432,
+      database: 'app',
+      username: 'postgres',
+      password: 'pw',
+      sslEnabled: false,
+    });
+  });
+
+  it('deduplicates partition foreign keys and preserves composite references', async () => {
+    const query = vi.fn()
+      .mockResolvedValueOnce({
+        rows: [
+          {
+            table_name: 'payments',
+            column_name: 'id',
+            ordinal_position: 1,
+            column_default: 'uuid_generate_v4()',
+            is_nullable: 'NO',
+            data_type: 'uuid',
+            udt_name: 'uuid',
+            is_identity: 'NO',
+          },
+          {
+            table_name: 'payments',
+            column_name: 'order_id',
+            ordinal_position: 2,
+            column_default: null,
+            is_nullable: 'NO',
+            data_type: 'uuid',
+            udt_name: 'uuid',
+            is_identity: 'NO',
+          },
+          {
+            table_name: 'payments',
+            column_name: 'order_created_at',
+            ordinal_position: 3,
+            column_default: null,
+            is_nullable: 'NO',
+            data_type: 'timestamp with time zone',
+            udt_name: 'timestamptz',
+            is_identity: 'NO',
+          },
+        ],
+      })
+      .mockResolvedValueOnce({
+        rows: [
+          {
+            table_name: 'payments',
+            constraint_name: 'payments_pkey',
+            constraint_type: 'PRIMARY KEY',
+            column_name: 'id',
+            foreign_table_name: null,
+            foreign_column_name: null,
+            update_rule: null,
+            delete_rule: null,
+          },
+          {
+            table_name: 'payments',
+            constraint_name: 'payments_order_id_order_created_at_fkey',
+            constraint_type: 'FOREIGN KEY',
+            column_name: 'order_id',
+            foreign_table_name: 'orders',
+            foreign_column_name: 'id',
+            update_rule: 'RESTRICT',
+            delete_rule: 'RESTRICT',
+          },
+          {
+            table_name: 'payments',
+            constraint_name: 'payments_order_id_order_created_at_fkey',
+            constraint_type: 'FOREIGN KEY',
+            column_name: 'order_created_at',
+            foreign_table_name: 'orders',
+            foreign_column_name: 'created_at',
+            update_rule: 'RESTRICT',
+            delete_rule: 'RESTRICT',
+          },
+          {
+            table_name: 'payments',
+            constraint_name: 'payments_order_id_order_created_at_fkey4',
+            constraint_type: 'FOREIGN KEY',
+            column_name: 'order_id',
+            foreign_table_name: 'orders_default',
+            foreign_column_name: 'id',
+            update_rule: 'RESTRICT',
+            delete_rule: 'RESTRICT',
+          },
+          {
+            table_name: 'payments',
+            constraint_name: 'payments_order_id_order_created_at_fkey4',
+            constraint_type: 'FOREIGN KEY',
+            column_name: 'order_created_at',
+            foreign_table_name: 'orders_default',
+            foreign_column_name: 'created_at',
+            update_rule: 'RESTRICT',
+            delete_rule: 'RESTRICT',
+          },
+        ],
+      })
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({
+        rows: [
+          {
+            child_table: 'orders_default',
+            parent_table: 'orders',
+          },
+        ],
+      });
+
+    mocks.createPgConnection.mockResolvedValue({ query });
+    mocks.closePgConnection.mockResolvedValue(undefined);
+
+    const tables = await schemaService.fetchRealSchema('conn-pg');
+
+    const payments = tables.find((t) => t.name === 'payments');
+    expect(payments).toBeDefined();
+
+    const fkConstraints = payments!.constraints.filter((c) => c.type === 'FK');
+    expect(fkConstraints).toHaveLength(1);
+    expect(fkConstraints[0]).toMatchObject({
+      name: 'payments_order_id_order_created_at_fkey',
+      columns: ['order_id', 'order_created_at'],
+      reference: {
+        table: 'orders',
+        column: 'id, created_at',
+      },
+    });
+
+    expect(payments!.columns.find((c) => c.name === 'order_id')?.reference).toMatchObject({
+      table: 'orders',
+      column: 'id',
+    });
+    expect(payments!.columns.find((c) => c.name === 'order_created_at')?.reference).toMatchObject({
+      table: 'orders',
+      column: 'created_at',
+    });
   });
 });

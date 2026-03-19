@@ -232,7 +232,7 @@ ALTER TABLE query_history ADD COLUMN dml_type TEXT;
 ```
 
 **동작:**
-- Query 리스트: 순서 표시, 드래그로 순서 변경
+- Query 리스트: 순서 표시, 드래그로 순서 변경, 호버 시 SQL 미리보기 툴팁, 클릭 시 아코디언으로 전체 SQL 펼침/접힘
 - 개별 실행 버튼 + 전체 실행(Run All)
 - 전체 실행 시 하나의 트랜잭션 (원자적)
 - SELECT 결과 → 클릭 시 모달(CollectionResultModal)로 표시

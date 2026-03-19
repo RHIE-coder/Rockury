@@ -7,11 +7,34 @@ export function quoteIdentifier(name: string, dbType: TDbType): string {
   return `\`${name.replace(/`/g, '``')}\``;
 }
 
-export function escapeValue(value: unknown): string {
+const BOOL_TYPES = /^(boolean|bool|tinyint\(1\)|bit)$/i;
+const NUMERIC_TYPES = /^(int|integer|bigint|smallint|tinyint|mediumint|serial|bigserial|real|float|double|decimal|numeric|money|smallmoney)/i;
+const DATE_TYPES = /^(date|time|datetime|timestamp|timestamptz|timetz)/i;
+
+export function escapeValue(value: unknown, dataType?: string): string {
   if (value === null || value === undefined) return 'NULL';
   if (typeof value === 'number') return String(value);
-  if (typeof value === 'boolean') return value ? '1' : '0';
+  if (typeof value === 'boolean') return value ? 'TRUE' : 'FALSE';
+
   const str = String(value);
+  if (str === '') return 'NULL';
+
+  if (dataType) {
+    // Boolean columns: 'true'/'false' strings → TRUE/FALSE
+    if (BOOL_TYPES.test(dataType)) {
+      return (str.toLowerCase() === 'true' || str === '1') ? 'TRUE' : 'FALSE';
+    }
+    // Numeric columns: pass through without quotes
+    if (NUMERIC_TYPES.test(dataType) && !isNaN(Number(str))) {
+      return str;
+    }
+    // Date/time columns: normalize ISO T-separator to space
+    if (DATE_TYPES.test(dataType)) {
+      const normalized = str.replace('T', ' ');
+      return `'${normalized.replace(/'/g, "''")}'`;
+    }
+  }
+
   return `'${str.replace(/'/g, "''")}'`;
 }
 
@@ -58,13 +81,14 @@ export interface IInsertParams {
   dbType: TDbType;
   columns: string[];
   values: Record<string, unknown>;
+  columnTypes?: Record<string, string>;
 }
 
 export function buildInsertQuery(params: IInsertParams): string {
-  const { table, dbType, columns, values } = params;
+  const { table, dbType, columns, values, columnTypes } = params;
   const q = (name: string) => quoteIdentifier(name, dbType);
   const cols = columns.map(q).join(', ');
-  const vals = columns.map((c) => escapeValue(values[c] ?? null)).join(', ');
+  const vals = columns.map((c) => escapeValue(values[c] ?? null, columnTypes?.[c])).join(', ');
   return `INSERT INTO ${q(table)} (${cols}) VALUES (${vals})`;
 }
 
@@ -74,16 +98,17 @@ export interface IUpdateParams {
   pkColumns: string[];
   pkValues: Record<string, unknown>;
   changes: Record<string, unknown>;
+  columnTypes?: Record<string, string>;
 }
 
 export function buildUpdateQuery(params: IUpdateParams): string {
-  const { table, dbType, pkColumns, pkValues, changes } = params;
+  const { table, dbType, pkColumns, pkValues, changes, columnTypes } = params;
   const q = (name: string) => quoteIdentifier(name, dbType);
   const setClauses = Object.entries(changes)
-    .map(([col, val]) => `${q(col)} = ${escapeValue(val)}`)
+    .map(([col, val]) => `${q(col)} = ${escapeValue(val, columnTypes?.[col])}`)
     .join(', ');
   const whereClauses = pkColumns
-    .map((pk) => `${q(pk)} = ${escapeValue(pkValues[pk])}`)
+    .map((pk) => `${q(pk)} = ${escapeValue(pkValues[pk], columnTypes?.[pk])}`)
     .join(' AND ');
   return `UPDATE ${q(table)} SET ${setClauses} WHERE ${whereClauses}`;
 }

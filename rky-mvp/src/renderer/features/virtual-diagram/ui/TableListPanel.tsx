@@ -1,11 +1,14 @@
-import { useEffect, useRef, useState, useMemo } from 'react';
+import { useEffect, useRef, useState, useMemo, useCallback } from 'react';
 import { createPortal } from 'react-dom';
-import { Table2, Eye as EyeIcon, EyeOff, Trash2, Check, X, GripVertical, ChevronDown, ChevronRight, GitBranch } from 'lucide-react';
+import { Table2, Eye as EyeIcon, EyeOff, Trash2, Check, X, GripVertical, ChevronDown, ChevronRight, GitBranch, ShieldCheck } from 'lucide-react';
 import { DndContext, closestCenter, PointerSensor, useSensor, useSensors, type DragEndEvent, DragOverlay } from '@dnd-kit/core';
 import { SortableContext, verticalListSortingStrategy, useSortable, arrayMove } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { Button } from '@/shared/components/ui/button';
 import type { ITable, ISearchResult } from '~/shared/types/db';
+import { ConstraintList } from '@/shared/components/ConstraintList';
+
+type TTab = 'tables' | 'constraints';
 
 interface TableListPanelProps {
   tables: ITable[];
@@ -205,9 +208,16 @@ export function TableListPanel({
   onTableDelete,
   onReorderTables,
 }: TableListPanelProps) {
+  const [tab, setTab] = useState<TTab>('tables');
   const itemRefs = useRef<Record<string, HTMLButtonElement | null>>({});
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [activeDragId, setActiveDragId] = useState<string | null>(null);
+
+  const constraintCount = useMemo(() => {
+    let count = 0;
+    for (const t of tables) count += t.constraints.length;
+    return count;
+  }, [tables]);
 
   const matchedTableIds = new Set(
     searchResults.filter((r) => r.type === 'table').map((r) => r.tableId),
@@ -289,127 +299,160 @@ export function TableListPanel({
 
   return (
     <div className="flex h-full w-[200px] shrink-0 flex-col border-r border-border bg-background">
-      {/* Header */}
-      <div className="flex items-center justify-between border-b border-border px-3 py-2">
-        <div className="flex items-center gap-1.5">
-          <Table2 className="size-4 text-muted-foreground" />
-          <span className="text-xs font-semibold">Objects ({tables.length})</span>
-        </div>
-        <div className="flex items-center gap-0.5">
-          {hasHidden && onShowAll && (
-            <Button variant="ghost" size="xs" onClick={onShowAll} title="Show all tables">
-              <EyeIcon className="size-3" />
-            </Button>
-          )}
-        </div>
-      </div>
-
-      {/* Table list */}
-      <div className="flex-1 overflow-y-auto">
-        {tables.length === 0 ? (
-          <p className="p-3 text-xs text-muted-foreground">No tables yet.</p>
-        ) : (
-          <DndContext
-            sensors={sensors}
-            collisionDetection={closestCenter}
-            onDragStart={(e) => setActiveDragId(String(e.active.id))}
-            onDragEnd={handleDragEnd}
-          >
-            <SortableContext items={tables.map((t) => t.id)} strategy={verticalListSortingStrategy}>
-              {/* Tables section */}
-              <div>
-                <button
-                  type="button"
-                  className="flex w-full items-center gap-1.5 px-2 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground hover:bg-muted/50"
-                  onClick={() => setTablesExpanded((v) => !v)}
-                >
-                  {tablesExpanded ? <ChevronDown className="size-3" /> : <ChevronRight className="size-3" />}
-                  <Table2 className="size-3" />
-                  <span className="flex-1 text-left">Tables</span>
-                  <span className="rounded-full bg-muted px-1.5 py-0.5 text-[9px]">{regularTables.length}</span>
-                </button>
-                {tablesExpanded && (
-                  <div className="pb-1">
-                    {renderTableItems(regularTables)}
-                  </div>
-                )}
-              </div>
-
-              {/* Partitions section */}
-              {partitionTables.length > 0 && (
-                <div className="border-t border-border/50">
-                  <button
-                    type="button"
-                    className="flex w-full items-center gap-1.5 px-2 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground hover:bg-muted/50"
-                    onClick={() => setPartitionsExpanded((v) => !v)}
-                  >
-                    {partitionsExpanded ? <ChevronDown className="size-3" /> : <ChevronRight className="size-3" />}
-                    <GitBranch className="size-3" />
-                    <span className="flex-1 text-left">Partitions</span>
-                    <span className="rounded-full bg-muted px-1.5 py-0.5 text-[9px]">{partitionTables.length}</span>
-                  </button>
-                  {partitionsExpanded && (
-                    <div className="pb-1">
-                      {[...partitionGroups.entries()].map(([parentName, children]) => (
-                        <div key={parentName}>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setCollapsedParents((prev) => {
-                                const next = new Set(prev);
-                                if (next.has(parentName)) next.delete(parentName);
-                                else next.add(parentName);
-                                return next;
-                              });
-                            }}
-                            className="flex w-full items-center gap-1 px-2 py-1 text-[10px] text-muted-foreground hover:bg-muted/50"
-                          >
-                            {collapsedParents.has(parentName) ? (
-                              <ChevronRight className="size-2.5" />
-                            ) : (
-                              <ChevronDown className="size-2.5" />
-                            )}
-                            <span className="truncate font-medium">{parentName}</span>
-                            <span className="ml-auto text-[9px] text-muted-foreground/60">{children.length}</span>
-                          </button>
-                          {!collapsedParents.has(parentName) && renderTableItems(children)}
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {/* Views section */}
-              {viewTables.length > 0 && (
-                <div className="border-t border-border/50">
-                  <button
-                    type="button"
-                    className="flex w-full items-center gap-1.5 px-2 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground hover:bg-muted/50"
-                    onClick={() => setViewsExpanded((v) => !v)}
-                  >
-                    {viewsExpanded ? <ChevronDown className="size-3" /> : <ChevronRight className="size-3" />}
-                    <EyeIcon className="size-3" />
-                    <span className="flex-1 text-left">Views</span>
-                    <span className="rounded-full bg-muted px-1.5 py-0.5 text-[9px]">{viewTables.length}</span>
-                  </button>
-                  {viewsExpanded && (
-                    <div className="pb-1">
-                      {renderTableItems(viewTables)}
-                    </div>
-                  )}
-                </div>
-              )}
-            </SortableContext>
-            {createPortal(
-              <DragOverlay>
-                {draggedTable ? <TableDragOverlay table={draggedTable} /> : null}
-              </DragOverlay>,
-              document.body,
-            )}
-          </DndContext>
+      {/* Tab bar */}
+      <div className="flex items-center gap-1 border-b border-border px-2 py-1.5">
+        <button
+          type="button"
+          onClick={() => setTab('tables')}
+          className={`flex items-center gap-1 rounded-md px-2 py-1 text-[10px] font-medium transition-colors ${
+            tab === 'tables'
+              ? 'bg-primary/10 text-primary'
+              : 'text-muted-foreground hover:bg-muted hover:text-foreground'
+          }`}
+        >
+          Tables
+          <span className={`rounded-full px-1 py-px text-[9px] leading-none ${
+            tab === 'tables' ? 'bg-primary/20' : 'bg-muted'
+          }`}>{tables.length}</span>
+        </button>
+        <button
+          type="button"
+          onClick={() => setTab('constraints')}
+          className={`flex items-center gap-1 rounded-md px-2 py-1 text-[10px] font-medium transition-colors ${
+            tab === 'constraints'
+              ? 'bg-primary/10 text-primary'
+              : 'text-muted-foreground hover:bg-muted hover:text-foreground'
+          }`}
+        >
+          Constraints
+          <span className={`rounded-full px-1 py-px text-[9px] leading-none ${
+            tab === 'constraints' ? 'bg-primary/20' : 'bg-muted'
+          }`}>{constraintCount}</span>
+        </button>
+        {hasHidden && onShowAll && tab === 'tables' && (
+          <Button variant="ghost" size="xs" onClick={onShowAll} title="Show all tables" className="ml-auto shrink-0">
+            <EyeIcon className="size-3" />
+          </Button>
         )}
       </div>
+
+      {/* Tab content */}
+      {tab === 'tables' ? (
+        <div className="flex-1 overflow-y-auto">
+          {tables.length === 0 ? (
+            <p className="p-3 text-xs text-muted-foreground">No tables yet.</p>
+          ) : (
+            <DndContext
+              sensors={sensors}
+              collisionDetection={closestCenter}
+              onDragStart={(e) => setActiveDragId(String(e.active.id))}
+              onDragEnd={handleDragEnd}
+            >
+              <SortableContext items={tables.map((t) => t.id)} strategy={verticalListSortingStrategy}>
+                {/* Tables section */}
+                <div>
+                  <button
+                    type="button"
+                    className="flex w-full items-center gap-1.5 px-2 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground hover:bg-muted/50"
+                    onClick={() => setTablesExpanded((v) => !v)}
+                  >
+                    {tablesExpanded ? <ChevronDown className="size-3" /> : <ChevronRight className="size-3" />}
+                    <Table2 className="size-3" />
+                    <span className="flex-1 text-left">Tables</span>
+                    <span className="rounded-full bg-muted px-1.5 py-0.5 text-[9px]">{regularTables.length}</span>
+                  </button>
+                  {tablesExpanded && (
+                    <div className="pb-1">
+                      {renderTableItems(regularTables)}
+                    </div>
+                  )}
+                </div>
+
+                {/* Partitions section */}
+                {partitionTables.length > 0 && (
+                  <div className="border-t border-border/50">
+                    <button
+                      type="button"
+                      className="flex w-full items-center gap-1.5 px-2 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground hover:bg-muted/50"
+                      onClick={() => setPartitionsExpanded((v) => !v)}
+                    >
+                      {partitionsExpanded ? <ChevronDown className="size-3" /> : <ChevronRight className="size-3" />}
+                      <GitBranch className="size-3" />
+                      <span className="flex-1 text-left">Partitions</span>
+                      <span className="rounded-full bg-muted px-1.5 py-0.5 text-[9px]">{partitionTables.length}</span>
+                    </button>
+                    {partitionsExpanded && (
+                      <div className="pb-1">
+                        {[...partitionGroups.entries()].map(([parentName, children]) => (
+                          <div key={parentName}>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setCollapsedParents((prev) => {
+                                  const next = new Set(prev);
+                                  if (next.has(parentName)) next.delete(parentName);
+                                  else next.add(parentName);
+                                  return next;
+                                });
+                              }}
+                              className="flex w-full items-center gap-1 px-2 py-1 text-[10px] text-muted-foreground hover:bg-muted/50"
+                            >
+                              {collapsedParents.has(parentName) ? (
+                                <ChevronRight className="size-2.5" />
+                              ) : (
+                                <ChevronDown className="size-2.5" />
+                              )}
+                              <span className="truncate font-medium">{parentName}</span>
+                              <span className="ml-auto text-[9px] text-muted-foreground/60">{children.length}</span>
+                            </button>
+                            {!collapsedParents.has(parentName) && renderTableItems(children)}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Views section */}
+                {viewTables.length > 0 && (
+                  <div className="border-t border-border/50">
+                    <button
+                      type="button"
+                      className="flex w-full items-center gap-1.5 px-2 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground hover:bg-muted/50"
+                      onClick={() => setViewsExpanded((v) => !v)}
+                    >
+                      {viewsExpanded ? <ChevronDown className="size-3" /> : <ChevronRight className="size-3" />}
+                      <EyeIcon className="size-3" />
+                      <span className="flex-1 text-left">Views</span>
+                      <span className="rounded-full bg-muted px-1.5 py-0.5 text-[9px]">{viewTables.length}</span>
+                    </button>
+                    {viewsExpanded && (
+                      <div className="pb-1">
+                        {renderTableItems(viewTables)}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </SortableContext>
+
+              {createPortal(
+                <DragOverlay>
+                  {draggedTable ? <TableDragOverlay table={draggedTable} /> : null}
+                </DragOverlay>,
+                document.body,
+              )}
+            </DndContext>
+          )}
+        </div>
+      ) : (
+        <ConstraintList
+          tables={tables}
+          onSelect={(tableName) => {
+            const t = tables.find((tb) => tb.name === tableName);
+            if (t) onTableSelect(t.id);
+          }}
+        />
+      )}
     </div>
   );
 }

@@ -6,11 +6,12 @@ import {
   type ColumnDef,
   type VisibilityState,
 } from '@tanstack/react-table';
-import { ArrowUp, ArrowDown, ArrowUpDown, Braces, Link } from 'lucide-react';
-import type { IQueryResult, IColumn, IForeignKeyRef } from '~/shared/types/db';
+import { ArrowUp, ArrowDown, ArrowUpDown, Braces } from 'lucide-react';
+import type { IQueryResult, IColumn } from '~/shared/types/db';
 import { CellEditor } from './CellEditor';
 import { JsonEditorModal } from './JsonEditorModal';
-import { FkLookupModal } from './FkLookupModal';
+import { formatDateForDisplay } from '../lib/timezone';
+import type { TDateDisplayMode } from '../lib/timezone';
 import type { IPendingChange } from '../model/usePendingChanges';
 
 type TRow = Record<string, unknown>;
@@ -18,6 +19,9 @@ type TRow = Record<string, unknown>;
 /** Format a cell value for display — handles objects, arrays, dates */
 function formatCellValue(val: unknown): string {
   if (val === null || val === undefined) return '';
+  if (val instanceof Date) {
+    return isNaN(val.getTime()) ? '' : val.toISOString();
+  }
   if (typeof val === 'object') {
     try {
       return JSON.stringify(val);
@@ -81,6 +85,12 @@ interface DataGridProps {
   /** Connection info for FK lookup */
   connectionId?: string;
   dbType?: 'mysql' | 'mariadb' | 'postgresql' | 'sqlite';
+  /** Called when user wants to look up an FK value */
+  onFkLookup?: (row: TRow, column: string) => void;
+  /** Timezone for date column conversion */
+  timezone?: string;
+  /** Global date display mode: raw / utc / local */
+  dateDisplayMode?: TDateDisplayMode;
 }
 
 export function DataGrid({
@@ -99,10 +109,31 @@ export function DataGrid({
   columnMeta,
   connectionId,
   dbType = 'mysql',
+  onFkLookup,
+  timezone,
+  dateDisplayMode = 'raw',
 }: DataGridProps) {
   const [editingCell, setEditingCell] = useState<{ rowIndex: number; column: string } | null>(null);
   const [jsonEditor, setJsonEditor] = useState<{ row: TRow; column: string; value: unknown } | null>(null);
-  const [fkLookup, setFkLookup] = useState<{ row: TRow; column: string; ref: IForeignKeyRef } | null>(null);
+
+  // Floating hover preview
+  const [hoverCell, setHoverCell] = useState<{ rect: DOMRect; text: string } | null>(null);
+  const hoverTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const handleCellMouseEnter = useCallback((e: React.MouseEvent<HTMLTableCellElement>, text: string) => {
+    if (!text || text.length < 10) return;
+    const rect = e.currentTarget.getBoundingClientRect();
+    if (hoverTimerRef.current) clearTimeout(hoverTimerRef.current);
+    hoverTimerRef.current = setTimeout(() => {
+      setHoverCell({ rect, text });
+    }, 250);
+  }, []);
+
+  const handleCellMouseLeave = useCallback(() => {
+    if (hoverTimerRef.current) { clearTimeout(hoverTimerRef.current); hoverTimerRef.current = null; }
+    setHoverCell(null);
+  }, []);
+
 
   // Build a column name -> metadata map for type detection, keyTypes, references
   const columnTypeMap = useMemo(() => {
@@ -169,18 +200,26 @@ export function DataGrid({
         const isSorted = orderBy?.column === col;
         const dir = isSorted ? orderBy.direction : null;
         const colInfo = columnInfoMap.get(col);
+        const dataType = columnTypeMap.get(col);
         return (
-          <button
-            type="button"
-            className="flex items-center gap-1 hover:text-foreground"
-            onClick={() => onToggleSort(col)}
-          >
-            <ColumnKeyBadges keyTypes={colInfo?.keyTypes} />
-            <span>{col}</span>
-            {dir === 'ASC' && <ArrowUp className="size-3" />}
-            {dir === 'DESC' && <ArrowDown className="size-3" />}
-            {!dir && <ArrowUpDown className="size-3 opacity-30" />}
-          </button>
+          <div className="flex flex-col items-start">
+            <button
+              type="button"
+              className="flex items-center gap-1 hover:text-foreground"
+              onClick={() => onToggleSort(col)}
+            >
+              <ColumnKeyBadges keyTypes={colInfo?.keyTypes} />
+              <span>{col}</span>
+              {dir === 'ASC' && <ArrowUp className="size-3" />}
+              {dir === 'DESC' && <ArrowDown className="size-3" />}
+              {!dir && <ArrowUpDown className="size-3 opacity-30" />}
+            </button>
+            {dataType && (
+              <span className="text-[9px] font-normal text-muted-foreground/70">
+                {dataType}
+              </span>
+            )}
+          </div>
         );
       },
       cell: ({ getValue, row }) => {
@@ -216,32 +255,10 @@ export function DataGrid({
             );
           }
 
-          // FK columns: show CellEditor with a lookup button
+          // FK columns: no direct editing — handled via onDoubleClick → onFkLookup
           if (fkRef) {
-            return (
-              <CellEditor
-                value={displayVal}
-                onSave={(newVal) => {
-                  onCellSave?.(row.original, col, newVal);
-                  setEditingCell(null);
-                }}
-                onCancel={() => setEditingCell(null)}
-                extraAction={
-                  <button
-                    type="button"
-                    onMouseDown={(e) => e.preventDefault()}
-                    onClick={() => {
-                      setFkLookup({ row: row.original, column: col, ref: fkRef });
-                      setEditingCell(null);
-                    }}
-                    className="shrink-0 rounded bg-blue-500/20 px-1 py-0.5 text-[9px] font-bold text-blue-600 hover:bg-blue-500/30 dark:text-blue-400"
-                    title={`Lookup from ${fkRef.table}.${fkRef.column}`}
-                  >
-                    <Link className="size-3" />
-                  </button>
-                }
-              />
-            );
+            setEditingCell(null);
+            return null;
           }
 
           // Date columns use datetime-local input
@@ -273,6 +290,10 @@ export function DataGrid({
 
         // Wrap display value with modified indicator
         const modifiedClass = isCellModified ? 'rounded-sm bg-yellow-500/20 px-1 -mx-1' : '';
+        // Date columns always use formatDateForDisplay
+        const titleText = isDate && displayVal != null
+          ? formatDateForDisplay(displayVal, dateDisplayMode, timezone ?? '')
+          : formatCellValue(displayVal);
 
         // Display
         if (displayVal === null) {
@@ -284,18 +305,18 @@ export function DataGrid({
           return (
             <span className={`flex items-center gap-1 truncate ${modifiedClass}`}>
               <Braces className="size-3 shrink-0 text-muted-foreground" />
-              <span className="truncate">{formatCellValue(displayVal)}</span>
+              <span className="truncate">{titleText}</span>
             </span>
           );
         }
 
-        return <span className={`truncate ${modifiedClass}`}>{formatCellValue(displayVal)}</span>;
+        return <span className={`truncate ${modifiedClass}`}>{titleText}</span>;
       },
     }));
 
     return [rowNumCol, ...dataCols];
   // eslint-disable-next-line react-hooks/exhaustive-deps -- pendingChanges forces re-render so cells read latest refs
-  }, [result.columns, pageOffset, orderBy, onToggleSort, editingCell, getRowChange, onCellSave, columnTypeMap, columnInfoMap, pendingChanges]);
+  }, [result.columns, pageOffset, orderBy, onToggleSort, editingCell, getRowChange, onCellSave, columnTypeMap, columnInfoMap, pendingChanges, timezone, dateDisplayMode]);
 
   const table = useReactTable({
     data: allRows,
@@ -341,15 +362,25 @@ export function DataGrid({
                     const colId = cell.column.id;
                     const isEditable = canEdit && colId !== '__rowNum' && change?.type !== 'delete';
                     const isEditing = editingCell?.rowIndex === row.index && editingCell?.column === colId;
+                    const cellVal = colId === '__rowNum' ? '' : formatCellValue(
+                      change ? change.modified[colId] : row.original[colId],
+                    );
                     return (
                       <td
                         key={cell.id}
                         className={`max-w-xs truncate border-b border-r border-border px-3 py-1 font-mono ${
                           isEditable ? 'cursor-pointer' : ''
                         } ${isEditing ? 'relative overflow-visible' : ''}`}
+                        onMouseEnter={(e) => handleCellMouseEnter(e, cellVal)}
+                        onMouseLeave={handleCellMouseLeave}
                         onDoubleClick={() => {
                           if (isEditable) {
-                            // For JSON columns, open modal directly
+                            const colInfo = columnInfoMap.get(colId);
+                            const fkRef = colInfo?.reference ?? null;
+                            if (fkRef && onFkLookup) {
+                              onFkLookup(row.original, colId);
+                              return;
+                            }
                             const dataType = columnTypeMap.get(colId) ?? '';
                             const val = change ? change.modified[colId] : row.original[colId];
                             if (!isDateType(dataType) && (isJsonType(dataType) || (typeof val === 'object' && val !== null && !(val instanceof Date)))) {
@@ -377,6 +408,16 @@ export function DataGrid({
         </table>
       </div>
 
+      {/* Floating hover preview */}
+      {hoverCell && (
+        <div
+          className="pointer-events-none fixed z-50 max-w-md whitespace-pre-wrap break-all rounded-md border border-border bg-popover px-3 py-1.5 font-mono text-xs text-popover-foreground shadow-lg"
+          style={{ left: hoverCell.rect.left, top: hoverCell.rect.bottom + 2 }}
+        >
+          {hoverCell.text}
+        </div>
+      )}
+
       {/* JSON Editor Modal */}
       {jsonEditor && (
         <JsonEditorModal
@@ -390,25 +431,11 @@ export function DataGrid({
         />
       )}
 
-      {fkLookup && connectionId && (
-        <FkLookupModal
-          open
-          connectionId={connectionId}
-          dbType={dbType}
-          refTable={fkLookup.ref.table}
-          refColumn={fkLookup.ref.column}
-          columnName={fkLookup.column}
-          onSelect={(val) => {
-            onCellSave?.(fkLookup.row, fkLookup.column, val);
-          }}
-          onClose={() => setFkLookup(null)}
-        />
-      )}
     </>
   );
 }
 
-/** Inline date/time input for date columns */
+/** Inline date/time input — text-based to support ms/ns precision */
 function DateCellInput({
   value,
   dataType,
@@ -420,14 +447,13 @@ function DateCellInput({
   onSave: (value: unknown) => void;
   onCancel: () => void;
 }) {
-  const inputType = getDateInputType(dataType);
-  const initialValue = formatDateForInput(value, inputType);
-  const [text, setText] = useState(initialValue);
+  const hint = getDateHint(dataType);
+  const [text, setText] = useState(() => formatDateInitial(value));
 
   return (
-    <div className="absolute left-0 top-0 z-20 flex min-w-[240px] items-center gap-1 rounded border border-primary bg-background p-1 shadow-lg">
+    <div className="absolute left-0 top-0 z-20 flex min-w-[280px] flex-col gap-1 rounded border border-primary bg-background p-1.5 shadow-lg">
       <input
-        type={inputType}
+        type="text"
         value={text}
         onChange={(e) => setText(e.target.value)}
         onKeyDown={(e) => {
@@ -435,40 +461,75 @@ function DateCellInput({
           if (e.key === 'Escape') onCancel();
         }}
         autoFocus
-        className="w-full rounded border border-border bg-background px-1 py-0.5 text-xs font-mono outline-none focus:border-primary"
+        placeholder={hint}
+        className="w-full rounded border border-border bg-background px-1.5 py-1 text-xs font-mono outline-none focus:border-primary"
       />
-      <button
-        type="button"
-        onClick={() => onSave(text || null)}
-        className="shrink-0 rounded bg-primary px-1.5 py-0.5 text-[9px] font-bold text-primary-foreground"
-      >
-        OK
-      </button>
-      <button
-        type="button"
-        onClick={onCancel}
-        className="shrink-0 rounded bg-muted px-1.5 py-0.5 text-[9px] font-bold text-muted-foreground"
-      >
-        ESC
-      </button>
+      <div className="flex items-center gap-1">
+        <span className="flex-1 text-[9px] text-muted-foreground/60">{hint}</span>
+        <button
+          type="button"
+          onClick={() => {
+            const now = new Date();
+            const pad = (n: number, w = 2) => String(n).padStart(w, '0');
+            const ts = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())} ${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}.${pad(now.getMilliseconds(), 3)}`;
+            setText(ts);
+          }}
+          className="shrink-0 rounded bg-muted px-1.5 py-0.5 text-[9px] font-bold text-muted-foreground hover:text-foreground"
+          title="Insert current time"
+        >
+          NOW
+        </button>
+        <button
+          type="button"
+          onClick={() => onSave(text || null)}
+          className="shrink-0 rounded bg-primary px-1.5 py-0.5 text-[9px] font-bold text-primary-foreground"
+        >
+          OK
+        </button>
+        <button
+          type="button"
+          onClick={onCancel}
+          className="shrink-0 rounded bg-muted px-1.5 py-0.5 text-[9px] font-bold text-muted-foreground"
+        >
+          ESC
+        </button>
+      </div>
     </div>
   );
 }
 
-function getDateInputType(dataType: string): string {
-  const lower = dataType.toLowerCase();
-  if (lower.startsWith('time') && !lower.includes('stamp')) return 'time';
-  if (lower === 'date') return 'date';
-  if (lower === 'year') return 'number';
-  return 'datetime-local'; // datetime, timestamp
+/** Convert value to compact editable string: YYYY-MM-DD HH:mm:ss[.SSS] */
+function formatDateInitial(value: unknown): string {
+  if (value == null) return '';
+  if (value instanceof Date) {
+    if (isNaN(value.getTime())) return '';
+    const pad = (n: number, w = 2) => String(n).padStart(w, '0');
+    const ms = value.getUTCMilliseconds();
+    const base = `${value.getUTCFullYear()}-${pad(value.getUTCMonth() + 1)}-${pad(value.getUTCDate())} ${pad(value.getUTCHours())}:${pad(value.getUTCMinutes())}:${pad(value.getUTCSeconds())}`;
+    return ms > 0 ? `${base}.${pad(ms, 3)}` : base;
+  }
+  let str = String(value).trim();
+  // Strip quotes
+  if ((str.startsWith('"') && str.endsWith('"')) || (str.startsWith("'") && str.endsWith("'"))) {
+    str = str.slice(1, -1);
+  }
+  // If already compact-ish (YYYY-MM-DD ...) return as-is
+  if (/^\d{4}-\d{2}-\d{2}/.test(str)) {
+    return str.replace('T', ' ').replace('Z', '');
+  }
+  // Fallback: parse and format
+  const d = new Date(str);
+  if (isNaN(d.getTime())) return str;
+  const pad = (n: number, w = 2) => String(n).padStart(w, '0');
+  const ms = d.getUTCMilliseconds();
+  const base = `${d.getUTCFullYear()}-${pad(d.getUTCMonth() + 1)}-${pad(d.getUTCDate())} ${pad(d.getUTCHours())}:${pad(d.getUTCMinutes())}:${pad(d.getUTCSeconds())}`;
+  return ms > 0 ? `${base}.${pad(ms, 3)}` : base;
 }
 
-function formatDateForInput(value: unknown, inputType: string): string {
-  if (value === null || value === undefined) return '';
-  const str = String(value);
-  if (inputType === 'datetime-local') {
-    // Convert "2024-01-15 12:30:00" → "2024-01-15T12:30:00"
-    return str.replace(' ', 'T').slice(0, 19);
-  }
-  return str;
+function getDateHint(dataType: string): string {
+  const lower = dataType.toLowerCase();
+  if (lower.startsWith('time') && !lower.includes('stamp')) return 'HH:mm:ss[.SSS]';
+  if (lower === 'date') return 'YYYY-MM-DD';
+  if (lower === 'year') return 'YYYY';
+  return 'YYYY-MM-DD HH:mm:ss[.SSS]';
 }

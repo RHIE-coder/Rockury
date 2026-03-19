@@ -1,4 +1,8 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useMemo } from 'react';
+import CodeMirror from '@uiw/react-codemirror';
+import { json, jsonParseLinter } from '@codemirror/lang-json';
+import { linter, lintGutter } from '@codemirror/lint';
+import { EditorView } from '@codemirror/view';
 import {
   Dialog,
   DialogContent,
@@ -34,17 +38,33 @@ function parseJsonValue(text: string): unknown {
   return JSON.parse(trimmed);
 }
 
+function validateJson(text: string): string | null {
+  const trimmed = text.trim();
+  if (trimmed === '') return null;
+  try {
+    JSON.parse(trimmed);
+    return null;
+  } catch (e) {
+    return (e as Error).message;
+  }
+}
+
 export function JsonEditorModal({ open, value, columnName, onSave, onClose }: JsonEditorModalProps) {
   const [text, setText] = useState(() => formatJson(value));
-  const [error, setError] = useState<string | null>(null);
+
+  const error = useMemo(() => validateJson(text), [text]);
+
+  const extensions = useMemo(
+    () => [json(), linter(jsonParseLinter()), lintGutter(), EditorView.lineWrapping],
+    [],
+  );
 
   const handleFormat = useCallback(() => {
     try {
       const parsed = JSON.parse(text);
       setText(JSON.stringify(parsed, null, 2));
-      setError(null);
-    } catch (e) {
-      setError((e as Error).message);
+    } catch {
+      // error already shown via lint
     }
   }, [text]);
 
@@ -52,9 +72,8 @@ export function JsonEditorModal({ open, value, columnName, onSave, onClose }: Js
     try {
       const parsed = JSON.parse(text);
       setText(JSON.stringify(parsed));
-      setError(null);
-    } catch (e) {
-      setError((e as Error).message);
+    } catch {
+      // error already shown via lint
     }
   }, [text]);
 
@@ -69,8 +88,8 @@ export function JsonEditorModal({ open, value, columnName, onSave, onClose }: Js
       const parsed = parseJsonValue(trimmed);
       onSave(typeof value === 'string' ? JSON.stringify(parsed) : parsed);
       onClose();
-    } catch (e) {
-      setError((e as Error).message);
+    } catch {
+      // error already shown via lint
     }
   }, [text, value, onSave, onClose]);
 
@@ -84,40 +103,48 @@ export function JsonEditorModal({ open, value, columnName, onSave, onClose }: Js
         </DialogHeader>
 
         <div className="space-y-2">
-          <div className="flex gap-1.5">
-            <Button variant="outline" size="xs" onClick={handleFormat}>
+          <div className="flex items-center gap-1.5">
+            <Button variant="outline" size="xs" onClick={handleFormat} disabled={!!error}>
               Format
             </Button>
-            <Button variant="outline" size="xs" onClick={handleMinify}>
+            <Button variant="outline" size="xs" onClick={handleMinify} disabled={!!error}>
               Minify
             </Button>
             <Button
               variant="outline"
               size="xs"
-              onClick={() => { setText(''); setError(null); }}
+              onClick={() => setText('')}
             >
               Clear
             </Button>
+            {error && (
+              <span className="ml-2 text-[10px] text-destructive">{error}</span>
+            )}
           </div>
 
-          <textarea
-            value={text}
-            onChange={(e) => { setText(e.target.value); setError(null); }}
-            className="h-64 w-full resize-y rounded-md border border-border bg-muted/30 p-3 font-mono text-xs outline-none focus:border-primary"
-            spellCheck={false}
-            placeholder="Enter JSON value..."
-          />
-
-          {error && (
-            <p className="text-xs text-destructive">{error}</p>
-          )}
+          <div className="overflow-hidden rounded-md border border-border">
+            <CodeMirror
+              value={text}
+              height="280px"
+              extensions={extensions}
+              onChange={(val) => setText(val)}
+              className="text-xs"
+              basicSetup={{
+                lineNumbers: true,
+                foldGutter: true,
+                bracketMatching: true,
+                closeBrackets: true,
+                autocompletion: false,
+              }}
+            />
+          </div>
         </div>
 
         <DialogFooter>
           <Button variant="outline" size="xs" onClick={onClose}>
             Cancel
           </Button>
-          <Button variant="default" size="xs" onClick={handleSave}>
+          <Button variant="default" size="xs" onClick={handleSave} disabled={!!error}>
             Save
           </Button>
         </DialogFooter>
