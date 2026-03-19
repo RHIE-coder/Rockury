@@ -266,6 +266,7 @@ export function FileTreePanel({
   const [dragActiveId, setDragActiveId] = useState<string | null>(null);
   const [dropTargetFolderId, setDropTargetFolderId] = useState<string | null | undefined>(undefined);
   const [lastClickedFolderId, setLastClickedFolderId] = useState<string | null>(null);
+  const [hoveredItem, setHoveredItem] = useState<{ id: string; rect: DOMRect } | null>(null);
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
@@ -644,49 +645,41 @@ export function FileTreePanel({
     return (
       <DraggableRow key={item.id} id={item.id} type="item" isDragActive={isDragging}>
         {({ ref, listeners, attributes }) => (
-          <div className="relative">
-            <div
-              className={`peer group flex w-full cursor-pointer items-center gap-1 py-1 text-xs transition-colors hover:bg-muted ${
-                isSelected ? 'bg-primary/10 font-semibold text-primary' : ''
-              }`}
-              style={{ paddingLeft: `${8 + depth * 16}px`, paddingRight: '8px' }}
-              onClick={(e) => { e.stopPropagation(); onSelect(item.id); }}
-              onDoubleClick={(e) => { e.stopPropagation(); startEdit(item.id, item.name, 'item'); }}
-              onContextMenu={(e) => handleItemContextMenu(e, item)}
-              role="button"
-              tabIndex={0}
+          <div
+            className={`group flex w-full cursor-pointer items-center gap-1 py-1 text-xs transition-colors hover:bg-muted ${
+              isSelected ? 'bg-primary/10 font-semibold text-primary' : ''
+            }`}
+            style={{ paddingLeft: `${8 + depth * 16}px`, paddingRight: '8px' }}
+            onClick={(e) => { e.stopPropagation(); onSelect(item.id); }}
+            onDoubleClick={(e) => { e.stopPropagation(); startEdit(item.id, item.name, 'item'); }}
+            onContextMenu={(e) => handleItemContextMenu(e, item)}
+            onMouseEnter={(e) => {
+              const rect = e.currentTarget.getBoundingClientRect();
+              setHoveredItem({ id: item.id, rect });
+            }}
+            onMouseLeave={() => setHoveredItem((prev) => prev?.id === item.id ? null : prev)}
+            role="button"
+            tabIndex={0}
+          >
+            <span
+              ref={ref as React.Ref<HTMLSpanElement>}
+              {...listeners}
+              {...attributes}
+              className="cursor-grab opacity-0 group-hover:opacity-40"
+              onClick={(e) => e.stopPropagation()}
             >
-              <span
-                ref={ref as React.Ref<HTMLSpanElement>}
-                {...listeners}
-                {...attributes}
-                className="cursor-grab opacity-0 group-hover:opacity-40"
-                onClick={(e) => e.stopPropagation()}
-              >
-                <GripVertical className="size-3" />
-              </span>
-              <ItemIcon className="size-3 shrink-0 text-muted-foreground" />
-              {isEditing ? (
-                <InlineInput
-                  value={editValue}
-                  onChange={setEditValue}
-                  onCommit={commitEdit}
-                  onCancel={cancelEdit}
-                />
-              ) : (
-                <span className="min-w-0 flex-1 truncate">{item.name}</span>
-              )}
-            </div>
-            {/* Hover card — shows after 300ms delay via CSS */}
-            {!isEditing && (item.name || item.description) && (
-              <div className="pointer-events-none invisible absolute left-[220px] top-0 z-50 w-52 rounded-md border border-border bg-popover p-2 shadow-lg opacity-0 transition-all delay-300 peer-hover:visible peer-hover:opacity-100">
-                <p className="text-xs font-semibold truncate">{item.name}</p>
-                {item.description ? (
-                  <p className="mt-1 text-[11px] text-muted-foreground line-clamp-3">{item.description}</p>
-                ) : (
-                  <p className="mt-1 text-[11px] italic text-muted-foreground/50">No description</p>
-                )}
-              </div>
+              <GripVertical className="size-3" />
+            </span>
+            <ItemIcon className="size-3 shrink-0 text-muted-foreground" />
+            {isEditing ? (
+              <InlineInput
+                value={editValue}
+                onChange={setEditValue}
+                onCommit={commitEdit}
+                onCancel={cancelEdit}
+              />
+            ) : (
+              <span className="min-w-0 flex-1 truncate">{item.name}</span>
             )}
           </div>
         )}
@@ -876,6 +869,25 @@ export function FileTreePanel({
           </div>
         </div>
       )}
+
+      {/* Hover card — fixed position, not clipped by overflow */}
+      {hoveredItem && (() => {
+        const item = items.find((i) => i.id === hoveredItem.id);
+        if (!item) return null;
+        return (
+          <div
+            className="pointer-events-none fixed z-50 w-52 rounded-md border border-border bg-popover p-2.5 shadow-lg"
+            style={{ left: hoveredItem.rect.right + 8, top: hoveredItem.rect.top }}
+          >
+            <p className="text-xs font-semibold">{item.name}</p>
+            {item.description ? (
+              <p className="mt-1 text-[11px] leading-relaxed text-muted-foreground line-clamp-4">{item.description}</p>
+            ) : (
+              <p className="mt-1 text-[11px] italic text-muted-foreground/50">No description</p>
+            )}
+          </div>
+        );
+      })()}
 
       {/* Delete alert for referenced collections */}
       {deleteAlert && (
