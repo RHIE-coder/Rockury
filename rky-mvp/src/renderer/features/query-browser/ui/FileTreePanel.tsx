@@ -200,7 +200,6 @@ function SortableItemRow({
   return (
     <div
       ref={setNodeRef}
-      style={style}
       {...attributes}
       {...listeners}
       className={`flex w-full cursor-pointer items-center gap-1 py-1 text-xs transition-colors hover:bg-muted ${
@@ -300,15 +299,18 @@ export function FileTreePanel({
   const menuRef = useRef<HTMLDivElement>(null);
 
   // Expand new folders automatically
+  const folderIds = folders.map((f) => f.id).join(',');
   useEffect(() => {
     setExpanded((prev) => {
+      let changed = false;
       const next = new Set(prev);
       for (const f of folders) {
-        if (!next.has(f.id)) next.add(f.id);
+        if (!next.has(f.id)) { next.add(f.id); changed = true; }
       }
-      return next;
+      return changed ? next : prev;
     });
-  }, [folders]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [folderIds]);
 
   // Close context menu on outside click
   useEffect(() => {
