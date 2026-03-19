@@ -338,8 +338,9 @@ export function QueryTab({ connectionId, dbType }: QueryTabProps) {
               )}
             </div>
 
-            {/* SQL Editor */}
+            {/* SQL Editor — key forces remount on query switch to avoid CodeMirror state mismatch */}
             <SqlEditorPanel
+              key={queryMeta.id}
               value={sqlContent}
               onChange={handleSqlChange}
               onRun={handleRun}
