@@ -347,6 +347,21 @@ export function CollectionTab({ connectionId, dbType }: CollectionTabProps) {
     [collectionTree, connectionId],
   );
 
+  const handleMoveFolder = useCallback(
+    (folderId: string, newParentId: string | null) => {
+      const folder = collectionTree.folders.find((f) => f.id === folderId);
+      if (!folder) return;
+      collectionTree.saveFolder({
+        id: folderId,
+        connectionId,
+        parentId: newParentId,
+        name: folder.name,
+        sortOrder: folder.sortOrder,
+      });
+    },
+    [collectionTree, connectionId],
+  );
+
   /* -- Map tree data for FileTreePanel --------------------------------- */
   const treeFolders = collectionTree.folders.map((f) => ({
     id: f.id,
@@ -389,6 +404,7 @@ export function CollectionTab({ connectionId, dbType }: CollectionTabProps) {
         onDeleteFolder={handleDeleteFolder}
         onDeleteItem={handleDeleteItem}
         onMove={handleMove}
+        onMoveFolder={handleMoveFolder}
         searchPlaceholder="Filter collections..."
         createItemLabel="New Collection"
         itemIcon="collection"

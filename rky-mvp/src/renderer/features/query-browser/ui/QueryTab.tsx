@@ -8,7 +8,7 @@ import { useQueryExecution } from '../model/useQueryExecution';
 import { useQueryBrowserStore } from '../model/queryBrowserStore';
 import { queryBrowserApi } from '../api/queryBrowserApi';
 import { FileTreePanel } from './FileTreePanel';
-import { SqlEditorPanel } from './SqlEditorPanel';
+import { SqlEditorPanel, type SqlEditorPanelHandle } from './SqlEditorPanel';
 import { DmlResultPanel } from './DmlResultPanel';
 import type { TDbType } from '~/shared/types/db';
 
@@ -40,7 +40,7 @@ export function QueryTab({ connectionId, dbType }: QueryTabProps) {
   const queryTree = useQueryTree(connectionId);
   const execution = useQueryExecution(connectionId);
 
-  const [sqlContent, setSqlContent] = useState('');
+  const [loadedSql, setLoadedSql] = useState('');
   const [queryMeta, setQueryMeta] = useState<QueryMeta | null>(null);
   const [isEditingDescription, setIsEditingDescription] = useState(false);
   const [descriptionDraft, setDescriptionDraft] = useState('');
@@ -48,6 +48,7 @@ export function QueryTab({ connectionId, dbType }: QueryTabProps) {
   const [page, setPage] = useState(0);
   const [pageSize, setPageSize] = useState(50);
 
+  const editorRef = useRef<SqlEditorPanelHandle>(null);
   const autoSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastSavedSqlRef = useRef('');
 
@@ -55,7 +56,7 @@ export function QueryTab({ connectionId, dbType }: QueryTabProps) {
   useEffect(() => {
     if (!selectedQueryId) {
       setQueryMeta(null);
-      setSqlContent('');
+      setLoadedSql('');
       lastSavedSqlRef.current = '';
       return;
     }
@@ -71,7 +72,7 @@ export function QueryTab({ connectionId, dbType }: QueryTabProps) {
         folderId: q.folderId ?? null,
         sortOrder: q.sortOrder ?? 0,
       });
-      setSqlContent(q.sqlContent);
+      setLoadedSql(q.sqlContent);
       lastSavedSqlRef.current = q.sqlContent;
     });
 
@@ -96,19 +97,13 @@ export function QueryTab({ connectionId, dbType }: QueryTabProps) {
     [queryMeta, connectionId, queryTree],
   );
 
-  const handleSqlChange = useCallback(
+  const handleContentChange = useCallback(
     (value: string) => {
-      setSqlContent(value);
       if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
       autoSaveTimerRef.current = setTimeout(() => saveCurrentSql(value), AUTO_SAVE_DELAY);
     },
     [saveCurrentSql],
   );
-
-  const handleSqlBlur = useCallback(() => {
-    if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
-    saveCurrentSql(sqlContent);
-  }, [saveCurrentSql, sqlContent]);
 
   /* -- Description editing ------------------------------------------ */
   const handleDescriptionClick = useCallback(() => {
@@ -124,32 +119,33 @@ export function QueryTab({ connectionId, dbType }: QueryTabProps) {
     if (trimmed === queryMeta.description) return;
     const updated = { ...queryMeta, description: trimmed };
     setQueryMeta(updated);
+    const currentSql = editorRef.current?.getValue() ?? '';
     queryTree.saveQuery({
       id: updated.id,
       connectionId,
       folderId: updated.folderId,
       name: updated.name,
       description: trimmed,
-      sqlContent,
+      sqlContent: currentSql,
       sortOrder: updated.sortOrder,
     });
-  }, [queryMeta, descriptionDraft, connectionId, sqlContent, queryTree]);
+  }, [queryMeta, descriptionDraft, connectionId, queryTree]);
 
   /* -- Run query ---------------------------------------------------- */
-  const handleRun = useCallback(() => {
-    if (!sqlContent.trim()) return;
-    // Save before running
-    saveCurrentSql(sqlContent);
+  const handleRun = useCallback((sql: string) => {
+    if (!sql.trim()) return;
+    saveCurrentSql(sql);
     setPage(0);
-    execution.execute(sqlContent);
-  }, [sqlContent, saveCurrentSql, execution]);
+    execution.execute(sql);
+  }, [saveCurrentSql, execution]);
 
   /* -- File tree callbacks ------------------------------------------ */
   const handleSelect = useCallback(
     (id: string) => {
       // Save current before switching
       if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
-      saveCurrentSql(sqlContent);
+      const currentSql = editorRef.current?.getValue() ?? '';
+      saveCurrentSql(currentSql);
       setSelectedQueryId(id);
       setColumnVisibility({});
       setPage(0);
@@ -209,13 +205,14 @@ export function QueryTab({ connectionId, dbType }: QueryTabProps) {
       if (queryMeta && queryMeta.id === id) {
         const updated = { ...queryMeta, name };
         setQueryMeta(updated);
+        const currentSql = editorRef.current?.getValue() ?? '';
         queryTree.saveQuery({
           id,
           connectionId,
           folderId: updated.folderId,
           name,
           description: updated.description,
-          sqlContent,
+          sqlContent: currentSql,
           sortOrder: updated.sortOrder,
         });
       } else {
@@ -235,7 +232,7 @@ export function QueryTab({ connectionId, dbType }: QueryTabProps) {
         });
       }
     },
-    [queryMeta, queryTree, connectionId, sqlContent],
+    [queryMeta, queryTree, connectionId],
   );
 
   const handleDeleteFolder = useCallback(
@@ -257,10 +254,25 @@ export function QueryTab({ connectionId, dbType }: QueryTabProps) {
   );
 
   const handleMove = useCallback(
-    (items: { id: string; folderId?: string | null; sortOrder: number }[]) => {
-      queryTree.bulkMove(items);
+    (moveItems: { id: string; folderId?: string | null; sortOrder: number }[]) => {
+      queryTree.bulkMove(moveItems);
     },
     [queryTree],
+  );
+
+  const handleMoveFolder = useCallback(
+    (folderId: string, newParentId: string | null) => {
+      const folder = queryTree.folders.find((f) => f.id === folderId);
+      if (!folder) return;
+      queryTree.saveFolder({
+        id: folderId,
+        connectionId,
+        parentId: newParentId,
+        name: folder.name,
+        sortOrder: folder.sortOrder,
+      });
+    },
+    [queryTree, connectionId],
   );
 
   /* -- Map tree items for FileTreePanel ----------------------------- */
@@ -297,6 +309,7 @@ export function QueryTab({ connectionId, dbType }: QueryTabProps) {
         onDeleteFolder={handleDeleteFolder}
         onDeleteItem={handleDeleteItem}
         onMove={handleMove}
+        onMoveFolder={handleMoveFolder}
         searchPlaceholder="Filter queries..."
         createItemLabel="New Query"
         itemIcon="query"
@@ -338,17 +351,15 @@ export function QueryTab({ connectionId, dbType }: QueryTabProps) {
               )}
             </div>
 
-            {/* SQL Editor — key forces remount on query switch to avoid CodeMirror state mismatch */}
+            {/* SQL Editor — key forces remount on query switch */}
             <SqlEditorPanel
               key={queryMeta.id}
-              value={sqlContent}
-              onChange={handleSqlChange}
+              ref={editorRef}
+              initialValue={loadedSql}
+              onContentChange={handleContentChange}
               onRun={handleRun}
               isLoading={execution.isLoading}
             />
-
-            {/* Blur handler for auto-save (invisible) */}
-            <div onFocus={handleSqlBlur} className="sr-only" tabIndex={-1} />
 
             {/* Error Banner */}
             {execution.error && (

@@ -60,6 +60,7 @@ export interface FileTreePanelProps {
     referencedCollections?: { id: string; name: string }[];
   }>;
   onMove: (items: { id: string; folderId?: string | null; sortOrder: number }[]) => void;
+  onMoveFolder?: (folderId: string, newParentId: string | null) => void;
   searchPlaceholder?: string;
   createItemLabel?: string;
   itemIcon?: 'query' | 'collection';
@@ -243,9 +244,18 @@ function DraggableItem({
 /*  Folder drop target (uses useSortable to be recognized by DndContext)*/
 /* ------------------------------------------------------------------ */
 
-function FolderDropTarget({ id, children }: { id: string; children: React.ReactNode }) {
-  const { setNodeRef } = useSortable({ id, disabled: true });
-  return <div ref={setNodeRef}>{children}</div>;
+function DraggableFolder({ id, children }: { id: string; children: React.ReactNode }) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id });
+  const style: React.CSSProperties = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.4 : 1,
+  };
+  return (
+    <div ref={setNodeRef} style={style} {...attributes} {...listeners}>
+      {children}
+    </div>
+  );
 }
 
 /* ------------------------------------------------------------------ */
@@ -264,6 +274,7 @@ export function FileTreePanel({
   onDeleteFolder,
   onDeleteItem,
   onMove,
+  onMoveFolder,
   searchPlaceholder = 'Filter...',
   createItemLabel = 'New Item',
   itemIcon = 'query',
@@ -492,15 +503,36 @@ export function FileTreePanel({
     const { active, over } = event;
     if (!over || active.id === over.id) return;
 
-    const activeItem = items.find((i) => i.id === active.id);
-    if (!activeItem) return;
-
+    const activeId = active.id as string;
     const overId = over.id as string;
+
+    const activeItem = items.find((i) => i.id === activeId);
+    const activeFolder = folders.find((f) => f.id === activeId);
     const overFolder = folders.find((f) => f.id === overId);
     const overItem = items.find((i) => i.id === overId);
 
+    if (activeFolder && onMoveFolder) {
+      // Dragging a folder
+      if (overFolder && overFolder.id !== activeFolder.parentId) {
+        // Prevent dropping folder into itself or its children
+        const isDescendant = (parentId: string, childId: string): boolean => {
+          const child = folders.find((f) => f.id === childId);
+          if (!child) return false;
+          if (child.parentId === parentId) return true;
+          if (child.parentId) return isDescendant(parentId, child.parentId);
+          return false;
+        };
+        if (!isDescendant(activeFolder.id, overFolder.id) && activeFolder.id !== overFolder.id) {
+          onMoveFolder(activeFolder.id, overFolder.id);
+        }
+      }
+      return;
+    }
+
+    if (!activeItem) return;
+
     if (overFolder) {
-      // Dropped onto a folder → move item into it
+      // Dropped item onto a folder → move item into it
       const folderItems = items
         .filter((i) => i.folderId === overFolder.id && i.id !== activeItem.id)
         .sort((a, b) => a.sortOrder - b.sortOrder);
@@ -515,7 +547,6 @@ export function FileTreePanel({
         .filter((i) => i.folderId === targetFolderId)
         .sort((a, b) => a.sortOrder - b.sortOrder);
 
-      // Remove active from old position if in same folder
       const withoutActive = siblings.filter((i) => i.id !== activeItem.id);
       const overIndex = withoutActive.findIndex((i) => i.id === overItem.id);
       const insertAt = overIndex >= 0 ? overIndex + 1 : withoutActive.length;
@@ -529,7 +560,7 @@ export function FileTreePanel({
         sortOrder: idx,
       })));
     }
-  }, [items, folders, onMove]);
+  }, [items, folders, onMove, onMoveFolder]);
 
   // All IDs for SortableContext (folders as drop targets + items as draggable)
   const allSortableIds = useMemo(() => {
@@ -540,6 +571,7 @@ export function FileTreePanel({
   }, [folders, items]);
 
   const dragItem = dragActiveId ? items.find((i) => i.id === dragActiveId) : null;
+  const dragFolder = dragActiveId ? folders.find((f) => f.id === dragActiveId) : null;
 
   /* -- Render folder node recursively ------------------------------ */
   const ItemIcon = itemIcon === 'query' ? FileCode : Package;
@@ -550,7 +582,7 @@ export function FileTreePanel({
     const isDropTarget = dropTargetFolderId === node.folder.id;
 
     return (
-      <FolderDropTarget key={node.folder.id} id={node.folder.id}>
+      <DraggableFolder key={node.folder.id} id={node.folder.id}>
         {/* Folder row */}
         <div
           className={`group flex w-full cursor-pointer items-center gap-1 py-1 text-xs transition-colors hover:bg-muted/50 ${
@@ -597,7 +629,7 @@ export function FileTreePanel({
             {node.items.map((item) => renderItemRow(item, depth + 1))}
           </div>
         )}
-      </FolderDropTarget>
+      </DraggableFolder>
     );
   }
 
@@ -708,6 +740,11 @@ export function FileTreePanel({
                 <div className="flex items-center gap-1 rounded bg-background px-2 py-1 text-xs shadow-md border border-border">
                   <ItemIcon className="size-3 text-muted-foreground" />
                   <span className="truncate">{dragItem.name}</span>
+                </div>
+              ) : dragFolder ? (
+                <div className="flex items-center gap-1 rounded bg-background px-2 py-1 text-xs shadow-md border border-border">
+                  <Folder className="size-3 text-amber-500" />
+                  <span className="truncate font-medium">{dragFolder.name}</span>
                 </div>
               ) : null}
             </DragOverlay>
