@@ -580,7 +580,7 @@ export function FileTreePanel({
             <div
               className="group flex w-full cursor-pointer items-center gap-1 py-1 text-xs transition-colors hover:bg-muted/50"
               style={{ paddingLeft: `${4 + depth * 16}px`, paddingRight: '4px' }}
-              onClick={() => toggleFolder(node.folder.id)}
+              onClick={(e) => { e.stopPropagation(); toggleFolder(node.folder.id); }}
               onContextMenu={(e) => handleFolderContextMenu(e, node.folder)}
               onDoubleClick={(e) => { e.stopPropagation(); startEdit(node.folder.id, node.folder.name, 'folder'); }}
               role="button"
@@ -648,7 +648,7 @@ export function FileTreePanel({
               isSelected ? 'bg-primary/10 font-semibold text-primary' : ''
             }`}
             style={{ paddingLeft: `${8 + depth * 16}px`, paddingRight: '8px' }}
-            onClick={() => onSelect(item.id)}
+            onClick={(e) => { e.stopPropagation(); onSelect(item.id); }}
             onDoubleClick={(e) => { e.stopPropagation(); startEdit(item.id, item.name, 'item'); }}
             onContextMenu={(e) => handleItemContextMenu(e, item)}
             role="button"
