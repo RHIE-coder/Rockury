@@ -233,6 +233,54 @@ const API: TElectronAPI = {
   // Composite
   [CHANNELS.SCHEMA_VALIDATE_AGAINST_VERSION]: (args) =>
     ipcRenderer.invoke(CHANNELS.SCHEMA_VALIDATE_AGAINST_VERSION, args),
+
+  // Query Browser - Query Tree
+  [CHANNELS.QB_QUERY_TREE_LIST]: (args) =>
+    ipcRenderer.invoke(CHANNELS.QB_QUERY_TREE_LIST, args),
+  [CHANNELS.QB_QUERY_FOLDER_SAVE]: (args) =>
+    ipcRenderer.invoke(CHANNELS.QB_QUERY_FOLDER_SAVE, args),
+  [CHANNELS.QB_QUERY_FOLDER_DELETE]: (args) =>
+    ipcRenderer.invoke(CHANNELS.QB_QUERY_FOLDER_DELETE, args),
+  [CHANNELS.QB_QUERY_SAVE]: (args) =>
+    ipcRenderer.invoke(CHANNELS.QB_QUERY_SAVE, args),
+  [CHANNELS.QB_QUERY_GET]: (args) =>
+    ipcRenderer.invoke(CHANNELS.QB_QUERY_GET, args),
+  [CHANNELS.QB_QUERY_DELETE]: (args) =>
+    ipcRenderer.invoke(CHANNELS.QB_QUERY_DELETE, args),
+  [CHANNELS.QB_QUERY_BULK_MOVE]: (args) =>
+    ipcRenderer.invoke(CHANNELS.QB_QUERY_BULK_MOVE, args),
+
+  // Query Browser - Collection Tree
+  [CHANNELS.QB_COLLECTION_TREE_LIST]: (args) =>
+    ipcRenderer.invoke(CHANNELS.QB_COLLECTION_TREE_LIST, args),
+  [CHANNELS.QB_COLLECTION_FOLDER_SAVE]: (args) =>
+    ipcRenderer.invoke(CHANNELS.QB_COLLECTION_FOLDER_SAVE, args),
+  [CHANNELS.QB_COLLECTION_FOLDER_DELETE]: (args) =>
+    ipcRenderer.invoke(CHANNELS.QB_COLLECTION_FOLDER_DELETE, args),
+  [CHANNELS.QB_COLLECTION_SAVE]: (args) =>
+    ipcRenderer.invoke(CHANNELS.QB_COLLECTION_SAVE, args),
+  [CHANNELS.QB_COLLECTION_GET]: (args) =>
+    ipcRenderer.invoke(CHANNELS.QB_COLLECTION_GET, args),
+  [CHANNELS.QB_COLLECTION_DELETE]: (args) =>
+    ipcRenderer.invoke(CHANNELS.QB_COLLECTION_DELETE, args),
+  [CHANNELS.QB_COLLECTION_ITEM_SAVE]: (args) =>
+    ipcRenderer.invoke(CHANNELS.QB_COLLECTION_ITEM_SAVE, args),
+
+  // Query Browser - Transaction
+  [CHANNELS.QB_TX_BEGIN]: (args) =>
+    ipcRenderer.invoke(CHANNELS.QB_TX_BEGIN, args),
+  [CHANNELS.QB_TX_EXECUTE]: (args) =>
+    ipcRenderer.invoke(CHANNELS.QB_TX_EXECUTE, args),
+  [CHANNELS.QB_TX_COMMIT]: (args) =>
+    ipcRenderer.invoke(CHANNELS.QB_TX_COMMIT, args),
+  [CHANNELS.QB_TX_ROLLBACK]: (args) =>
+    ipcRenderer.invoke(CHANNELS.QB_TX_ROLLBACK, args),
+
+  // Query Browser - History
+  [CHANNELS.QB_HISTORY_LIST]: (args) =>
+    ipcRenderer.invoke(CHANNELS.QB_HISTORY_LIST, args),
+  [CHANNELS.QB_HISTORY_DELETE]: (args) =>
+    ipcRenderer.invoke(CHANNELS.QB_HISTORY_DELETE, args),
 };
 
 contextBridge.exposeInMainWorld('electronAPI', API);

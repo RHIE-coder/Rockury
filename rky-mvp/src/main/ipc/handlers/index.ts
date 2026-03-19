@@ -14,6 +14,7 @@ import { registerSeedHandlers } from './seedHandlers';
 import { registerSchemaObjectsHandlers } from './schemaObjectsHandlers';
 import { registerValidationSuiteHandlers } from './validationSuiteHandlers';
 import { registerForwardHandlers } from './forwardHandlers';
+import { registerQueryBrowserHandlers } from './queryBrowserHandlers';
 
 export function registerAllHandlers() {
   registerSystemInfoHandlers();
@@ -32,4 +33,5 @@ export function registerAllHandlers() {
   registerSchemaObjectsHandlers();
   registerValidationSuiteHandlers();
   registerForwardHandlers();
+  registerQueryBrowserHandlers();
 }
