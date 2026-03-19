@@ -1,22 +1,5 @@
 import { useState, useRef, useEffect, useMemo, useCallback } from 'react';
 import {
-  DndContext,
-  closestCenter,
-  PointerSensor,
-  useSensor,
-  useSensors,
-  type DragEndEvent,
-  DragOverlay,
-  type DragStartEvent,
-} from '@dnd-kit/core';
-import {
-  SortableContext,
-  verticalListSortingStrategy,
-  useSortable,
-  arrayMove,
-} from '@dnd-kit/sortable';
-import { CSS } from '@dnd-kit/utilities';
-import {
   Search,
   FolderOpen,
   Folder,
@@ -28,6 +11,7 @@ import {
   Plus,
   Pencil,
   Trash2,
+  FolderInput,
 } from 'lucide-react';
 
 /* ------------------------------------------------------------------ */
@@ -94,12 +78,10 @@ function buildTree(folders: FolderItem[], items: TreeItem[]) {
     }
   }
 
-  // Sort children by sortOrder
   for (const node of folderMap.values()) {
     node.children.sort((a, b) => a.folder.sortOrder - b.folder.sortOrder);
   }
 
-  // Distribute items to folders
   const rootItems: TreeItem[] = [];
   for (const item of items) {
     if (item.folderId && folderMap.has(item.folderId)) {
@@ -109,7 +91,6 @@ function buildTree(folders: FolderItem[], items: TreeItem[]) {
     }
   }
 
-  // Sort items inside each folder
   for (const node of folderMap.values()) {
     node.items.sort((a, b) => a.sortOrder - b.sortOrder);
   }
@@ -117,26 +98,6 @@ function buildTree(folders: FolderItem[], items: TreeItem[]) {
   rootFolders.sort((a, b) => a.folder.sortOrder - b.folder.sortOrder);
 
   return { rootFolders, rootItems, folderMap };
-}
-
-/** Flatten items into a sortable order for DnD */
-function flattenItemIds(
-  rootFolders: FolderNode[],
-  rootItems: TreeItem[],
-  expanded: Set<string>,
-): string[] {
-  const ids: string[] = [];
-
-  function visitFolder(node: FolderNode) {
-    if (expanded.has(node.folder.id)) {
-      for (const child of node.children) visitFolder(child);
-      for (const item of node.items) ids.push(item.id);
-    }
-  }
-
-  for (const f of rootFolders) visitFolder(f);
-  for (const item of rootItems) ids.push(item.id);
-  return ids;
 }
 
 /* ------------------------------------------------------------------ */
@@ -149,82 +110,7 @@ interface ContextMenuState {
   type: 'folder' | 'item';
   id: string;
   name: string;
-}
-
-/* ------------------------------------------------------------------ */
-/*  Sortable item                                                      */
-/* ------------------------------------------------------------------ */
-
-interface SortableItemRowProps {
-  item: TreeItem;
-  isSelected: boolean;
-  depth: number;
-  icon: 'query' | 'collection';
-  onSelect: (id: string) => void;
-  onContextMenu: (e: React.MouseEvent, item: TreeItem) => void;
-  editingId: string | null;
-  editValue: string;
-  onEditChange: (val: string) => void;
-  onEditCommit: () => void;
-  onEditCancel: () => void;
-  onStartEdit: (id: string, name: string) => void;
-}
-
-function SortableItemRow({
-  item,
-  isSelected,
-  depth,
-  icon,
-  onSelect,
-  onContextMenu,
-  editingId,
-  editValue,
-  onEditChange,
-  onEditCommit,
-  onEditCancel,
-  onStartEdit,
-}: SortableItemRowProps) {
-  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
-    id: item.id,
-  });
-
-  const style: React.CSSProperties = {
-    transform: CSS.Transform.toString(transform),
-    transition,
-    opacity: isDragging ? 0.4 : 1,
-  };
-
-  const Icon = icon === 'query' ? FileCode : Package;
-  const isEditing = editingId === item.id;
-
-  return (
-    <div
-      ref={setNodeRef}
-      {...attributes}
-      {...listeners}
-      className={`flex w-full cursor-pointer items-center gap-1 py-1 text-xs transition-colors hover:bg-muted ${
-        isSelected ? 'bg-primary/10 font-semibold text-primary' : ''
-      }`}
-      role="button"
-      tabIndex={0}
-      onClick={() => onSelect(item.id)}
-      onDoubleClick={() => onStartEdit(item.id, item.name)}
-      onContextMenu={(e) => onContextMenu(e, item)}
-      style={{ ...style, paddingLeft: `${8 + depth * 12}px`, paddingRight: '8px' }}
-    >
-      <Icon className="size-3 shrink-0 text-muted-foreground" />
-      {isEditing ? (
-        <InlineInput
-          value={editValue}
-          onChange={onEditChange}
-          onCommit={onEditCommit}
-          onCancel={onEditCancel}
-        />
-      ) : (
-        <span className="min-w-0 flex-1 truncate">{item.name}</span>
-      )}
-    </div>
-  );
+  parentFolderId: string | null;
 }
 
 /* ------------------------------------------------------------------ */
@@ -295,8 +181,6 @@ export function FileTreePanel({
   const [deleteAlert, setDeleteAlert] = useState<{
     collections: { id: string; name: string }[];
   } | null>(null);
-  const [dragActiveId, setDragActiveId] = useState<string | null>(null);
-  const menuRef = useRef<HTMLDivElement>(null);
 
   // Expand new folders automatically
   const folderIds = folders.map((f) => f.id).join(',');
@@ -320,11 +204,7 @@ export function FileTreePanel({
     return () => document.removeEventListener('click', handler);
   }, [contextMenu]);
 
-  const sensors = useSensors(
-    useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
-  );
-
-  // Filter items by search
+  // Filter
   const filteredItems = useMemo(() => {
     if (!search) return items;
     const lower = search.toLowerCase();
@@ -333,7 +213,6 @@ export function FileTreePanel({
 
   const filteredFolders = useMemo(() => {
     if (!search) return folders;
-    // Show folders that match or contain matching items
     const lower = search.toLowerCase();
     const folderIdsWithItems = new Set(filteredItems.map((i) => i.folderId).filter(Boolean));
     return folders.filter(
@@ -341,14 +220,9 @@ export function FileTreePanel({
     );
   }, [folders, search, filteredItems]);
 
-  const { rootFolders, rootItems, folderMap } = useMemo(
+  const { rootFolders, rootItems } = useMemo(
     () => buildTree(filteredFolders, filteredItems),
     [filteredFolders, filteredItems],
-  );
-
-  const sortableIds = useMemo(
-    () => flattenItemIds(rootFolders, rootItems, expanded),
-    [rootFolders, rootItems, expanded],
   );
 
   /* -- Toggle folder expand ---------------------------------------- */
@@ -366,7 +240,14 @@ export function FileTreePanel({
     (e: React.MouseEvent, folder: FolderItem) => {
       e.preventDefault();
       e.stopPropagation();
-      setContextMenu({ x: e.clientX, y: e.clientY, type: 'folder', id: folder.id, name: folder.name });
+      setContextMenu({
+        x: e.clientX,
+        y: e.clientY,
+        type: 'folder',
+        id: folder.id,
+        name: folder.name,
+        parentFolderId: folder.parentId,
+      });
     },
     [],
   );
@@ -375,7 +256,14 @@ export function FileTreePanel({
     (e: React.MouseEvent, item: TreeItem) => {
       e.preventDefault();
       e.stopPropagation();
-      setContextMenu({ x: e.clientX, y: e.clientY, type: 'item', id: item.id, name: item.name });
+      setContextMenu({
+        x: e.clientX,
+        y: e.clientY,
+        type: 'item',
+        id: item.id,
+        name: item.name,
+        parentFolderId: item.folderId,
+      });
     },
     [],
   );
@@ -424,84 +312,67 @@ export function FileTreePanel({
     }
   }, [contextMenu, onDeleteFolder, onDeleteItem]);
 
-  /* -- DnD handlers ------------------------------------------------ */
-  const handleDragStart = useCallback((event: DragStartEvent) => {
-    setDragActiveId(event.active.id as string);
-  }, []);
+  /* -- Create inside folder --------------------------------------- */
+  const handleCreateSubfolder = useCallback(() => {
+    if (!contextMenu || contextMenu.type !== 'folder') return;
+    const parentId = contextMenu.id;
+    setContextMenu(null);
+    // Ensure parent is expanded
+    setExpanded((prev) => {
+      if (prev.has(parentId)) return prev;
+      const next = new Set(prev);
+      next.add(parentId);
+      return next;
+    });
+    onCreateFolder(parentId);
+  }, [contextMenu, onCreateFolder]);
 
-  const handleDragEnd = useCallback(
-    (event: DragEndEvent) => {
-      setDragActiveId(null);
-      const { active, over } = event;
-      if (!over || active.id === over.id) return;
+  const handleCreateItemInFolder = useCallback(() => {
+    if (!contextMenu || contextMenu.type !== 'folder') return;
+    const folderId = contextMenu.id;
+    setContextMenu(null);
+    setExpanded((prev) => {
+      if (prev.has(folderId)) return prev;
+      const next = new Set(prev);
+      next.add(folderId);
+      return next;
+    });
+    onCreateItem(folderId);
+  }, [contextMenu, onCreateItem]);
 
-      const activeItem = items.find((i) => i.id === active.id);
-      if (!activeItem) return;
+  /* -- Move item to folder (via context menu) --------------------- */
+  const handleMoveToFolder = useCallback(
+    (targetFolderId: string | null) => {
+      if (!contextMenu || contextMenu.type !== 'item') return;
+      const itemId = contextMenu.id;
+      setContextMenu(null);
 
-      // Determine target folder: if dropped over a folder row, move into it
-      const overFolder = folders.find((f) => f.id === over.id);
-      const overItem = items.find((i) => i.id === over.id);
-
-      if (overFolder) {
-        // Dropped onto a folder — move item into that folder
-        const folderItems = items
-          .filter((i) => i.folderId === overFolder.id && i.id !== active.id)
-          .sort((a, b) => a.sortOrder - b.sortOrder);
-        const movePayload = [
-          ...folderItems.map((i, idx) => ({ id: i.id, folderId: overFolder.id, sortOrder: idx })),
-          { id: activeItem.id, folderId: overFolder.id, sortOrder: folderItems.length },
-        ];
-        onMove(movePayload);
-        return;
-      }
-
-      if (overItem) {
-        // Reorder within same context
-        const targetFolderId = overItem.folderId;
-        const siblings = items
-          .filter((i) => i.folderId === targetFolderId)
-          .sort((a, b) => a.sortOrder - b.sortOrder);
-
-        const oldIndex = siblings.findIndex((i) => i.id === active.id);
-        const newIndex = siblings.findIndex((i) => i.id === over.id);
-
-        if (oldIndex === -1) {
-          // Moving from different folder
-          const newSiblings = [...siblings];
-          const insertAt = newIndex >= 0 ? newIndex : newSiblings.length;
-          newSiblings.splice(insertAt, 0, activeItem);
-          const movePayload = newSiblings.map((i, idx) => ({
-            id: i.id,
-            folderId: targetFolderId,
-            sortOrder: idx,
-          }));
-          onMove(movePayload);
-        } else if (newIndex !== -1 && oldIndex !== newIndex) {
-          const reordered = arrayMove(siblings, oldIndex, newIndex);
-          const movePayload = reordered.map((i, idx) => ({
-            id: i.id,
-            folderId: targetFolderId,
-            sortOrder: idx,
-          }));
-          onMove(movePayload);
-        }
-      }
+      // Get siblings at target location to determine sort order
+      const siblings = items.filter((i) => i.folderId === targetFolderId && i.id !== itemId);
+      onMove([
+        ...siblings.map((i, idx) => ({ id: i.id, folderId: targetFolderId, sortOrder: idx })),
+        { id: itemId, folderId: targetFolderId, sortOrder: siblings.length },
+      ]);
     },
-    [items, folders, onMove],
+    [contextMenu, items, onMove],
   );
 
   /* -- Render folder node recursively ------------------------------ */
+  const ItemIcon = itemIcon === 'query' ? FileCode : Package;
+
   function renderFolderNode(node: FolderNode, depth: number) {
     const isExpanded = expanded.has(node.folder.id);
     const isFolderEditing = editingId === node.folder.id && editingType === 'folder';
 
     return (
       <div key={node.folder.id}>
+        {/* Folder row */}
         <div
-          className="flex w-full cursor-pointer items-center gap-1 py-1 text-xs transition-colors hover:bg-muted/50"
-          style={{ paddingLeft: `${4 + depth * 12}px`, paddingRight: '4px' }}
+          className="group flex w-full cursor-pointer items-center gap-1 py-1 text-xs transition-colors hover:bg-muted/50"
+          style={{ paddingLeft: `${4 + depth * 16}px`, paddingRight: '4px' }}
           onClick={() => toggleFolder(node.folder.id)}
           onContextMenu={(e) => handleFolderContextMenu(e, node.folder)}
+          onDoubleClick={(e) => { e.stopPropagation(); startEdit(node.folder.id, node.folder.name, 'folder'); }}
           role="button"
           tabIndex={0}
         >
@@ -523,37 +394,77 @@ export function FileTreePanel({
               onCancel={cancelEdit}
             />
           ) : (
-            <span className="min-w-0 flex-1 truncate font-medium">{node.folder.name}</span>
+            <>
+              <span className="min-w-0 flex-1 truncate font-medium">{node.folder.name}</span>
+              <span className="text-[9px] text-muted-foreground opacity-0 group-hover:opacity-100">
+                {node.items.length + node.children.length}
+              </span>
+            </>
           )}
         </div>
+
+        {/* Children */}
         {isExpanded && (
           <div>
             {node.children.map((child) => renderFolderNode(child, depth + 1))}
-            {node.items.map((item) => (
-              <SortableItemRow
-                key={item.id}
-                item={item}
-                isSelected={item.id === selectedId}
-                depth={depth + 1}
-                icon={itemIcon}
-                onSelect={onSelect}
-                onContextMenu={handleItemContextMenu}
-                editingId={editingId}
-                editValue={editValue}
-                onEditChange={setEditValue}
-                onEditCommit={commitEdit}
-                onEditCancel={cancelEdit}
-                onStartEdit={(id, name) => startEdit(id, name, 'item')}
-              />
-            ))}
+            {node.items.map((item) => renderItemRow(item, depth + 1))}
           </div>
         )}
       </div>
     );
   }
 
-  const dragItem = dragActiveId ? items.find((i) => i.id === dragActiveId) : null;
-  const DragIcon = itemIcon === 'query' ? FileCode : Package;
+  function renderItemRow(item: TreeItem, depth: number) {
+    const isSelected = item.id === selectedId;
+    const isEditing = editingId === item.id && editingType === 'item';
+
+    return (
+      <div
+        key={item.id}
+        className={`flex w-full cursor-pointer items-center gap-1 py-1 text-xs transition-colors hover:bg-muted ${
+          isSelected ? 'bg-primary/10 font-semibold text-primary' : ''
+        }`}
+        style={{ paddingLeft: `${8 + depth * 16}px`, paddingRight: '8px' }}
+        onClick={() => onSelect(item.id)}
+        onDoubleClick={(e) => { e.stopPropagation(); startEdit(item.id, item.name, 'item'); }}
+        onContextMenu={(e) => handleItemContextMenu(e, item)}
+        role="button"
+        tabIndex={0}
+      >
+        <ItemIcon className="size-3 shrink-0 text-muted-foreground" />
+        {isEditing ? (
+          <InlineInput
+            value={editValue}
+            onChange={setEditValue}
+            onCommit={commitEdit}
+            onCancel={cancelEdit}
+          />
+        ) : (
+          <span className="min-w-0 flex-1 truncate">{item.name}</span>
+        )}
+      </div>
+    );
+  }
+
+  /* -- Move-to submenu folders ------------------------------------ */
+  const moveTargetFolders = useMemo(() => {
+    if (!contextMenu || contextMenu.type !== 'item') return [];
+    const currentFolderId = items.find((i) => i.id === contextMenu.id)?.folderId ?? null;
+    const targets: { id: string | null; name: string }[] = [];
+
+    // Add "Root" option if item is inside a folder
+    if (currentFolderId !== null) {
+      targets.push({ id: null, name: '(Root)' });
+    }
+
+    // Add all folders except current parent
+    for (const f of folders) {
+      if (f.id !== currentFolderId) {
+        targets.push({ id: f.id, name: f.name });
+      }
+    }
+    return targets;
+  }, [contextMenu, items, folders]);
 
   return (
     <div className="flex h-full w-[220px] shrink-0 flex-col border-r border-border bg-background">
@@ -603,53 +514,21 @@ export function FileTreePanel({
             {items.length === 0 && folders.length === 0 ? 'No items yet.' : 'No matches.'}
           </p>
         ) : (
-          <DndContext
-            sensors={sensors}
-            collisionDetection={closestCenter}
-            onDragStart={handleDragStart}
-            onDragEnd={handleDragEnd}
-          >
-            <SortableContext items={sortableIds} strategy={verticalListSortingStrategy}>
-              <div className="py-1">
-                {rootFolders.map((node) => renderFolderNode(node, 0))}
-                {rootItems.map((item) => (
-                  <SortableItemRow
-                    key={item.id}
-                    item={item}
-                    isSelected={item.id === selectedId}
-                    depth={0}
-                    icon={itemIcon}
-                    onSelect={onSelect}
-                    onContextMenu={handleItemContextMenu}
-                    editingId={editingId}
-                    editValue={editValue}
-                    onEditChange={setEditValue}
-                    onEditCommit={commitEdit}
-                    onEditCancel={cancelEdit}
-                    onStartEdit={(id, name) => startEdit(id, name, 'item')}
-                  />
-                ))}
-              </div>
-            </SortableContext>
-            <DragOverlay>
-              {dragItem ? (
-                <div className="flex items-center gap-1 rounded bg-background px-2 py-1 text-xs shadow-md">
-                  <DragIcon className="size-3 text-muted-foreground" />
-                  <span className="truncate">{dragItem.name}</span>
-                </div>
-              ) : null}
-            </DragOverlay>
-          </DndContext>
+          <div className="py-1">
+            {rootFolders.map((node) => renderFolderNode(node, 0))}
+            {rootItems.map((item) => renderItemRow(item, 0))}
+          </div>
         )}
       </div>
 
       {/* Context menu */}
       {contextMenu && (
         <div
-          ref={menuRef}
-          className="fixed z-50 min-w-[120px] rounded-md border border-border bg-popover p-1 shadow-md"
+          className="fixed z-50 min-w-[160px] rounded-md border border-border bg-popover p-1 shadow-md"
           style={{ left: contextMenu.x, top: contextMenu.y }}
+          onClick={(e) => e.stopPropagation()}
         >
+          {/* Rename */}
           <button
             type="button"
             className="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-xs hover:bg-accent"
@@ -658,14 +537,61 @@ export function FileTreePanel({
             <Pencil className="size-3" />
             Rename
           </button>
-          <button
-            type="button"
-            className="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-xs text-destructive hover:bg-accent"
-            onClick={handleDelete}
-          >
-            <Trash2 className="size-3" />
-            Delete
-          </button>
+
+          {/* Folder-specific: create subfolder and item inside */}
+          {contextMenu.type === 'folder' && (
+            <>
+              <button
+                type="button"
+                className="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-xs hover:bg-accent"
+                onClick={handleCreateSubfolder}
+              >
+                <FolderPlus className="size-3" />
+                New Subfolder
+              </button>
+              <button
+                type="button"
+                className="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-xs hover:bg-accent"
+                onClick={handleCreateItemInFolder}
+              >
+                <Plus className="size-3" />
+                New {itemIcon === 'query' ? 'Query' : 'Collection'} Here
+              </button>
+            </>
+          )}
+
+          {/* Item-specific: move to folder */}
+          {contextMenu.type === 'item' && moveTargetFolders.length > 0 && (
+            <div className="border-t border-border pt-1 mt-1">
+              <span className="flex items-center gap-2 px-2 py-1 text-[10px] text-muted-foreground">
+                <FolderInput className="size-3" />
+                Move to...
+              </span>
+              {moveTargetFolders.map((target) => (
+                <button
+                  key={target.id ?? '__root__'}
+                  type="button"
+                  className="flex w-full items-center gap-2 rounded-sm px-4 py-1 text-xs hover:bg-accent"
+                  onClick={() => handleMoveToFolder(target.id)}
+                >
+                  {target.id ? <Folder className="size-3 text-amber-500" /> : <span className="size-3" />}
+                  {target.name}
+                </button>
+              ))}
+            </div>
+          )}
+
+          {/* Divider + Delete */}
+          <div className="border-t border-border pt-1 mt-1">
+            <button
+              type="button"
+              className="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-xs text-destructive hover:bg-accent"
+              onClick={handleDelete}
+            >
+              <Trash2 className="size-3" />
+              Delete
+            </button>
+          </div>
         </div>
       )}
 
