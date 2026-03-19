@@ -27,10 +27,32 @@ export function extractKeywordsFromMultiple(sqls: string[]): string[] {
   return [...keywords];
 }
 
-/** Replace {{keyword}} with corresponding values. Unmatched keywords are left as-is. */
+/**
+ * Replace {{keyword}} with corresponding values.
+ * - If the keyword is already inside quotes (e.g. '{{x}}'), replace the value as-is.
+ * - Otherwise, auto-quote: numbers stay bare, everything else gets single-quoted (with escaping).
+ * Unmatched keywords are left as-is.
+ */
 export function replaceKeywords(sql: string, values: Record<string, string>): string {
-  return sql.replace(KEYWORD_REGEX, (full, name) => {
-    return name in values ? values[name] : full;
+  // Use a regex that also captures the character before {{ to detect quoting
+  return sql.replace(/(['"]?)\{\{(\w+)\}\}\1/g, (full, quote, name) => {
+    if (!(name in values)) return full;
+    const val = values[name];
+
+    if (quote) {
+      // Already quoted by user, e.g. '{{x}}' → 'value'
+      return `${quote}${val.replace(/'/g, "''")}${quote}`;
+    }
+
+    // Auto-detect: if it looks like a number, keep bare; otherwise single-quote
+    if (/^-?\d+(\.\d+)?$/.test(val)) {
+      return val;
+    }
+    // NULL keyword
+    if (val.toUpperCase() === 'NULL') {
+      return 'NULL';
+    }
+    return `'${val.replace(/'/g, "''")}'`;
   });
 }
 

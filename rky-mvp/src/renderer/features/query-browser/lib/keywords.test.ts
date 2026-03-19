@@ -27,9 +27,21 @@ describe('extractKeywordsFromMultiple', () => {
 });
 
 describe('replaceKeywords', () => {
-  it('replaces keywords with values', () => {
-    const result = replaceKeywords('SELECT * FROM users WHERE id = {{user_id}}', { user_id: '42' });
-    expect(result).toBe('SELECT * FROM users WHERE id = 42');
+  it('auto-quotes string values', () => {
+    const result = replaceKeywords('WHERE id = {{user_id}}', { user_id: 'c4ded0b8-59cd-4f' });
+    expect(result).toBe("WHERE id = 'c4ded0b8-59cd-4f'");
+  });
+  it('keeps numbers bare', () => {
+    const result = replaceKeywords('WHERE id = {{user_id}}', { user_id: '42' });
+    expect(result).toBe('WHERE id = 42');
+  });
+  it('keeps NULL bare', () => {
+    const result = replaceKeywords('WHERE id = {{val}}', { val: 'NULL' });
+    expect(result).toBe('WHERE id = NULL');
+  });
+  it('respects user-provided quotes', () => {
+    const result = replaceKeywords("WHERE name = '{{name}}'", { name: "O'Brien" });
+    expect(result).toBe("WHERE name = 'O''Brien'");
   });
   it('leaves unmatched keywords', () => {
     const result = replaceKeywords('{{a}} and {{b}}', { a: '1' });
@@ -38,6 +50,10 @@ describe('replaceKeywords', () => {
   it('handles multiple occurrences', () => {
     const result = replaceKeywords('{{x}} + {{x}}', { x: '5' });
     expect(result).toBe('5 + 5');
+  });
+  it('escapes single quotes in auto-quoted values', () => {
+    const result = replaceKeywords('WHERE name = {{name}}', { name: "it's" });
+    expect(result).toBe("WHERE name = 'it''s'");
   });
 });
 
