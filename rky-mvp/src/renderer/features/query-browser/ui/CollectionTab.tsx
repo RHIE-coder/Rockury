@@ -1,12 +1,21 @@
 import { useState, useCallback, useEffect, useMemo } from 'react';
 import {
+  DndContext,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  useDroppable,
+  type DragEndEvent,
+  DragOverlay,
+} from '@dnd-kit/core';
+import {
   Play,
-  Plus,
   Loader2,
   CheckCircle2,
   RotateCcw,
   XCircle,
   AlertTriangle,
+  FileCode,
 } from 'lucide-react';
 import { Button } from '@/shared/components/ui/button';
 import { generateUuid } from '@/features/data-browser/lib/uuid';
@@ -18,6 +27,7 @@ import { queryBrowserApi } from '../api/queryBrowserApi';
 import { FileTreePanel } from './FileTreePanel';
 import { CollectionQueryList } from './CollectionQueryList';
 import { CollectionResultModal } from './CollectionResultModal';
+import { QueryPickerPanel } from './QueryPickerPanel';
 import type { TDbType, ICollectionItem } from '~/shared/types/db';
 
 /* ------------------------------------------------------------------ */
@@ -38,54 +48,22 @@ interface CollectionMeta {
 }
 
 /* ------------------------------------------------------------------ */
-/*  Add Query Picker                                                   */
+/*  Collection list drop zone                                          */
 /* ------------------------------------------------------------------ */
 
-function AddQueryPicker({
-  queries,
-  onAdd,
-  onClose,
-}: {
-  queries: { id: string; name: string }[];
-  onAdd: (queryId: string) => void;
-  onClose: () => void;
-}) {
-  const [search, setSearch] = useState('');
-  const filtered = useMemo(() => {
-    if (!search) return queries;
-    const lower = search.toLowerCase();
-    return queries.filter((q) => q.name.toLowerCase().includes(lower));
-  }, [queries, search]);
-
+function CollectionDropZone({ children, isEmpty }: { children: React.ReactNode; isEmpty: boolean }) {
+  const { setNodeRef, isOver } = useDroppable({ id: 'collection-drop-zone' });
   return (
-    <div className="absolute bottom-full left-0 z-20 mb-1 w-64 rounded-md border border-border bg-popover p-2 shadow-lg">
-      <input
-        type="text"
-        placeholder="Search queries..."
-        value={search}
-        onChange={(e) => setSearch(e.target.value)}
-        autoFocus
-        className="mb-1 w-full rounded border border-border bg-background px-2 py-1 text-xs outline-none"
-      />
-      <div className="max-h-40 overflow-y-auto">
-        {filtered.length === 0 ? (
-          <p className="px-2 py-1 text-xs text-muted-foreground">No queries found</p>
-        ) : (
-          filtered.map((q) => (
-            <button
-              key={q.id}
-              type="button"
-              className="flex w-full items-center rounded-sm px-2 py-1 text-xs hover:bg-accent"
-              onClick={() => {
-                onAdd(q.id);
-                onClose();
-              }}
-            >
-              {q.name}
-            </button>
-          ))
-        )}
-      </div>
+    <div
+      ref={setNodeRef}
+      className={`flex-1 overflow-y-auto ${isOver ? 'bg-primary/5 ring-2 ring-inset ring-primary/30' : ''}`}
+    >
+      {children}
+      {isEmpty && (
+        <div className={`flex items-center justify-center py-8 text-xs ${isOver ? 'text-primary' : 'text-muted-foreground'}`}>
+          {isOver ? 'Drop to add query' : 'Drag queries from the right panel'}
+        </div>
+      )}
     </div>
   );
 }
@@ -105,8 +83,27 @@ export function CollectionTab({ connectionId, dbType }: CollectionTabProps) {
   const [items, setItems] = useState<ICollectionItem[]>([]);
   const [isEditingDescription, setIsEditingDescription] = useState(false);
   const [descriptionDraft, setDescriptionDraft] = useState('');
-  const [showAddPicker, setShowAddPicker] = useState(false);
   const [resultModal, setResultModal] = useState<{ itemId: string; queryName: string } | null>(null);
+  const [dragOverlayName, setDragOverlayName] = useState<string | null>(null);
+
+  const dndSensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }));
+
+  const handleDndDragEnd = useCallback((event: DragEndEvent) => {
+    setDragOverlayName(null);
+    const { active, over } = event;
+    if (!over || over.id !== 'collection-drop-zone') return;
+    const data = active.data.current as { type?: string; queryId?: string } | undefined;
+    if (data?.type === 'picker-query' && data.queryId && collectionMeta) {
+      const newItems = [
+        ...items.map((i) => ({ queryId: i.queryId, sortOrder: i.sortOrder })),
+        { queryId: data.queryId, sortOrder: items.length },
+      ];
+      collectionTree.saveItems({
+        collectionId: collectionMeta.id,
+        items: newItems,
+      }).then(() => detail.refetch());
+    }
+  }, [items, collectionMeta, collectionTree, detail]);
 
   /* -- Sync loaded detail into local state ----------------------------- */
   const detailCollectionId = detail.collection?.id ?? null;
@@ -190,21 +187,6 @@ export function CollectionTab({ connectionId, dbType }: CollectionTabProps) {
       collectionTree.saveItems({
         collectionId: collectionMeta.id,
         items: remaining,
-      }).then(() => detail.refetch());
-    },
-    [collectionMeta, items, collectionTree, detail],
-  );
-
-  const handleAddQuery = useCallback(
-    (queryId: string) => {
-      if (!collectionMeta) return;
-      const newItems = [
-        ...items.map((i) => ({ queryId: i.queryId, sortOrder: i.sortOrder })),
-        { queryId, sortOrder: items.length },
-      ];
-      collectionTree.saveItems({
-        collectionId: collectionMeta.id,
-        items: newItems,
       }).then(() => detail.refetch());
     },
     [collectionMeta, items, collectionTree, detail],
@@ -378,11 +360,6 @@ export function CollectionTab({ connectionId, dbType }: CollectionTabProps) {
     description: c.description,
   }));
 
-  /* -- Available queries for add picker -------------------------------- */
-  const availableQueries = queryTree.queries.map((q) => ({
-    id: q.id,
-    name: q.name,
-  }));
 
   /* -- Render ---------------------------------------------------------- */
   const isRunning = runner.state.isRunning;
@@ -391,8 +368,16 @@ export function CollectionTab({ connectionId, dbType }: CollectionTabProps) {
   const hasTx = runner.state.txId !== null;
 
   return (
+    <DndContext
+      sensors={dndSensors}
+      onDragStart={(e) => {
+        const data = e.active.data.current as { queryName?: string } | undefined;
+        setDragOverlayName(data?.queryName ?? null);
+      }}
+      onDragEnd={handleDndDragEnd}
+    >
     <div className="flex h-full">
-      {/* Left Panel: File Tree */}
+      {/* Left Panel: Collection File Tree */}
       <FileTreePanel
         folders={treeFolders}
         items={treeItems}
@@ -458,35 +443,18 @@ export function CollectionTab({ connectionId, dbType }: CollectionTabProps) {
               </Button>
             </div>
 
-            {/* Query list */}
-            <CollectionQueryList
-              items={items}
-              itemStatuses={runner.state.itemStatuses}
-              onRunSingle={handleRunSingle}
-              onReorder={handleReorder}
-              onRemove={handleRemove}
-              onViewResult={handleViewResult}
-              selectResultIds={selectResultIds}
-            />
-
-            {/* Add Query button */}
-            <div className="relative border-t border-border px-3 py-2">
-              <Button
-                variant="outline"
-                size="xs"
-                onClick={() => setShowAddPicker((v) => !v)}
-              >
-                <Plus className="mr-1 size-3" />
-                Add Query
-              </Button>
-              {showAddPicker && (
-                <AddQueryPicker
-                  queries={availableQueries}
-                  onAdd={handleAddQuery}
-                  onClose={() => setShowAddPicker(false)}
-                />
-              )}
-            </div>
+            {/* Query list (droppable zone) */}
+            <CollectionDropZone isEmpty={items.length === 0}>
+              <CollectionQueryList
+                items={items}
+                itemStatuses={runner.state.itemStatuses}
+                onRunSingle={handleRunSingle}
+                onReorder={handleReorder}
+                onRemove={handleRemove}
+                onViewResult={handleViewResult}
+                selectResultIds={selectResultIds}
+              />
+            </CollectionDropZone>
 
             {/* Error banner */}
             {hasFailed && runner.state.failedItem && (
@@ -538,6 +506,24 @@ export function CollectionTab({ connectionId, dbType }: CollectionTabProps) {
         )}
       </div>
 
+      {/* Right Panel: Query Picker */}
+      {collectionMeta && (
+        <QueryPickerPanel
+          folders={queryTree.folders}
+          queries={queryTree.queries}
+        />
+      )}
+
+      {/* Drag overlay */}
+      <DragOverlay>
+        {dragOverlayName ? (
+          <div className="flex items-center gap-1 rounded bg-background px-2 py-1 text-xs shadow-md border border-border">
+            <FileCode className="size-3 text-muted-foreground" />
+            <span className="truncate">{dragOverlayName}</span>
+          </div>
+        ) : null}
+      </DragOverlay>
+
       {/* Result Modal */}
       {resultModal && runner.selectResults.has(resultModal.itemId) && (
         <CollectionResultModal
@@ -548,5 +534,6 @@ export function CollectionTab({ connectionId, dbType }: CollectionTabProps) {
         />
       )}
     </div>
+    </DndContext>
   );
 }
