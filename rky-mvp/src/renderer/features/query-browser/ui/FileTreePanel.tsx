@@ -1,16 +1,15 @@
 import { useState, useRef, useEffect, useMemo, useCallback } from 'react';
 import {
   DndContext,
-  closestCenter,
   PointerSensor,
   useSensor,
   useSensors,
+  useDraggable,
+  useDroppable,
   type DragEndEvent,
   type DragStartEvent,
   DragOverlay,
 } from '@dnd-kit/core';
-import { SortableContext, useSortable } from '@dnd-kit/sortable';
-import { CSS } from '@dnd-kit/utilities';
 import {
   Search,
   FolderOpen,
@@ -167,92 +166,41 @@ function InlineInput({
 }
 
 /* ------------------------------------------------------------------ */
-/*  Draggable item (uses useSortable for drag handle)                  */
+/*  Draggable row wrapper — only the grip handle initiates drag        */
 /* ------------------------------------------------------------------ */
 
-function DraggableItem({
-  item,
-  depth,
-  isSelected,
-  isEditing,
+function DraggableRow({
+  id,
+  type,
+  children,
   isDragActive,
-  editValue,
-  onEditChange,
-  onEditCommit,
-  onEditCancel,
-  onSelect,
-  onStartEdit,
-  onContextMenu,
-  Icon,
 }: {
-  item: TreeItem;
-  depth: number;
-  isSelected: boolean;
-  isEditing: boolean;
+  id: string;
+  type: 'item' | 'folder';
+  children: (gripProps: { ref: React.Ref<HTMLElement>; listeners: Record<string, unknown>; attributes: Record<string, unknown> }) => React.ReactNode;
   isDragActive: boolean;
-  editValue: string;
-  onEditChange: (v: string) => void;
-  onEditCommit: () => void;
-  onEditCancel: () => void;
-  onSelect: (id: string) => void;
-  onStartEdit: (id: string, name: string) => void;
-  onContextMenu: (e: React.MouseEvent, item: TreeItem) => void;
-  Icon: typeof FileCode;
 }) {
-  const { attributes, listeners, setNodeRef, transform, transition } = useSortable({ id: item.id });
-
-  const style: React.CSSProperties = {
-    transform: CSS.Transform.toString(transform),
-    transition,
-    opacity: isDragActive ? 0.4 : 1,
-    paddingLeft: `${8 + depth * 16}px`,
-    paddingRight: '8px',
-  };
+  const { attributes, listeners, setNodeRef: setDragRef } = useDraggable({
+    id,
+    data: { type },
+  });
 
   return (
-    <div
-      ref={setNodeRef}
-      style={style}
-      className={`group flex w-full cursor-pointer items-center gap-1 py-1 text-xs transition-colors hover:bg-muted ${
-        isSelected ? 'bg-primary/10 font-semibold text-primary' : ''
-      }`}
-      onClick={() => onSelect(item.id)}
-      onDoubleClick={(e) => { e.stopPropagation(); onStartEdit(item.id, item.name); }}
-      onContextMenu={(e) => onContextMenu(e, item)}
-      role="button"
-      tabIndex={0}
-    >
-      <span {...attributes} {...listeners} className="cursor-grab opacity-0 group-hover:opacity-50">
-        <GripVertical className="size-3" />
-      </span>
-      <Icon className="size-3 shrink-0 text-muted-foreground" />
-      {isEditing ? (
-        <InlineInput
-          value={editValue}
-          onChange={onEditChange}
-          onCommit={onEditCommit}
-          onCancel={onEditCancel}
-        />
-      ) : (
-        <span className="min-w-0 flex-1 truncate">{item.name}</span>
-      )}
+    <div style={{ opacity: isDragActive ? 0.3 : 1 }}>
+      {children({ ref: setDragRef, listeners: listeners ?? {}, attributes: attributes ?? {} })}
     </div>
   );
 }
 
 /* ------------------------------------------------------------------ */
-/*  Folder drop target (uses useSortable to be recognized by DndContext)*/
+/*  Droppable folder zone                                              */
 /* ------------------------------------------------------------------ */
 
-function DraggableFolder({ id, children }: { id: string; children: React.ReactNode }) {
-  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id });
-  const style: React.CSSProperties = {
-    transform: CSS.Transform.toString(transform),
-    transition,
-    opacity: isDragging ? 0.4 : 1,
-  };
+function DroppableFolder({ id, children, isOver }: { id: string; children: React.ReactNode; isOver?: boolean }) {
+  const { setNodeRef, isOver: dndIsOver } = useDroppable({ id });
+  const highlight = isOver ?? dndIsOver;
   return (
-    <div ref={setNodeRef} style={style} {...attributes} {...listeners}>
+    <div ref={setNodeRef} className={highlight ? 'bg-accent/20 rounded' : ''}>
       {children}
     </div>
   );
@@ -479,7 +427,6 @@ export function FileTreePanel({
     const { over } = event;
     if (!over) { setDropTargetFolderId(undefined); return; }
     const overId = over.id as string;
-    // Check if hovering over a folder
     const overFolder = folders.find((f) => f.id === overId);
     if (overFolder) {
       setDropTargetFolderId(overFolder.id);
@@ -491,11 +438,9 @@ export function FileTreePanel({
         return next;
       });
     } else {
-      // Hovering over an item — target its parent folder
-      const overItem = items.find((i) => i.id === overId);
-      setDropTargetFolderId(overItem?.folderId ?? null);
+      setDropTargetFolderId(undefined);
     }
-  }, [folders, items]);
+  }, [folders]);
 
   const handleDragEnd = useCallback((event: DragEndEvent) => {
     setDragActiveId(null);
@@ -562,14 +507,6 @@ export function FileTreePanel({
     }
   }, [items, folders, onMove, onMoveFolder]);
 
-  // All IDs for SortableContext (folders as drop targets + items as draggable)
-  const allSortableIds = useMemo(() => {
-    const ids: string[] = [];
-    for (const f of folders) ids.push(f.id);
-    for (const i of items) ids.push(i.id);
-    return ids;
-  }, [folders, items]);
-
   const dragItem = dragActiveId ? items.find((i) => i.id === dragActiveId) : null;
   const dragFolder = dragActiveId ? folders.find((f) => f.id === dragActiveId) : null;
 
@@ -579,78 +516,112 @@ export function FileTreePanel({
   function renderFolderNode(node: FolderNode, depth: number) {
     const isExpanded = expanded.has(node.folder.id);
     const isFolderEditing = editingId === node.folder.id && editingType === 'folder';
-    const isDropTarget = dropTargetFolderId === node.folder.id;
+    const isDragging = dragActiveId === node.folder.id;
 
     return (
-      <DraggableFolder key={node.folder.id} id={node.folder.id}>
-        {/* Folder row */}
-        <div
-          className={`group flex w-full cursor-pointer items-center gap-1 py-1 text-xs transition-colors hover:bg-muted/50 ${
-            isDropTarget ? 'bg-accent/30 ring-1 ring-accent' : ''
-          }`}
-          style={{ paddingLeft: `${4 + depth * 16}px`, paddingRight: '4px' }}
-          onClick={() => toggleFolder(node.folder.id)}
-          onContextMenu={(e) => handleFolderContextMenu(e, node.folder)}
-          onDoubleClick={(e) => { e.stopPropagation(); startEdit(node.folder.id, node.folder.name, 'folder'); }}
-          role="button"
-          tabIndex={0}
-        >
-          {isExpanded ? (
-            <ChevronDown className="size-3 shrink-0 text-muted-foreground" />
-          ) : (
-            <ChevronRight className="size-3 shrink-0 text-muted-foreground" />
-          )}
-          {isExpanded ? (
-            <FolderOpen className="size-3 shrink-0 text-amber-500" />
-          ) : (
-            <Folder className="size-3 shrink-0 text-amber-500" />
-          )}
-          {isFolderEditing ? (
-            <InlineInput
-              value={editValue}
-              onChange={setEditValue}
-              onCommit={commitEdit}
-              onCancel={cancelEdit}
-            />
-          ) : (
-            <>
-              <span className="min-w-0 flex-1 truncate font-medium">{node.folder.name}</span>
-              <span className="text-[9px] text-muted-foreground opacity-0 group-hover:opacity-100">
-                {node.items.length + node.children.length}
+      <DroppableFolder key={node.folder.id} id={node.folder.id}>
+        <DraggableRow id={node.folder.id} type="folder" isDragActive={isDragging}>
+          {({ ref, listeners, attributes }) => (
+            <div
+              className="group flex w-full cursor-pointer items-center gap-1 py-1 text-xs transition-colors hover:bg-muted/50"
+              style={{ paddingLeft: `${4 + depth * 16}px`, paddingRight: '4px' }}
+              onClick={() => toggleFolder(node.folder.id)}
+              onContextMenu={(e) => handleFolderContextMenu(e, node.folder)}
+              onDoubleClick={(e) => { e.stopPropagation(); startEdit(node.folder.id, node.folder.name, 'folder'); }}
+              role="button"
+              tabIndex={0}
+            >
+              <span
+                ref={ref as React.Ref<HTMLSpanElement>}
+                {...listeners}
+                {...attributes}
+                className="cursor-grab opacity-0 group-hover:opacity-40"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <GripVertical className="size-3" />
               </span>
-            </>
+              {isExpanded ? (
+                <ChevronDown className="size-3 shrink-0 text-muted-foreground" />
+              ) : (
+                <ChevronRight className="size-3 shrink-0 text-muted-foreground" />
+              )}
+              {isExpanded ? (
+                <FolderOpen className="size-3 shrink-0 text-amber-500" />
+              ) : (
+                <Folder className="size-3 shrink-0 text-amber-500" />
+              )}
+              {isFolderEditing ? (
+                <InlineInput
+                  value={editValue}
+                  onChange={setEditValue}
+                  onCommit={commitEdit}
+                  onCancel={cancelEdit}
+                />
+              ) : (
+                <>
+                  <span className="min-w-0 flex-1 truncate font-medium">{node.folder.name}</span>
+                  <span className="text-[9px] text-muted-foreground opacity-0 group-hover:opacity-100">
+                    {node.items.length + node.children.length}
+                  </span>
+                </>
+              )}
+            </div>
           )}
-        </div>
+        </DraggableRow>
 
-        {/* Children */}
+        {/* Children — always rendered, not affected by drag */}
         {isExpanded && (
           <div>
             {node.children.map((child) => renderFolderNode(child, depth + 1))}
             {node.items.map((item) => renderItemRow(item, depth + 1))}
           </div>
         )}
-      </DraggableFolder>
+      </DroppableFolder>
     );
   }
 
   function renderItemRow(item: TreeItem, depth: number) {
+    const isSelected = item.id === selectedId;
+    const isEditing = editingId === item.id && editingType === 'item';
+    const isDragging = dragActiveId === item.id;
+
     return (
-      <DraggableItem
-        key={item.id}
-        item={item}
-        depth={depth}
-        isSelected={item.id === selectedId}
-        isEditing={editingId === item.id && editingType === 'item'}
-        isDragActive={dragActiveId === item.id}
-        editValue={editValue}
-        onEditChange={setEditValue}
-        onEditCommit={commitEdit}
-        onEditCancel={cancelEdit}
-        onSelect={onSelect}
-        onStartEdit={(id, name) => startEdit(id, name, 'item')}
-        onContextMenu={handleItemContextMenu}
-        Icon={ItemIcon}
-      />
+      <DraggableRow key={item.id} id={item.id} type="item" isDragActive={isDragging}>
+        {({ ref, listeners, attributes }) => (
+          <div
+            className={`group flex w-full cursor-pointer items-center gap-1 py-1 text-xs transition-colors hover:bg-muted ${
+              isSelected ? 'bg-primary/10 font-semibold text-primary' : ''
+            }`}
+            style={{ paddingLeft: `${8 + depth * 16}px`, paddingRight: '8px' }}
+            onClick={() => onSelect(item.id)}
+            onDoubleClick={(e) => { e.stopPropagation(); startEdit(item.id, item.name, 'item'); }}
+            onContextMenu={(e) => handleItemContextMenu(e, item)}
+            role="button"
+            tabIndex={0}
+          >
+            <span
+              ref={ref as React.Ref<HTMLSpanElement>}
+              {...listeners}
+              {...attributes}
+              className="cursor-grab opacity-0 group-hover:opacity-40"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <GripVertical className="size-3" />
+            </span>
+            <ItemIcon className="size-3 shrink-0 text-muted-foreground" />
+            {isEditing ? (
+              <InlineInput
+                value={editValue}
+                onChange={setEditValue}
+                onCommit={commitEdit}
+                onCancel={cancelEdit}
+              />
+            ) : (
+              <span className="min-w-0 flex-1 truncate">{item.name}</span>
+            )}
+          </div>
+        )}
+      </DraggableRow>
     );
   }
 
@@ -724,17 +695,14 @@ export function FileTreePanel({
         ) : (
           <DndContext
             sensors={sensors}
-            collisionDetection={closestCenter}
             onDragStart={handleDragStart}
             onDragOver={handleDragOver}
             onDragEnd={handleDragEnd}
           >
-            <SortableContext items={allSortableIds}>
               <div className="py-1">
                 {rootFolders.map((node) => renderFolderNode(node, 0))}
                 {rootItems.map((item) => renderItemRow(item, 0))}
               </div>
-            </SortableContext>
             <DragOverlay>
               {dragItem ? (
                 <div className="flex items-center gap-1 rounded bg-background px-2 py-1 text-xs shadow-md border border-border">
