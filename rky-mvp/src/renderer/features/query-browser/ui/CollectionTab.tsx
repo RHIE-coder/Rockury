@@ -484,6 +484,11 @@ export function CollectionTab({ connectionId, dbType }: CollectionTabProps) {
                 onReorder={handleReorder}
                 onRemove={handleRemove}
                 onViewResult={handleViewResult}
+                onEditQuery={(queryId) => {
+                  const { setActiveTab, setSelectedQueryId } = useQueryBrowserStore.getState();
+                  setSelectedQueryId(queryId);
+                  setActiveTab('query');
+                }}
                 selectResultIds={selectResultIds}
               />
             </CollectionDropZone>

@@ -27,6 +27,7 @@ import {
   Loader2,
   Eye,
   MinusCircle,
+  Pencil,
 } from 'lucide-react';
 import type { ICollectionItem } from '~/shared/types/db';
 import type { TItemStatus } from '../model/useCollectionRunner';
@@ -97,6 +98,7 @@ interface SortableQueryRowProps {
   onRunSingle?: (item: ICollectionItem) => void;
   onRemove: (itemId: string) => void;
   onViewResult?: (itemId: string) => void;
+  onEditQuery?: (queryId: string) => void;
   hasResult?: boolean;
 }
 
@@ -109,6 +111,7 @@ function SortableQueryRow({
   onRunSingle,
   onRemove,
   onViewResult,
+  onEditQuery,
   hasResult,
 }: SortableQueryRowProps) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
@@ -145,10 +148,13 @@ function SortableQueryRow({
         {/* Number */}
         <span className="w-5 shrink-0 text-center text-muted-foreground">{index + 1}</span>
 
-        {/* Query name */}
-        <span className="min-w-0 flex-1 truncate" title={sqlPreview}>
-          {item.queryName ?? 'Unnamed'}
-        </span>
+        {/* Query name + description */}
+        <div className="min-w-0 flex-1" title={sqlPreview}>
+          <span className="truncate block">{item.queryName ?? 'Unnamed'}</span>
+          {item.queryDescription && (
+            <span className="truncate block text-[10px] text-muted-foreground/70">{item.queryDescription}</span>
+          )}
+        </div>
 
         {/* Status */}
         <StatusBadge status={status} />
@@ -174,6 +180,18 @@ function SortableQueryRow({
             title="Run this query"
           >
             <Play className="size-3" />
+          </button>
+        )}
+
+        {/* Edit button */}
+        {onEditQuery && (
+          <button
+            type="button"
+            onClick={() => onEditQuery(item.queryId)}
+            className="shrink-0 rounded p-0.5 text-muted-foreground opacity-0 hover:bg-muted hover:text-foreground group-hover:opacity-100"
+            title="Edit query"
+          >
+            <Pencil className="size-3" />
           </button>
         )}
 
@@ -211,6 +229,7 @@ interface CollectionQueryListProps {
   onReorder: (items: { queryId: string; sortOrder: number }[]) => void;
   onRemove: (itemId: string) => void;
   onViewResult?: (itemId: string) => void;
+  onEditQuery?: (queryId: string) => void;
   selectResultIds?: Set<string>;
 }
 
@@ -221,6 +240,7 @@ export function CollectionQueryList({
   onReorder,
   onRemove,
   onViewResult,
+  onEditQuery,
   selectResultIds,
 }: CollectionQueryListProps) {
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
@@ -286,6 +306,7 @@ export function CollectionQueryList({
             onRunSingle={onRunSingle}
             onRemove={onRemove}
             onViewResult={onViewResult}
+            onEditQuery={onEditQuery}
             hasResult={selectResultIds?.has(item.id)}
           />
         ))}

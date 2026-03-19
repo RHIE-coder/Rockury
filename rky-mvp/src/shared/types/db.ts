@@ -816,6 +816,7 @@ export interface ICollectionItem {
   queryId: string;
   sortOrder: number;
   queryName?: string;
+  queryDescription?: string;
   sqlContent?: string;
 }
 

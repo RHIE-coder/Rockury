@@ -28,6 +28,7 @@ interface CollectionItemRow {
   query_id: string;
   sort_order: number;
   query_name?: string;
+  query_description?: string;
   sql_content?: string;
 }
 
@@ -63,6 +64,7 @@ function toCollectionItem(row: CollectionItemRow): ICollectionItem {
     queryId: row.query_id,
     sortOrder: row.sort_order,
     queryName: row.query_name,
+    queryDescription: row.query_description,
     sqlContent: row.sql_content,
   };
 }
@@ -173,7 +175,7 @@ export const collectionRepository = {
     if (!collectionRow) return null;
 
     const itemRows = db.prepare(
-      'SELECT ci.*, q.name as query_name, q.sql_content FROM collection_items ci JOIN queries q ON q.id = ci.query_id WHERE ci.collection_id = ? ORDER BY ci.sort_order ASC',
+      'SELECT ci.*, q.name as query_name, q.description as query_description, q.sql_content FROM collection_items ci JOIN queries q ON q.id = ci.query_id WHERE ci.collection_id = ? ORDER BY ci.sort_order ASC',
     ).all(id) as CollectionItemRow[];
 
     return {
