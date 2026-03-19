@@ -93,22 +93,25 @@ export const collectionRepository = {
     const db = getDb();
 
     if (data.id) {
-      const sets: string[] = [];
-      const values: unknown[] = [];
+      const existing = db.prepare('SELECT id FROM collection_folders WHERE id = ?').get(data.id);
+      if (existing) {
+        const sets: string[] = [];
+        const values: unknown[] = [];
 
-      sets.push('name = ?'); values.push(data.name);
-      sets.push('sort_order = ?'); values.push(data.sortOrder);
-      if (data.parentId !== undefined) { sets.push('parent_id = ?'); values.push(data.parentId); }
-      sets.push(`updated_at = datetime('now')`);
-      values.push(data.id);
+        sets.push('name = ?'); values.push(data.name);
+        sets.push('sort_order = ?'); values.push(data.sortOrder);
+        if (data.parentId !== undefined) { sets.push('parent_id = ?'); values.push(data.parentId); }
+        sets.push(`updated_at = datetime('now')`);
+        values.push(data.id);
 
-      db.prepare(`UPDATE collection_folders SET ${sets.join(', ')} WHERE id = ?`).run(...values);
+        db.prepare(`UPDATE collection_folders SET ${sets.join(', ')} WHERE id = ?`).run(...values);
 
-      const row = db.prepare('SELECT * FROM collection_folders WHERE id = ?').get(data.id) as CollectionFolderRow;
-      return toCollectionFolder(row);
+        const row = db.prepare('SELECT * FROM collection_folders WHERE id = ?').get(data.id) as CollectionFolderRow;
+        return toCollectionFolder(row);
+      }
     }
 
-    const id = crypto.randomUUID();
+    const id = data.id ?? crypto.randomUUID();
     db.prepare(
       'INSERT INTO collection_folders (id, connection_id, parent_id, name, sort_order) VALUES (?, ?, ?, ?, ?)',
     ).run(id, data.connectionId, data.parentId ?? null, data.name, data.sortOrder);
@@ -133,25 +136,28 @@ export const collectionRepository = {
     const db = getDb();
 
     if (data.id) {
-      const sets: string[] = [];
-      const values: unknown[] = [];
+      const existing = db.prepare('SELECT id FROM collections WHERE id = ?').get(data.id);
+      if (existing) {
+        const sets: string[] = [];
+        const values: unknown[] = [];
 
-      if (data.name !== undefined) { sets.push('name = ?'); values.push(data.name); }
-      if (data.description !== undefined) { sets.push('description = ?'); values.push(data.description); }
-      if (data.folderId !== undefined) { sets.push('folder_id = ?'); values.push(data.folderId); }
-      if (data.sortOrder !== undefined) { sets.push('sort_order = ?'); values.push(data.sortOrder); }
+        if (data.name !== undefined) { sets.push('name = ?'); values.push(data.name); }
+        if (data.description !== undefined) { sets.push('description = ?'); values.push(data.description); }
+        if (data.folderId !== undefined) { sets.push('folder_id = ?'); values.push(data.folderId); }
+        if (data.sortOrder !== undefined) { sets.push('sort_order = ?'); values.push(data.sortOrder); }
 
-      if (sets.length > 0) {
-        sets.push(`updated_at = datetime('now')`);
-        values.push(data.id);
-        db.prepare(`UPDATE collections SET ${sets.join(', ')} WHERE id = ?`).run(...values);
+        if (sets.length > 0) {
+          sets.push(`updated_at = datetime('now')`);
+          values.push(data.id);
+          db.prepare(`UPDATE collections SET ${sets.join(', ')} WHERE id = ?`).run(...values);
+        }
+
+        const row = db.prepare('SELECT * FROM collections WHERE id = ?').get(data.id) as CollectionRow;
+        return toCollection(row);
       }
-
-      const row = db.prepare('SELECT * FROM collections WHERE id = ?').get(data.id) as CollectionRow;
-      return toCollection(row);
     }
 
-    const id = crypto.randomUUID();
+    const id = data.id ?? crypto.randomUUID();
     db.prepare(
       'INSERT INTO collections (id, connection_id, folder_id, name, description, sort_order) VALUES (?, ?, ?, ?, ?, ?)',
     ).run(id, data.connectionId, data.folderId ?? null, data.name, data.description, data.sortOrder);

@@ -109,6 +109,8 @@ export function CollectionTab({ connectionId, dbType }: CollectionTabProps) {
   const [resultModal, setResultModal] = useState<{ itemId: string; queryName: string } | null>(null);
 
   /* -- Sync loaded detail into local state ----------------------------- */
+  const detailCollectionId = detail.collection?.id ?? null;
+  const detailItemsJson = JSON.stringify(detail.items.map((i) => i.id));
   useEffect(() => {
     if (detail.collection) {
       setCollectionMeta({
@@ -123,7 +125,8 @@ export function CollectionTab({ connectionId, dbType }: CollectionTabProps) {
       setCollectionMeta(null);
       setItems([]);
     }
-  }, [detail.collection, detail.items, selectedCollectionId]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [detailCollectionId, detailItemsJson, selectedCollectionId]);
 
   /* -- Description editing --------------------------------------------- */
   const handleDescriptionClick = useCallback(() => {

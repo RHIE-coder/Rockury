@@ -77,22 +77,26 @@ export const queryBrowserRepository = {
     const db = getDb();
 
     if (data.id) {
-      const sets: string[] = [];
-      const values: unknown[] = [];
+      // Check if record exists — if so UPDATE, otherwise INSERT with provided id
+      const existing = db.prepare('SELECT id FROM query_folders WHERE id = ?').get(data.id);
+      if (existing) {
+        const sets: string[] = [];
+        const values: unknown[] = [];
 
-      sets.push('name = ?'); values.push(data.name);
-      sets.push('sort_order = ?'); values.push(data.sortOrder);
-      if (data.parentId !== undefined) { sets.push('parent_id = ?'); values.push(data.parentId); }
-      sets.push(`updated_at = datetime('now')`);
-      values.push(data.id);
+        sets.push('name = ?'); values.push(data.name);
+        sets.push('sort_order = ?'); values.push(data.sortOrder);
+        if (data.parentId !== undefined) { sets.push('parent_id = ?'); values.push(data.parentId); }
+        sets.push(`updated_at = datetime('now')`);
+        values.push(data.id);
 
-      db.prepare(`UPDATE query_folders SET ${sets.join(', ')} WHERE id = ?`).run(...values);
+        db.prepare(`UPDATE query_folders SET ${sets.join(', ')} WHERE id = ?`).run(...values);
 
-      const row = db.prepare('SELECT * FROM query_folders WHERE id = ?').get(data.id) as QueryFolderRow;
-      return toQueryFolder(row);
+        const row = db.prepare('SELECT * FROM query_folders WHERE id = ?').get(data.id) as QueryFolderRow;
+        return toQueryFolder(row);
+      }
     }
 
-    const id = crypto.randomUUID();
+    const id = data.id ?? crypto.randomUUID();
     db.prepare(
       'INSERT INTO query_folders (id, connection_id, parent_id, name, sort_order) VALUES (?, ?, ?, ?, ?)',
     ).run(id, data.connectionId, data.parentId ?? null, data.name, data.sortOrder);
@@ -118,26 +122,29 @@ export const queryBrowserRepository = {
     const db = getDb();
 
     if (data.id) {
-      const sets: string[] = [];
-      const values: unknown[] = [];
+      const existing = db.prepare('SELECT id FROM queries WHERE id = ?').get(data.id);
+      if (existing) {
+        const sets: string[] = [];
+        const values: unknown[] = [];
 
-      if (data.name !== undefined) { sets.push('name = ?'); values.push(data.name); }
-      if (data.description !== undefined) { sets.push('description = ?'); values.push(data.description); }
-      if (data.sqlContent !== undefined) { sets.push('sql_content = ?'); values.push(data.sqlContent); }
-      if (data.folderId !== undefined) { sets.push('folder_id = ?'); values.push(data.folderId); }
-      if (data.sortOrder !== undefined) { sets.push('sort_order = ?'); values.push(data.sortOrder); }
+        if (data.name !== undefined) { sets.push('name = ?'); values.push(data.name); }
+        if (data.description !== undefined) { sets.push('description = ?'); values.push(data.description); }
+        if (data.sqlContent !== undefined) { sets.push('sql_content = ?'); values.push(data.sqlContent); }
+        if (data.folderId !== undefined) { sets.push('folder_id = ?'); values.push(data.folderId); }
+        if (data.sortOrder !== undefined) { sets.push('sort_order = ?'); values.push(data.sortOrder); }
 
-      if (sets.length > 0) {
-        sets.push(`updated_at = datetime('now')`);
-        values.push(data.id);
-        db.prepare(`UPDATE queries SET ${sets.join(', ')} WHERE id = ?`).run(...values);
+        if (sets.length > 0) {
+          sets.push(`updated_at = datetime('now')`);
+          values.push(data.id);
+          db.prepare(`UPDATE queries SET ${sets.join(', ')} WHERE id = ?`).run(...values);
+        }
+
+        const row = db.prepare('SELECT * FROM queries WHERE id = ?').get(data.id) as QueryRow;
+        return toQuery(row);
       }
-
-      const row = db.prepare('SELECT * FROM queries WHERE id = ?').get(data.id) as QueryRow;
-      return toQuery(row);
     }
 
-    const id = crypto.randomUUID();
+    const id = data.id ?? crypto.randomUUID();
     db.prepare(
       'INSERT INTO queries (id, connection_id, folder_id, name, description, sql_content, tags, sort_order) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
     ).run(id, data.connectionId, data.folderId ?? null, data.name, data.description, data.sqlContent, '[]', data.sortOrder);
