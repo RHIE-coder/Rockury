@@ -30,6 +30,8 @@ import { CollectionQueryList } from './CollectionQueryList';
 import { CollectionResultModal } from './CollectionResultModal';
 import { QueryPickerPanel } from './QueryPickerPanel';
 import { QueryEditModal } from './QueryEditModal';
+import { KeywordInputPanel } from './KeywordInputPanel';
+import { extractKeywordsFromMultiple, replaceKeywords } from '../lib/keywords';
 import type { TDbType, ICollectionItem } from '~/shared/types/db';
 
 /* ------------------------------------------------------------------ */
@@ -87,6 +89,8 @@ export function CollectionTab({ connectionId, dbType }: CollectionTabProps) {
   const [descriptionDraft, setDescriptionDraft] = useState('');
   const [resultModal, setResultModal] = useState<{ itemId: string; queryName: string } | null>(null);
   const [editQueryId, setEditQueryId] = useState<string | null>(null);
+  const [pendingKeywords, setPendingKeywords] = useState<string[] | null>(null);
+  const [lastKeywordValues, setLastKeywordValues] = useState<Record<string, string>>({});
   const [dragOverlayName, setDragOverlayName] = useState<string | null>(null);
 
   const dndSensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }));
@@ -180,8 +184,33 @@ export function CollectionTab({ connectionId, dbType }: CollectionTabProps) {
   /* -- Run handlers ---------------------------------------------------- */
   const handleRunAll = useCallback(() => {
     if (items.length === 0) return;
+
+    // Check for keywords across all queries
+    const sqls = items.map((i) => i.sqlContent ?? '').filter(Boolean);
+    const keywords = extractKeywordsFromMultiple(sqls);
+    if (keywords.length > 0) {
+      setPendingKeywords(keywords);
+      return;
+    }
+
+    setPendingKeywords(null);
     runner.runAll(items);
   }, [items, runner]);
+
+  const handleKeywordSubmit = useCallback((values: Record<string, string>) => {
+    setLastKeywordValues(values);
+    setPendingKeywords(null);
+    // Replace keywords in all items and run
+    const resolvedItems = items.map((item) => ({
+      ...item,
+      sqlContent: item.sqlContent ? replaceKeywords(item.sqlContent, values) : item.sqlContent,
+    }));
+    runner.runAll(resolvedItems);
+  }, [items, runner]);
+
+  const handleKeywordCancel = useCallback(() => {
+    setPendingKeywords(null);
+  }, []);
 
   const handleRunSingle = useCallback(
     (item: ICollectionItem) => {
@@ -476,6 +505,17 @@ export function CollectionTab({ connectionId, dbType }: CollectionTabProps) {
                 Run All
               </Button>
             </div>
+
+            {/* Keyword Input */}
+            {pendingKeywords && pendingKeywords.length > 0 && (
+              <KeywordInputPanel
+                keywords={pendingKeywords}
+                initialValues={lastKeywordValues}
+                onSubmit={handleKeywordSubmit}
+                onCancel={handleKeywordCancel}
+                submitLabel="Run All"
+              />
+            )}
 
             {/* Query list (droppable zone) */}
             <CollectionDropZone isEmpty={items.length === 0}>

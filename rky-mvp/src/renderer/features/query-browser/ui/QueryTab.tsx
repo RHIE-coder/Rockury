@@ -10,6 +10,8 @@ import { queryBrowserApi } from '../api/queryBrowserApi';
 import { FileTreePanel } from './FileTreePanel';
 import { SqlEditorPanel, type SqlEditorPanelHandle } from './SqlEditorPanel';
 import { DmlResultPanel } from './DmlResultPanel';
+import { KeywordInputPanel } from './KeywordInputPanel';
+import { extractKeywords, replaceKeywords } from '../lib/keywords';
 import type { TDbType } from '~/shared/types/db';
 
 /* ------------------------------------------------------------------ */
@@ -47,6 +49,8 @@ export function QueryTab({ connectionId, dbType }: QueryTabProps) {
   const [columnVisibility, setColumnVisibility] = useState<VisibilityState>({});
   const [page, setPage] = useState(0);
   const [pageSize, setPageSize] = useState(50);
+  const [pendingKeywords, setPendingKeywords] = useState<string[] | null>(null);
+  const [lastKeywordValues, setLastKeywordValues] = useState<Record<string, string>>({});
 
   const editorRef = useRef<SqlEditorPanelHandle>(null);
   const autoSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -135,9 +139,31 @@ export function QueryTab({ connectionId, dbType }: QueryTabProps) {
   const handleRun = useCallback((sql: string) => {
     if (!sql.trim()) return;
     saveCurrentSql(sql);
+
+    // Check for keywords
+    const keywords = extractKeywords(sql);
+    if (keywords.length > 0) {
+      setPendingKeywords(keywords);
+      return;
+    }
+
+    setPendingKeywords(null);
     setPage(0);
     execution.execute(sql);
   }, [saveCurrentSql, execution]);
+
+  const handleKeywordSubmit = useCallback((values: Record<string, string>) => {
+    const rawSql = editorRef.current?.getValue() ?? '';
+    const resolvedSql = replaceKeywords(rawSql, values);
+    setLastKeywordValues(values);
+    setPendingKeywords(null);
+    setPage(0);
+    execution.execute(resolvedSql);
+  }, [execution]);
+
+  const handleKeywordCancel = useCallback(() => {
+    setPendingKeywords(null);
+  }, []);
 
   /* -- File tree callbacks ------------------------------------------ */
   const handleSelect = useCallback(
@@ -361,6 +387,16 @@ export function QueryTab({ connectionId, dbType }: QueryTabProps) {
               onRun={handleRun}
               isLoading={execution.isLoading}
             />
+
+            {/* Keyword Input */}
+            {pendingKeywords && pendingKeywords.length > 0 && (
+              <KeywordInputPanel
+                keywords={pendingKeywords}
+                initialValues={lastKeywordValues}
+                onSubmit={handleKeywordSubmit}
+                onCancel={handleKeywordCancel}
+              />
+            )}
 
             {/* Error Banner */}
             {execution.error && (
