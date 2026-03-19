@@ -523,6 +523,9 @@ export interface IQuery {
   description: string;
   sqlContent: string;
   tags: string[];
+  connectionId?: string;
+  folderId?: string | null;
+  sortOrder?: number;
   createdAt: string;
   updatedAt: string;
 }
@@ -537,6 +540,11 @@ export interface IQueryHistory {
   rowCount: number;
   status: TQueryStatus;
   errorMessage: string | null;
+  connectionId?: string;
+  source?: THistorySource;
+  affectedTables?: string[];
+  affectedRows?: number;
+  dmlType?: TDmlType;
   executedAt: string;
 }
 
@@ -769,3 +777,47 @@ export interface IDriftCheckResult {
   correspondingDdl: string;
   checkedAt: string;
 }
+
+// ─── Query Browser ───
+export interface IQueryFolder {
+  id: string;
+  connectionId: string;
+  parentId: string | null;
+  name: string;
+  sortOrder: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ICollectionFolder {
+  id: string;
+  connectionId: string;
+  parentId: string | null;
+  name: string;
+  sortOrder: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ICollection {
+  id: string;
+  connectionId: string;
+  folderId: string | null;
+  name: string;
+  description: string;
+  sortOrder: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ICollectionItem {
+  id: string;
+  collectionId: string;
+  queryId: string;
+  sortOrder: number;
+  queryName?: string;
+  sqlContent?: string;
+}
+
+export type THistorySource = 'query' | 'data' | 'collection';
+export type TDmlType = 'SELECT' | 'INSERT' | 'UPDATE' | 'DELETE' | 'DDL';

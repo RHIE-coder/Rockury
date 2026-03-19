@@ -299,6 +299,78 @@ CREATE TABLE IF NOT EXISTS validation_suites (
 );
 `;
 
+export const SQL_CREATE_QUERY_FOLDERS = `
+CREATE TABLE IF NOT EXISTS query_folders (
+  id TEXT PRIMARY KEY,
+  connection_id TEXT NOT NULL,
+  parent_id TEXT,
+  name TEXT NOT NULL,
+  sort_order INTEGER NOT NULL DEFAULT 0,
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+  FOREIGN KEY (connection_id) REFERENCES connections(id) ON DELETE CASCADE,
+  FOREIGN KEY (parent_id) REFERENCES query_folders(id) ON DELETE CASCADE
+);
+`;
+
+export const SQL_CREATE_QUERY_FOLDERS_INDEXES = `
+CREATE INDEX IF NOT EXISTS idx_query_folders_connection ON query_folders(connection_id);
+CREATE INDEX IF NOT EXISTS idx_query_folders_parent ON query_folders(parent_id);
+`;
+
+export const SQL_CREATE_COLLECTION_FOLDERS = `
+CREATE TABLE IF NOT EXISTS collection_folders (
+  id TEXT PRIMARY KEY,
+  connection_id TEXT NOT NULL,
+  parent_id TEXT,
+  name TEXT NOT NULL,
+  sort_order INTEGER NOT NULL DEFAULT 0,
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+  FOREIGN KEY (connection_id) REFERENCES connections(id) ON DELETE CASCADE,
+  FOREIGN KEY (parent_id) REFERENCES collection_folders(id) ON DELETE CASCADE
+);
+`;
+
+export const SQL_CREATE_COLLECTION_FOLDERS_INDEXES = `
+CREATE INDEX IF NOT EXISTS idx_collection_folders_connection ON collection_folders(connection_id);
+`;
+
+export const SQL_CREATE_COLLECTIONS = `
+CREATE TABLE IF NOT EXISTS collections (
+  id TEXT PRIMARY KEY,
+  connection_id TEXT NOT NULL,
+  folder_id TEXT,
+  name TEXT NOT NULL,
+  description TEXT NOT NULL DEFAULT '',
+  sort_order INTEGER NOT NULL DEFAULT 0,
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+  FOREIGN KEY (connection_id) REFERENCES connections(id) ON DELETE CASCADE,
+  FOREIGN KEY (folder_id) REFERENCES collection_folders(id) ON DELETE SET NULL
+);
+`;
+
+export const SQL_CREATE_COLLECTIONS_INDEXES = `
+CREATE INDEX IF NOT EXISTS idx_collections_connection ON collections(connection_id);
+`;
+
+export const SQL_CREATE_COLLECTION_ITEMS = `
+CREATE TABLE IF NOT EXISTS collection_items (
+  id TEXT PRIMARY KEY,
+  collection_id TEXT NOT NULL,
+  query_id TEXT NOT NULL,
+  sort_order INTEGER NOT NULL DEFAULT 0,
+  FOREIGN KEY (collection_id) REFERENCES collections(id) ON DELETE CASCADE,
+  FOREIGN KEY (query_id) REFERENCES queries(id) ON DELETE RESTRICT
+);
+`;
+
+export const SQL_CREATE_COLLECTION_ITEMS_INDEXES = `
+CREATE INDEX IF NOT EXISTS idx_collection_items_collection ON collection_items(collection_id);
+CREATE INDEX IF NOT EXISTS idx_collection_items_query ON collection_items(query_id);
+`;
+
 const ALL_MIGRATIONS = [
   SQL_CREATE_PACKAGES,
   SQL_CREATE_PACKAGE_RESOURCES,
@@ -320,6 +392,14 @@ const ALL_MIGRATIONS = [
   SQL_CREATE_MIGRATION_PACKS_INDEXES,
   SQL_CREATE_SEEDS,
   SQL_CREATE_VALIDATION_SUITES,
+  SQL_CREATE_QUERY_FOLDERS,
+  SQL_CREATE_QUERY_FOLDERS_INDEXES,
+  SQL_CREATE_COLLECTION_FOLDERS,
+  SQL_CREATE_COLLECTION_FOLDERS_INDEXES,
+  SQL_CREATE_COLLECTIONS,
+  SQL_CREATE_COLLECTIONS_INDEXES,
+  SQL_CREATE_COLLECTION_ITEMS,
+  SQL_CREATE_COLLECTION_ITEMS_INDEXES,
 ];
 
 export function runMigrations(db: Database.Database): void {
@@ -347,6 +427,14 @@ export function runMigrations(db: Database.Database): void {
       SQL_ADD_DIAGRAM_VERSIONS_IS_LOCKED,
       `ALTER TABLE connections ADD COLUMN sort_order INTEGER NOT NULL DEFAULT 0;`,
       `ALTER TABLE connections ADD COLUMN ignored INTEGER NOT NULL DEFAULT 0;`,
+      `ALTER TABLE queries ADD COLUMN connection_id TEXT;`,
+      `ALTER TABLE queries ADD COLUMN folder_id TEXT;`,
+      `ALTER TABLE queries ADD COLUMN sort_order INTEGER NOT NULL DEFAULT 0;`,
+      `ALTER TABLE query_history ADD COLUMN connection_id TEXT;`,
+      `ALTER TABLE query_history ADD COLUMN source TEXT NOT NULL DEFAULT 'query';`,
+      `ALTER TABLE query_history ADD COLUMN affected_tables TEXT NOT NULL DEFAULT '[]';`,
+      `ALTER TABLE query_history ADD COLUMN affected_rows INTEGER NOT NULL DEFAULT 0;`,
+      `ALTER TABLE query_history ADD COLUMN dml_type TEXT;`,
     ];
     for (const sql of alterMigrations) {
       try {
@@ -355,6 +443,10 @@ export function runMigrations(db: Database.Database): void {
         // Column already exists - safe to ignore
       }
     }
+
+    // Create indexes for new query columns
+    db.exec('CREATE INDEX IF NOT EXISTS idx_queries_connection ON queries(connection_id);');
+    db.exec('CREATE INDEX IF NOT EXISTS idx_queries_folder ON queries(folder_id);');
 
     // Fix CHECK constraint: recreate diagram_migrations with 'rolled_back' status
     try {
