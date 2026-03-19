@@ -150,7 +150,7 @@ export function QueryTab({ connectionId, dbType }: QueryTabProps) {
       setColumnVisibility({});
       setPage(0);
     },
-    [saveCurrentSql, sqlContent, setSelectedQueryId],
+    [saveCurrentSql, setSelectedQueryId],
   );
 
   const handleCreateFolder = useCallback(
