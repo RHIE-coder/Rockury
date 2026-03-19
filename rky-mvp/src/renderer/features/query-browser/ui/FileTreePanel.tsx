@@ -60,6 +60,8 @@ export interface FileTreePanelProps {
   }>;
   onMove: (items: { id: string; folderId?: string | null; sortOrder: number }[]) => void;
   onMoveFolder?: (folderId: string, newParentId: string | null) => void;
+  /** Currently focused folder id — used to determine where new items are created */
+  activeFolderId?: string | null;
   searchPlaceholder?: string;
   createItemLabel?: string;
   itemIcon?: 'query' | 'collection';
@@ -246,6 +248,7 @@ export function FileTreePanel({
   onDeleteItem,
   onMove,
   onMoveFolder,
+  activeFolderId,
   searchPlaceholder = 'Filter...',
   createItemLabel = 'New Item',
   itemIcon = 'query',
@@ -261,6 +264,7 @@ export function FileTreePanel({
   } | null>(null);
   const [dragActiveId, setDragActiveId] = useState<string | null>(null);
   const [dropTargetFolderId, setDropTargetFolderId] = useState<string | null | undefined>(undefined);
+  const [lastClickedFolderId, setLastClickedFolderId] = useState<string | null>(null);
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
@@ -311,6 +315,7 @@ export function FileTreePanel({
 
   /* -- Toggle folder expand ---------------------------------------- */
   const toggleFolder = useCallback((folderId: string) => {
+    setLastClickedFolderId(folderId);
     setExpanded((prev) => {
       const next = new Set(prev);
       if (next.has(folderId)) next.delete(folderId);
@@ -549,6 +554,17 @@ export function FileTreePanel({
   const dragItem = dragActiveId ? items.find((i) => i.id === dragActiveId) : null;
   const dragFolder = dragActiveId ? folders.find((f) => f.id === dragActiveId) : null;
 
+  // Determine effective active folder: explicit prop > last clicked folder > selected item's folder
+  const effectiveFolderId = useMemo(() => {
+    if (activeFolderId !== undefined && activeFolderId !== null) return activeFolderId;
+    if (lastClickedFolderId && folders.some((f) => f.id === lastClickedFolderId)) return lastClickedFolderId;
+    if (selectedId) {
+      const selectedItem = items.find((i) => i.id === selectedId);
+      if (selectedItem?.folderId) return selectedItem.folderId;
+    }
+    return null;
+  }, [activeFolderId, lastClickedFolderId, selectedId, items, folders]);
+
   /* -- Render folder node recursively ------------------------------ */
   const ItemIcon = itemIcon === 'query' ? FileCode : Package;
 
@@ -695,7 +711,13 @@ export function FileTreePanel({
           <button
             type="button"
             title="New Folder"
-            onClick={() => onCreateFolder(null)}
+            onClick={() => {
+              const parentId = effectiveFolderId ?? null;
+              if (parentId) {
+                setExpanded((prev) => { if (prev.has(parentId)) return prev; const next = new Set(prev); next.add(parentId); return next; });
+              }
+              onCreateFolder(parentId);
+            }}
             className="rounded p-0.5 text-muted-foreground hover:bg-muted hover:text-foreground"
           >
             <FolderPlus className="size-3.5" />
@@ -703,7 +725,13 @@ export function FileTreePanel({
           <button
             type="button"
             title={createItemLabel}
-            onClick={() => onCreateItem(null)}
+            onClick={() => {
+              const folderId = effectiveFolderId ?? null;
+              if (folderId) {
+                setExpanded((prev) => { if (prev.has(folderId)) return prev; const next = new Set(prev); next.add(folderId); return next; });
+              }
+              onCreateItem(folderId);
+            }}
             className="rounded p-0.5 text-muted-foreground hover:bg-muted hover:text-foreground"
           >
             <Plus className="size-3.5" />
