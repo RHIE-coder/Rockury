@@ -29,6 +29,7 @@ import { FileTreePanel } from './FileTreePanel';
 import { CollectionQueryList } from './CollectionQueryList';
 import { CollectionResultModal } from './CollectionResultModal';
 import { QueryPickerPanel } from './QueryPickerPanel';
+import { QueryEditModal } from './QueryEditModal';
 import type { TDbType, ICollectionItem } from '~/shared/types/db';
 
 /* ------------------------------------------------------------------ */
@@ -85,6 +86,7 @@ export function CollectionTab({ connectionId, dbType }: CollectionTabProps) {
   const [isEditingDescription, setIsEditingDescription] = useState(false);
   const [descriptionDraft, setDescriptionDraft] = useState('');
   const [resultModal, setResultModal] = useState<{ itemId: string; queryName: string } | null>(null);
+  const [editQueryId, setEditQueryId] = useState<string | null>(null);
   const [dragOverlayName, setDragOverlayName] = useState<string | null>(null);
 
   const dndSensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }));
@@ -484,11 +486,7 @@ export function CollectionTab({ connectionId, dbType }: CollectionTabProps) {
                 onReorder={handleReorder}
                 onRemove={handleRemove}
                 onViewResult={handleViewResult}
-                onEditQuery={(queryId) => {
-                  const { setActiveTab, setSelectedQueryId } = useQueryBrowserStore.getState();
-                  setSelectedQueryId(queryId);
-                  setActiveTab('query');
-                }}
+                onEditQuery={(queryId) => setEditQueryId(queryId)}
                 selectResultIds={selectResultIds}
               />
             </CollectionDropZone>
@@ -568,6 +566,16 @@ export function CollectionTab({ connectionId, dbType }: CollectionTabProps) {
           queryName={resultModal.queryName}
           result={runner.selectResults.get(resultModal.itemId)!}
           onClose={() => setResultModal(null)}
+        />
+      )}
+
+      {/* Query Edit Modal */}
+      {editQueryId && (
+        <QueryEditModal
+          open
+          queryId={editQueryId}
+          onClose={() => setEditQueryId(null)}
+          onSaved={() => detail.refetch()}
         />
       )}
     </div>
