@@ -207,6 +207,29 @@ function DroppableFolder({ id, children, isOver }: { id: string; children: React
 }
 
 /* ------------------------------------------------------------------ */
+/*  Root drop zone — visible during drag for "move to root"            */
+/* ------------------------------------------------------------------ */
+
+function RootDropZone({ isActive }: { isActive: boolean }) {
+  const { setNodeRef, isOver } = useDroppable({ id: '__root__' });
+
+  if (!isActive) return null;
+
+  return (
+    <div
+      ref={setNodeRef}
+      className={`mx-2 mt-1 flex items-center justify-center rounded border border-dashed py-2 text-[10px] transition-colors ${
+        isOver
+          ? 'border-primary bg-primary/10 text-primary'
+          : 'border-muted-foreground/30 text-muted-foreground/50'
+      }`}
+    >
+      Drop here to move to root
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------ */
 /*  Main component                                                     */
 /* ------------------------------------------------------------------ */
 
@@ -457,8 +480,12 @@ export function FileTreePanel({
     const overItem = items.find((i) => i.id === overId);
 
     if (activeFolder && onMoveFolder) {
-      // Dragging a folder
-      if (overFolder && overFolder.id !== activeFolder.parentId) {
+      if (overId === '__root__') {
+        // Drop folder to root
+        if (activeFolder.parentId !== null) {
+          onMoveFolder(activeFolder.id, null);
+        }
+      } else if (overFolder && overFolder.id !== activeFolder.parentId) {
         // Prevent dropping folder into itself or its children
         const isDescendant = (parentId: string, childId: string): boolean => {
           const child = folders.find((f) => f.id === childId);
@@ -475,6 +502,18 @@ export function FileTreePanel({
     }
 
     if (!activeItem) return;
+
+    if (overId === '__root__') {
+      // Dropped item to root
+      if (activeItem.folderId !== null) {
+        const rootSiblings = items.filter((i) => i.folderId === null && i.id !== activeItem.id);
+        onMove([
+          ...rootSiblings.map((i, idx) => ({ id: i.id, folderId: null, sortOrder: idx })),
+          { id: activeItem.id, folderId: null, sortOrder: rootSiblings.length },
+        ]);
+      }
+      return;
+    }
 
     if (overFolder) {
       // Dropped item onto a folder → move item into it
@@ -703,6 +742,8 @@ export function FileTreePanel({
                 {rootFolders.map((node) => renderFolderNode(node, 0))}
                 {rootItems.map((item) => renderItemRow(item, 0))}
               </div>
+              {/* Root drop zone — drop here to move to root level */}
+              <RootDropZone isActive={!!dragActiveId} />
             <DragOverlay>
               {dragItem ? (
                 <div className="flex items-center gap-1 rounded bg-background px-2 py-1 text-xs shadow-md border border-border">
