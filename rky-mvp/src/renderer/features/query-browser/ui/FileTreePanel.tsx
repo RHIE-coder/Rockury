@@ -754,7 +754,7 @@ export function FileTreePanel({
       </div>
 
       {/* Tree */}
-      <div className="flex-1 overflow-y-auto">
+      <div className="flex-1 overflow-y-auto" onClick={() => setLastClickedFolderId(null)}>
         {filteredItems.length === 0 && filteredFolders.length === 0 ? (
           <p className="p-3 text-xs text-muted-foreground">
             {items.length === 0 && folders.length === 0 ? 'No items yet.' : 'No matches.'}
