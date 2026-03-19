@@ -12,3 +12,5 @@ export { schemaSnapshotRepository } from './schemaSnapshotRepository';
 export { migrationPackRepository } from './migrationPackRepository';
 export { seedRepository } from './seedRepository';
 export { validationSuiteRepository } from './validationSuiteRepository';
+export { queryBrowserRepository } from './queryBrowserRepository';
+export { collectionRepository } from './collectionRepository';
