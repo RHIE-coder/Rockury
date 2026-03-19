@@ -4,6 +4,7 @@ import { BROWSER_WINDOWS } from './windows-config';
 import { createWindow } from './windows';
 import { registerAllHandlers } from '#/ipc';
 import { initLocalDb, closeLocalDb } from '#/infrastructure';
+import { transactionService } from '#/services';
 
 // Handle creating/removing shortcuts on Windows when installing/uninstalling.
 if (started) {
@@ -18,6 +19,9 @@ app.whenReady().then(() => {
 
   // Register all IPC handlers
   registerAllHandlers();
+
+  // Start periodic cleanup of expired transactions
+  transactionService.startCleanup();
 
   createWindow(BROWSER_WINDOWS.MAIN);
 });
@@ -36,6 +40,7 @@ app.on('activate', () => {
   }
 });
 
-app.on('before-quit', () => {
+app.on('before-quit', async () => {
+  await transactionService.cleanupAll();
   closeLocalDb();
 });

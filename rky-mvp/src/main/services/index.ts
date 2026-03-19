@@ -18,3 +18,6 @@ export { schemaObjectsService } from './schemaObjectsService';
 export { querySafetyService } from './querySafetyService';
 export { validationSuiteService } from './validationSuiteService';
 export { forwardService } from './forwardService';
+export { queryBrowserService } from './queryBrowserService';
+export { collectionService } from './collectionService';
+export { transactionService } from './transactionService';

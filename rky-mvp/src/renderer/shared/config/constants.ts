@@ -18,6 +18,7 @@ export const ROUTES = {
       CONNECTION: '/db/console/connection',
       DIAGRAM: '/db/console/diagram',
       DATA: '/db/console/data',
+      QUERY: '/db/console/query',
     },
     REFERENCE: '/db/reference',
   },

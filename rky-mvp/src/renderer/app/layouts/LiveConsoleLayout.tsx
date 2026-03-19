@@ -3,6 +3,7 @@ import {
   Plug,
   GitBranch,
   Table,
+  Terminal,
 } from 'lucide-react';
 import { ROUTES } from '@/shared/config/constants';
 import { ViewTabs } from '@/widgets/db-view-tabs';
@@ -26,6 +27,7 @@ export function LiveConsoleLayout() {
     { id: 'connection', label: 'Connection', icon: Plug, path: ROUTES.DB.LIVE_CONSOLE.CONNECTION },
     { id: 'diagram', label: 'Diagram', icon: GitBranch, path: ROUTES.DB.LIVE_CONSOLE.DIAGRAM, disabled: !hasConnection },
     { id: 'data', label: 'Data', icon: Table, path: ROUTES.DB.LIVE_CONSOLE.DATA, disabled: !hasConnection },
+    { id: 'query', label: 'Query', icon: Terminal, path: ROUTES.DB.LIVE_CONSOLE.QUERY, disabled: !hasConnection },
   ];
 
   return (

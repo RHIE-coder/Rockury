@@ -5,7 +5,7 @@ import type {
   IConnection, IConnectionFormData, IConnectionTestResult,
   IDiagram, IDiagramLayout, IDiagramVersion, IDiagramFilter, TDiagramType,
   ITable, TDbType, TSchemaObjectType, IDiffResult, IMigration, TMigrationDirection, IViewSnapshot,
-  IQuery, IQueryResult, IQueryHistory,
+  IQuery, IQueryResult, IQueryHistory, IQueryFolder, ICollectionFolder, ICollection, ICollectionItem, THistorySource,
   IDocument, TExportFormat,
   IValidationReport,
   IValidationSuite, IValidationRunResult,
@@ -546,5 +546,93 @@ export interface IEvents {
   [CHANNELS.SCHEMA_VALIDATE_AGAINST_VERSION]: {
     args: { connectionId: string; versionId: string };
     response: { success: boolean; data: IValidationResult };
+  };
+
+  // Query Browser - Query Tree
+  [CHANNELS.QB_QUERY_TREE_LIST]: {
+    args: { connectionId: string };
+    response: { success: boolean; data?: { folders: IQueryFolder[]; queries: IQuery[] }; error?: string };
+  };
+  [CHANNELS.QB_QUERY_FOLDER_SAVE]: {
+    args: { id?: string; connectionId: string; parentId?: string | null; name: string; sortOrder: number };
+    response: { success: boolean; data?: IQueryFolder; error?: string };
+  };
+  [CHANNELS.QB_QUERY_FOLDER_DELETE]: {
+    args: { id: string };
+    response: { success: boolean; error?: string };
+  };
+  [CHANNELS.QB_QUERY_SAVE]: {
+    args: { id?: string; connectionId: string; folderId?: string | null; name: string; description: string; sqlContent: string; sortOrder: number };
+    response: { success: boolean; data?: IQuery; error?: string };
+  };
+  [CHANNELS.QB_QUERY_GET]: {
+    args: { id: string };
+    response: { success: boolean; data?: IQuery; error?: string };
+  };
+  [CHANNELS.QB_QUERY_DELETE]: {
+    args: { id: string };
+    response: { success: boolean; error?: string; referencedCollections?: { id: string; name: string }[] };
+  };
+  [CHANNELS.QB_QUERY_BULK_MOVE]: {
+    args: { items: { id: string; folderId?: string | null; sortOrder: number }[] };
+    response: { success: boolean; error?: string };
+  };
+
+  // Query Browser - Collection Tree
+  [CHANNELS.QB_COLLECTION_TREE_LIST]: {
+    args: { connectionId: string };
+    response: { success: boolean; data?: { folders: ICollectionFolder[]; collections: ICollection[] }; error?: string };
+  };
+  [CHANNELS.QB_COLLECTION_FOLDER_SAVE]: {
+    args: { id?: string; connectionId: string; parentId?: string | null; name: string; sortOrder: number };
+    response: { success: boolean; data?: ICollectionFolder; error?: string };
+  };
+  [CHANNELS.QB_COLLECTION_FOLDER_DELETE]: {
+    args: { id: string };
+    response: { success: boolean; error?: string };
+  };
+  [CHANNELS.QB_COLLECTION_SAVE]: {
+    args: { id?: string; connectionId: string; folderId?: string | null; name: string; description: string; sortOrder: number };
+    response: { success: boolean; data?: ICollection; error?: string };
+  };
+  [CHANNELS.QB_COLLECTION_GET]: {
+    args: { id: string };
+    response: { success: boolean; data?: { collection: ICollection; items: ICollectionItem[] }; error?: string };
+  };
+  [CHANNELS.QB_COLLECTION_DELETE]: {
+    args: { id: string };
+    response: { success: boolean; error?: string };
+  };
+  [CHANNELS.QB_COLLECTION_ITEM_SAVE]: {
+    args: { collectionId: string; items: { queryId: string; sortOrder: number }[] };
+    response: { success: boolean; error?: string };
+  };
+
+  // Query Browser - Transaction
+  [CHANNELS.QB_TX_BEGIN]: {
+    args: { connectionId: string };
+    response: { success: boolean; data?: { txId: string }; error?: string };
+  };
+  [CHANNELS.QB_TX_EXECUTE]: {
+    args: { txId: string; sql: string };
+    response: { success: boolean; data?: IQueryResult; error?: string };
+  };
+  [CHANNELS.QB_TX_COMMIT]: {
+    args: { txId: string };
+    response: { success: boolean; error?: string };
+  };
+  [CHANNELS.QB_TX_ROLLBACK]: {
+    args: { txId: string };
+    response: { success: boolean; error?: string };
+  };
+
+  // Query Browser - History
+  [CHANNELS.QB_HISTORY_LIST]: {
+    args: { connectionId?: string; source?: THistorySource; search?: string; page: number; pageSize: number };
+    response: { success: boolean; data?: { items: IQueryHistory[]; total: number }; error?: string };
+  };
+  [CHANNELS.QB_HISTORY_DELETE]: {
+    args: { id: string };
+    response: { success: boolean; error?: string };
   };
 }
