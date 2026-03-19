@@ -8,6 +8,7 @@ import {
   type DragEndEvent,
   DragOverlay,
 } from '@dnd-kit/core';
+import { arrayMove } from '@dnd-kit/sortable';
 import {
   Play,
   Loader2,
@@ -91,19 +92,40 @@ export function CollectionTab({ connectionId, dbType }: CollectionTabProps) {
   const handleDndDragEnd = useCallback((event: DragEndEvent) => {
     setDragOverlayName(null);
     const { active, over } = event;
-    if (!over || over.id !== 'collection-drop-zone') return;
+    if (!over || !collectionMeta) return;
+
     const data = active.data.current as { type?: string; queryId?: string } | undefined;
-    if (data?.type === 'picker-query' && data.queryId && collectionMeta) {
-      const newItems = [
-        ...items.map((i) => ({ queryId: i.queryId, sortOrder: i.sortOrder })),
-        { queryId: data.queryId, sortOrder: items.length },
-      ];
-      collectionTree.saveItems({
-        collectionId: collectionMeta.id,
-        items: newItems,
-      }).then(() => detail.refetch());
+
+    // Case 1: Dropping a query from picker panel into collection
+    if (data?.type === 'picker-query' && data.queryId) {
+      if (over.id === 'collection-drop-zone' || items.some((i) => i.id === over.id)) {
+        const newItems = [
+          ...items.map((i) => ({ queryId: i.queryId, sortOrder: i.sortOrder })),
+          { queryId: data.queryId, sortOrder: items.length },
+        ];
+        collectionTree.saveItems({
+          collectionId: collectionMeta.id,
+          items: newItems,
+        }).then(() => detail.refetch());
+      }
+      return;
     }
-  }, [items, collectionMeta, collectionTree, detail]);
+
+    // Case 2: Reordering within the collection list
+    if (active.id !== over.id) {
+      const oldIndex = items.findIndex((i) => i.id === active.id);
+      const newIndex = items.findIndex((i) => i.id === over.id);
+      if (oldIndex !== -1 && newIndex !== -1) {
+        const reordered = arrayMove(items, oldIndex, newIndex);
+        handleReorder(
+          reordered.map((item: ICollectionItem, idx: number) => ({
+            queryId: item.queryId,
+            sortOrder: idx,
+          })),
+        );
+      }
+    }
+  }, [items, collectionMeta, collectionTree, detail, handleReorder]);
 
   /* -- Sync loaded detail into local state ----------------------------- */
   const detailCollectionId = detail.collection?.id ?? null;
@@ -372,7 +394,13 @@ export function CollectionTab({ connectionId, dbType }: CollectionTabProps) {
       sensors={dndSensors}
       onDragStart={(e) => {
         const data = e.active.data.current as { queryName?: string } | undefined;
-        setDragOverlayName(data?.queryName ?? null);
+        if (data?.queryName) {
+          setDragOverlayName(data.queryName);
+        } else {
+          // Reorder drag — find item name
+          const item = items.find((i) => i.id === e.active.id);
+          setDragOverlayName(item?.queryName ?? null);
+        }
       }}
       onDragEnd={handleDndDragEnd}
     >

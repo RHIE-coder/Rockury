@@ -269,46 +269,27 @@ export function CollectionQueryList({
   const dragItem = dragActiveId ? items.find((i) => i.id === dragActiveId) : null;
 
   if (items.length === 0) {
-    return (
-      <div className="flex flex-1 items-center justify-center p-6">
-        <p className="text-xs text-muted-foreground">No queries in this collection</p>
-      </div>
-    );
+    return null;
   }
 
   return (
-    <DndContext
-      sensors={sensors}
-      collisionDetection={closestCenter}
-      onDragStart={handleDragStart}
-      onDragEnd={handleDragEnd}
-    >
-      <SortableContext items={sortableIds} strategy={verticalListSortingStrategy}>
-        <div className="flex-1 overflow-y-auto">
-          {items.map((item, index) => (
-            <SortableQueryRow
-              key={item.id}
-              item={item}
-              index={index}
-              status={itemStatuses?.get(item.id)}
-              isExpanded={expandedIds.has(item.id)}
-              onToggleExpand={toggleExpand}
-              onRunSingle={onRunSingle}
-              onRemove={onRemove}
-              onViewResult={onViewResult}
-              hasResult={selectResultIds?.has(item.id)}
-            />
-          ))}
-        </div>
-      </SortableContext>
-      <DragOverlay>
-        {dragItem ? (
-          <div className="flex items-center gap-2 rounded bg-background px-2 py-1.5 text-xs shadow-md">
-            <span className="text-muted-foreground">#</span>
-            <span className="truncate">{dragItem.queryName ?? 'Unnamed'}</span>
-          </div>
-        ) : null}
-      </DragOverlay>
-    </DndContext>
+    <SortableContext items={sortableIds} strategy={verticalListSortingStrategy}>
+      <div>
+        {items.map((item, index) => (
+          <SortableQueryRow
+            key={item.id}
+            item={item}
+            index={index}
+            status={itemStatuses?.get(item.id)}
+            isExpanded={expandedIds.has(item.id)}
+            onToggleExpand={toggleExpand}
+            onRunSingle={onRunSingle}
+            onRemove={onRemove}
+            onViewResult={onViewResult}
+            hasResult={selectResultIds?.has(item.id)}
+          />
+        ))}
+      </div>
+    </SortableContext>
   );
 }
