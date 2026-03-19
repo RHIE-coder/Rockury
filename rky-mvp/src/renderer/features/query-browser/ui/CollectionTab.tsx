@@ -117,6 +117,8 @@ export function CollectionTab({ connectionId, dbType }: CollectionTabProps) {
       const newIndex = items.findIndex((i) => i.id === over.id);
       if (oldIndex !== -1 && newIndex !== -1) {
         const reordered = arrayMove(items, oldIndex, newIndex);
+        // Optimistic update — apply new order immediately
+        setItems(reordered.map((item, idx) => ({ ...item, sortOrder: idx })));
         const reorderedPayload = reordered.map((item: ICollectionItem, idx: number) => ({
           queryId: item.queryId,
           sortOrder: idx,
