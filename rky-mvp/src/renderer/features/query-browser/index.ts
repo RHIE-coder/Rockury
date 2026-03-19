@@ -6,3 +6,6 @@ export { isDdl } from './lib/ddlDetection';
 export { FileTreePanel } from './ui/FileTreePanel';
 export type { FileTreePanelProps } from './ui/FileTreePanel';
 export { QueryTab } from './ui/QueryTab';
+export { HistoryTab } from './ui/HistoryTab';
+export { HistoryDrawer } from './ui/HistoryDrawer';
+export { useQueryHistory } from './model/useQueryHistory';
