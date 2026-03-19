@@ -1,5 +1,17 @@
 import { useState, useRef, useEffect, useMemo, useCallback } from 'react';
 import {
+  DndContext,
+  closestCenter,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+  type DragStartEvent,
+  DragOverlay,
+} from '@dnd-kit/core';
+import { SortableContext, useSortable } from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
+import {
   Search,
   FolderOpen,
   Folder,
@@ -12,6 +24,7 @@ import {
   Pencil,
   Trash2,
   FolderInput,
+  GripVertical,
 } from 'lucide-react';
 
 /* ------------------------------------------------------------------ */
@@ -153,6 +166,89 @@ function InlineInput({
 }
 
 /* ------------------------------------------------------------------ */
+/*  Draggable item (uses useSortable for drag handle)                  */
+/* ------------------------------------------------------------------ */
+
+function DraggableItem({
+  item,
+  depth,
+  isSelected,
+  isEditing,
+  isDragActive,
+  editValue,
+  onEditChange,
+  onEditCommit,
+  onEditCancel,
+  onSelect,
+  onStartEdit,
+  onContextMenu,
+  Icon,
+}: {
+  item: TreeItem;
+  depth: number;
+  isSelected: boolean;
+  isEditing: boolean;
+  isDragActive: boolean;
+  editValue: string;
+  onEditChange: (v: string) => void;
+  onEditCommit: () => void;
+  onEditCancel: () => void;
+  onSelect: (id: string) => void;
+  onStartEdit: (id: string, name: string) => void;
+  onContextMenu: (e: React.MouseEvent, item: TreeItem) => void;
+  Icon: typeof FileCode;
+}) {
+  const { attributes, listeners, setNodeRef, transform, transition } = useSortable({ id: item.id });
+
+  const style: React.CSSProperties = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragActive ? 0.4 : 1,
+    paddingLeft: `${8 + depth * 16}px`,
+    paddingRight: '8px',
+  };
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      className={`group flex w-full cursor-pointer items-center gap-1 py-1 text-xs transition-colors hover:bg-muted ${
+        isSelected ? 'bg-primary/10 font-semibold text-primary' : ''
+      }`}
+      onClick={() => onSelect(item.id)}
+      onDoubleClick={(e) => { e.stopPropagation(); onStartEdit(item.id, item.name); }}
+      onContextMenu={(e) => onContextMenu(e, item)}
+      role="button"
+      tabIndex={0}
+    >
+      <span {...attributes} {...listeners} className="cursor-grab opacity-0 group-hover:opacity-50">
+        <GripVertical className="size-3" />
+      </span>
+      <Icon className="size-3 shrink-0 text-muted-foreground" />
+      {isEditing ? (
+        <InlineInput
+          value={editValue}
+          onChange={onEditChange}
+          onCommit={onEditCommit}
+          onCancel={onEditCancel}
+        />
+      ) : (
+        <span className="min-w-0 flex-1 truncate">{item.name}</span>
+      )}
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/*  Folder drop target (uses useSortable to be recognized by DndContext)*/
+/* ------------------------------------------------------------------ */
+
+function FolderDropTarget({ id, children }: { id: string; children: React.ReactNode }) {
+  const { setNodeRef } = useSortable({ id, disabled: true });
+  return <div ref={setNodeRef}>{children}</div>;
+}
+
+/* ------------------------------------------------------------------ */
 /*  Main component                                                     */
 /* ------------------------------------------------------------------ */
 
@@ -181,6 +277,12 @@ export function FileTreePanel({
   const [deleteAlert, setDeleteAlert] = useState<{
     collections: { id: string; name: string }[];
   } | null>(null);
+  const [dragActiveId, setDragActiveId] = useState<string | null>(null);
+  const [dropTargetFolderId, setDropTargetFolderId] = useState<string | null | undefined>(undefined);
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
+  );
 
   // Expand new folders automatically
   const folderIds = folders.map((f) => f.id).join(',');
@@ -357,18 +459,103 @@ export function FileTreePanel({
     [contextMenu, items, onMove],
   );
 
+  /* -- DnD handlers ------------------------------------------------ */
+  const handleDragStart = useCallback((event: DragStartEvent) => {
+    setDragActiveId(event.active.id as string);
+  }, []);
+
+  const handleDragOver = useCallback((event: any) => {
+    const { over } = event;
+    if (!over) { setDropTargetFolderId(undefined); return; }
+    const overId = over.id as string;
+    // Check if hovering over a folder
+    const overFolder = folders.find((f) => f.id === overId);
+    if (overFolder) {
+      setDropTargetFolderId(overFolder.id);
+      // Auto-expand folder on hover
+      setExpanded((prev) => {
+        if (prev.has(overFolder.id)) return prev;
+        const next = new Set(prev);
+        next.add(overFolder.id);
+        return next;
+      });
+    } else {
+      // Hovering over an item — target its parent folder
+      const overItem = items.find((i) => i.id === overId);
+      setDropTargetFolderId(overItem?.folderId ?? null);
+    }
+  }, [folders, items]);
+
+  const handleDragEnd = useCallback((event: DragEndEvent) => {
+    setDragActiveId(null);
+    setDropTargetFolderId(undefined);
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+
+    const activeItem = items.find((i) => i.id === active.id);
+    if (!activeItem) return;
+
+    const overId = over.id as string;
+    const overFolder = folders.find((f) => f.id === overId);
+    const overItem = items.find((i) => i.id === overId);
+
+    if (overFolder) {
+      // Dropped onto a folder → move item into it
+      const folderItems = items
+        .filter((i) => i.folderId === overFolder.id && i.id !== activeItem.id)
+        .sort((a, b) => a.sortOrder - b.sortOrder);
+      onMove([
+        ...folderItems.map((i, idx) => ({ id: i.id, folderId: overFolder.id, sortOrder: idx })),
+        { id: activeItem.id, folderId: overFolder.id, sortOrder: folderItems.length },
+      ]);
+    } else if (overItem) {
+      // Dropped onto another item → move to same folder, reorder
+      const targetFolderId = overItem.folderId;
+      const siblings = items
+        .filter((i) => i.folderId === targetFolderId)
+        .sort((a, b) => a.sortOrder - b.sortOrder);
+
+      // Remove active from old position if in same folder
+      const withoutActive = siblings.filter((i) => i.id !== activeItem.id);
+      const overIndex = withoutActive.findIndex((i) => i.id === overItem.id);
+      const insertAt = overIndex >= 0 ? overIndex + 1 : withoutActive.length;
+
+      const reordered = [...withoutActive];
+      reordered.splice(insertAt, 0, activeItem);
+
+      onMove(reordered.map((i, idx) => ({
+        id: i.id,
+        folderId: targetFolderId,
+        sortOrder: idx,
+      })));
+    }
+  }, [items, folders, onMove]);
+
+  // All IDs for SortableContext (folders as drop targets + items as draggable)
+  const allSortableIds = useMemo(() => {
+    const ids: string[] = [];
+    for (const f of folders) ids.push(f.id);
+    for (const i of items) ids.push(i.id);
+    return ids;
+  }, [folders, items]);
+
+  const dragItem = dragActiveId ? items.find((i) => i.id === dragActiveId) : null;
+
   /* -- Render folder node recursively ------------------------------ */
   const ItemIcon = itemIcon === 'query' ? FileCode : Package;
 
   function renderFolderNode(node: FolderNode, depth: number) {
     const isExpanded = expanded.has(node.folder.id);
     const isFolderEditing = editingId === node.folder.id && editingType === 'folder';
+    const isDropTarget = dropTargetFolderId === node.folder.id;
 
     return (
-      <div key={node.folder.id}>
+      <FolderDropTarget key={node.folder.id} id={node.folder.id}>
         {/* Folder row */}
         <div
-          className="group flex w-full cursor-pointer items-center gap-1 py-1 text-xs transition-colors hover:bg-muted/50"
+          className={`group flex w-full cursor-pointer items-center gap-1 py-1 text-xs transition-colors hover:bg-muted/50 ${
+            isDropTarget ? 'bg-accent/30 ring-1 ring-accent' : ''
+          }`}
           style={{ paddingLeft: `${4 + depth * 16}px`, paddingRight: '4px' }}
           onClick={() => toggleFolder(node.folder.id)}
           onContextMenu={(e) => handleFolderContextMenu(e, node.folder)}
@@ -410,39 +597,28 @@ export function FileTreePanel({
             {node.items.map((item) => renderItemRow(item, depth + 1))}
           </div>
         )}
-      </div>
+      </FolderDropTarget>
     );
   }
 
   function renderItemRow(item: TreeItem, depth: number) {
-    const isSelected = item.id === selectedId;
-    const isEditing = editingId === item.id && editingType === 'item';
-
     return (
-      <div
+      <DraggableItem
         key={item.id}
-        className={`flex w-full cursor-pointer items-center gap-1 py-1 text-xs transition-colors hover:bg-muted ${
-          isSelected ? 'bg-primary/10 font-semibold text-primary' : ''
-        }`}
-        style={{ paddingLeft: `${8 + depth * 16}px`, paddingRight: '8px' }}
-        onClick={() => onSelect(item.id)}
-        onDoubleClick={(e) => { e.stopPropagation(); startEdit(item.id, item.name, 'item'); }}
-        onContextMenu={(e) => handleItemContextMenu(e, item)}
-        role="button"
-        tabIndex={0}
-      >
-        <ItemIcon className="size-3 shrink-0 text-muted-foreground" />
-        {isEditing ? (
-          <InlineInput
-            value={editValue}
-            onChange={setEditValue}
-            onCommit={commitEdit}
-            onCancel={cancelEdit}
-          />
-        ) : (
-          <span className="min-w-0 flex-1 truncate">{item.name}</span>
-        )}
-      </div>
+        item={item}
+        depth={depth}
+        isSelected={item.id === selectedId}
+        isEditing={editingId === item.id && editingType === 'item'}
+        isDragActive={dragActiveId === item.id}
+        editValue={editValue}
+        onEditChange={setEditValue}
+        onEditCommit={commitEdit}
+        onEditCancel={cancelEdit}
+        onSelect={onSelect}
+        onStartEdit={(id, name) => startEdit(id, name, 'item')}
+        onContextMenu={handleItemContextMenu}
+        Icon={ItemIcon}
+      />
     );
   }
 
@@ -514,10 +690,28 @@ export function FileTreePanel({
             {items.length === 0 && folders.length === 0 ? 'No items yet.' : 'No matches.'}
           </p>
         ) : (
-          <div className="py-1">
-            {rootFolders.map((node) => renderFolderNode(node, 0))}
-            {rootItems.map((item) => renderItemRow(item, 0))}
-          </div>
+          <DndContext
+            sensors={sensors}
+            collisionDetection={closestCenter}
+            onDragStart={handleDragStart}
+            onDragOver={handleDragOver}
+            onDragEnd={handleDragEnd}
+          >
+            <SortableContext items={allSortableIds}>
+              <div className="py-1">
+                {rootFolders.map((node) => renderFolderNode(node, 0))}
+                {rootItems.map((item) => renderItemRow(item, 0))}
+              </div>
+            </SortableContext>
+            <DragOverlay>
+              {dragItem ? (
+                <div className="flex items-center gap-1 rounded bg-background px-2 py-1 text-xs shadow-md border border-border">
+                  <ItemIcon className="size-3 text-muted-foreground" />
+                  <span className="truncate">{dragItem.name}</span>
+                </div>
+              ) : null}
+            </DragOverlay>
+          </DndContext>
         )}
       </div>
 
