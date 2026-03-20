@@ -5,13 +5,16 @@
 
 const KEYWORD_REGEX = /\{\{(\w+)\}\}/g;
 
-/** Extract unique keyword names from SQL */
+/** Extract unique keyword names from SQL (excludes quoted '{{x}}' or "{{x}}") */
 export function extractKeywords(sql: string): string[] {
   const keywords = new Set<string>();
+  const regex = /(['"])\{\{(\w+)\}\}\1|\{\{(\w+)\}\}/g;
   let match: RegExpExecArray | null;
-  const regex = new RegExp(KEYWORD_REGEX.source, 'g');
   while ((match = regex.exec(sql)) !== null) {
-    keywords.add(match[1]);
+    // match[1] = quote char (if quoted → skip), match[3] = bare keyword name
+    if (!match[1] && match[3]) {
+      keywords.add(match[3]);
+    }
   }
   return [...keywords];
 }
@@ -29,26 +32,27 @@ export function extractKeywordsFromMultiple(sqls: string[]): string[] {
 
 /**
  * Replace {{keyword}} with corresponding values.
- * - If the keyword is already inside quotes (e.g. '{{x}}'), replace the value as-is.
- * - Otherwise, auto-quote: numbers stay bare, everything else gets single-quoted (with escaping).
+ * - '{{x}}' or "{{x}}" (quoted) → treated as literal string, NOT replaced.
+ * - {{x}} (bare) → replaced. Numbers/NULL stay bare, strings get auto single-quoted.
  * Unmatched keywords are left as-is.
  */
 export function replaceKeywords(sql: string, values: Record<string, string>): string {
-  // Use a regex that also captures the character before {{ to detect quoting
-  return sql.replace(/(['"]?)\{\{(\w+)\}\}\1/g, (full, quote, name) => {
+  // Match both quoted and bare keyword patterns.
+  // Quoted: '{{x}}' or "{{x}}" → skip (literal).
+  // Bare: {{x}} → replace.
+  return sql.replace(/(['"])\{\{(\w+)\}\}\1|\{\{(\w+)\}\}/g, (full, quote, quotedName, bareName) => {
+    if (quote) {
+      // Quoted → literal, keep as-is (the quotes + keyword text)
+      return full;
+    }
+
+    const name = bareName;
     if (!(name in values)) return full;
     const val = values[name];
 
-    if (quote) {
-      // Already quoted by user, e.g. '{{x}}' → 'value'
-      return `${quote}${val.replace(/'/g, "''")}${quote}`;
-    }
-
-    // Auto-detect: if it looks like a number, keep bare; otherwise single-quote
     if (/^-?\d+(\.\d+)?$/.test(val)) {
       return val;
     }
-    // NULL keyword
     if (val.toUpperCase() === 'NULL') {
       return 'NULL';
     }
@@ -56,7 +60,7 @@ export function replaceKeywords(sql: string, values: Record<string, string>): st
   });
 }
 
-/** Check if SQL contains any keywords */
+/** Check if SQL contains any bare (non-quoted) keywords */
 export function hasKeywords(sql: string): boolean {
-  return KEYWORD_REGEX.test(sql);
+  return extractKeywords(sql).length > 0;
 }

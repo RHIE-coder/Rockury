@@ -14,6 +14,12 @@ describe('extractKeywords', () => {
   it('returns empty for no keywords', () => {
     expect(extractKeywords('SELECT 1')).toEqual([]);
   });
+  it('excludes single-quoted keywords', () => {
+    expect(extractKeywords("WHERE name = '{{name}}' AND id = {{id}}")).toEqual(['id']);
+  });
+  it('excludes double-quoted keywords', () => {
+    expect(extractKeywords('WHERE name = "{{name}}"')).toEqual([]);
+  });
 });
 
 describe('extractKeywordsFromMultiple', () => {
@@ -39,9 +45,13 @@ describe('replaceKeywords', () => {
     const result = replaceKeywords('WHERE id = {{val}}', { val: 'NULL' });
     expect(result).toBe('WHERE id = NULL');
   });
-  it('respects user-provided quotes', () => {
-    const result = replaceKeywords("WHERE name = '{{name}}'", { name: "O'Brien" });
-    expect(result).toBe("WHERE name = 'O''Brien'");
+  it('preserves quoted keywords as literal text', () => {
+    const result = replaceKeywords("WHERE name = '{{name}}'", { name: "anything" });
+    expect(result).toBe("WHERE name = '{{name}}'");
+  });
+  it('preserves double-quoted keywords as literal text', () => {
+    const result = replaceKeywords('WHERE name = "{{name}}"', { name: "anything" });
+    expect(result).toBe('WHERE name = "{{name}}"');
   });
   it('leaves unmatched keywords', () => {
     const result = replaceKeywords('{{a}} and {{b}}', { a: '1' });
