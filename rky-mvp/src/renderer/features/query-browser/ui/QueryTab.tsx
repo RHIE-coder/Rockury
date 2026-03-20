@@ -10,7 +10,6 @@ import { queryBrowserApi } from '../api/queryBrowserApi';
 import { FileTreePanel } from './FileTreePanel';
 import { SqlEditorPanel, type SqlEditorPanelHandle } from './SqlEditorPanel';
 import { DmlResultPanel } from './DmlResultPanel';
-import { KeywordInputPanel } from './KeywordInputPanel';
 import { extractKeywords, replaceKeywords } from '../lib/keywords';
 import type { TDbType } from '~/shared/types/db';
 
@@ -49,8 +48,9 @@ export function QueryTab({ connectionId, dbType }: QueryTabProps) {
   const [columnVisibility, setColumnVisibility] = useState<VisibilityState>({});
   const [page, setPage] = useState(0);
   const [pageSize, setPageSize] = useState(50);
-  const [pendingKeywords, setPendingKeywords] = useState<string[] | null>(null);
-  const [lastKeywordValues, setLastKeywordValues] = useState<Record<string, string>>({});
+  const [detectedKeywords, setDetectedKeywords] = useState<string[]>([]);
+  const [keywordValues, setKeywordValues] = useState<Record<string, string>>({});
+  const [showKeywordError, setShowKeywordError] = useState(false);
 
   const editorRef = useRef<SqlEditorPanelHandle>(null);
   const autoSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -78,6 +78,13 @@ export function QueryTab({ connectionId, dbType }: QueryTabProps) {
       });
       setLoadedSql(q.sqlContent);
       lastSavedSqlRef.current = q.sqlContent;
+      const kws = extractKeywords(q.sqlContent);
+      setDetectedKeywords(kws);
+      setKeywordValues((prev) => {
+        const next: Record<string, string> = {};
+        for (const kw of kws) next[kw] = prev[kw] ?? '';
+        return next;
+      });
     });
 
     return () => { cancelled = true; };
@@ -105,6 +112,17 @@ export function QueryTab({ connectionId, dbType }: QueryTabProps) {
     (value: string) => {
       if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
       autoSaveTimerRef.current = setTimeout(() => saveCurrentSql(value), AUTO_SAVE_DELAY);
+
+      // Real-time keyword detection
+      const kws = extractKeywords(value);
+      setDetectedKeywords(kws);
+      setShowKeywordError(false);
+      // Preserve existing values, remove stale ones
+      setKeywordValues((prev) => {
+        const next: Record<string, string> = {};
+        for (const kw of kws) next[kw] = prev[kw] ?? '';
+        return next;
+      });
     },
     [saveCurrentSql],
   );
@@ -140,30 +158,20 @@ export function QueryTab({ connectionId, dbType }: QueryTabProps) {
     if (!sql.trim()) return;
     saveCurrentSql(sql);
 
-    // Check for keywords
-    const keywords = extractKeywords(sql);
-    if (keywords.length > 0) {
-      setPendingKeywords(keywords);
-      return;
+    if (detectedKeywords.length > 0) {
+      const hasEmpty = detectedKeywords.some((kw) => !keywordValues[kw]?.trim());
+      if (hasEmpty) {
+        setShowKeywordError(true);
+        return;
+      }
+      const resolvedSql = replaceKeywords(sql, keywordValues);
+      setPage(0);
+      execution.execute(resolvedSql);
+    } else {
+      setPage(0);
+      execution.execute(sql);
     }
-
-    setPendingKeywords(null);
-    setPage(0);
-    execution.execute(sql);
-  }, [saveCurrentSql, execution]);
-
-  const handleKeywordSubmit = useCallback((values: Record<string, string>) => {
-    const rawSql = editorRef.current?.getValue() ?? '';
-    const resolvedSql = replaceKeywords(rawSql, values);
-    setLastKeywordValues(values);
-    setPendingKeywords(null);
-    setPage(0);
-    execution.execute(resolvedSql);
-  }, [execution]);
-
-  const handleKeywordCancel = useCallback(() => {
-    setPendingKeywords(null);
-  }, []);
+  }, [saveCurrentSql, execution, detectedKeywords, keywordValues]);
 
   /* -- File tree callbacks ------------------------------------------ */
   const handleSelect = useCallback(
@@ -378,6 +386,39 @@ export function QueryTab({ connectionId, dbType }: QueryTabProps) {
               )}
             </div>
 
+            {/* Live keyword inputs — shown above editor when keywords detected */}
+            {detectedKeywords.length > 0 && (
+              <div className="border-b border-border bg-amber-500/5 px-3 py-1.5">
+                <div className="mb-1 flex items-center gap-1.5 text-[10px] font-medium text-amber-600 dark:text-amber-400">
+                  <span>{detectedKeywords.length} keyword{detectedKeywords.length > 1 ? 's' : ''}</span>
+                  {showKeywordError && (
+                    <span className="text-destructive">— fill in all values to run</span>
+                  )}
+                </div>
+                <div className="flex flex-wrap gap-x-3 gap-y-1.5">
+                  {detectedKeywords.map((kw) => (
+                    <div key={kw} className="flex items-center gap-1">
+                      <span className="font-mono text-[10px] text-muted-foreground">{kw}</span>
+                      <input
+                        type="text"
+                        value={keywordValues[kw] ?? ''}
+                        onChange={(e) => {
+                          setKeywordValues((prev) => ({ ...prev, [kw]: e.target.value }));
+                          setShowKeywordError(false);
+                        }}
+                        placeholder="value"
+                        className={`w-28 rounded border px-1.5 py-0.5 text-xs outline-none focus:ring-1 focus:ring-primary ${
+                          showKeywordError && !keywordValues[kw]?.trim()
+                            ? 'border-destructive bg-destructive/5'
+                            : 'border-border bg-background'
+                        }`}
+                      />
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
             {/* SQL Editor — key forces remount on query switch */}
             <SqlEditorPanel
               key={queryMeta.id}
@@ -387,16 +428,6 @@ export function QueryTab({ connectionId, dbType }: QueryTabProps) {
               onRun={handleRun}
               isLoading={execution.isLoading}
             />
-
-            {/* Keyword Input */}
-            {pendingKeywords && pendingKeywords.length > 0 && (
-              <KeywordInputPanel
-                keywords={pendingKeywords}
-                initialValues={lastKeywordValues}
-                onSubmit={handleKeywordSubmit}
-                onCancel={handleKeywordCancel}
-              />
-            )}
 
             {/* Error Banner */}
             {execution.error && (
