@@ -182,11 +182,13 @@ export function CollectionTab({ connectionId, dbType }: CollectionTabProps) {
   }, [collectionMeta, descriptionDraft, connectionId, collectionTree]);
 
   /* -- Run handlers ---------------------------------------------------- */
+  const runnableItems = useMemo(() => items.filter((i) => i.sqlContent?.trim()), [items]);
+
   const handleRunAll = useCallback(() => {
-    if (items.length === 0) return;
+    if (runnableItems.length === 0) return;
 
     // Check for keywords across all queries
-    const sqls = items.map((i) => i.sqlContent ?? '').filter(Boolean);
+    const sqls = runnableItems.map((i) => i.sqlContent ?? '').filter(Boolean);
     const keywords = extractKeywordsFromMultiple(sqls);
     if (keywords.length > 0) {
       setPendingKeywords(keywords);
@@ -194,19 +196,19 @@ export function CollectionTab({ connectionId, dbType }: CollectionTabProps) {
     }
 
     setPendingKeywords(null);
-    runner.runAll(items);
-  }, [items, runner]);
+    runner.runAll(runnableItems);
+  }, [runnableItems, runner]);
 
   const handleKeywordSubmit = useCallback((values: Record<string, string>) => {
     setLastKeywordValues(values);
     setPendingKeywords(null);
-    // Replace keywords in all items and run
-    const resolvedItems = items.map((item) => ({
+    // Replace keywords in runnable items and run
+    const resolvedItems = runnableItems.map((item) => ({
       ...item,
       sqlContent: item.sqlContent ? replaceKeywords(item.sqlContent, values) : item.sqlContent,
     }));
     runner.runAll(resolvedItems);
-  }, [items, runner]);
+  }, [runnableItems, runner]);
 
   const handleKeywordCancel = useCallback(() => {
     setPendingKeywords(null);
@@ -495,7 +497,7 @@ export function CollectionTab({ connectionId, dbType }: CollectionTabProps) {
                 variant="default"
                 size="xs"
                 onClick={handleRunAll}
-                disabled={isRunning || items.length === 0}
+                disabled={isRunning || runnableItems.length === 0}
               >
                 {isRunning ? (
                   <Loader2 className="mr-1 size-3 animate-spin" />
@@ -614,6 +616,7 @@ export function CollectionTab({ connectionId, dbType }: CollectionTabProps) {
         <QueryEditModal
           open
           queryId={editQueryId}
+          dbType={dbType}
           onClose={() => setEditQueryId(null)}
           onSaved={() => detail.refetch()}
         />

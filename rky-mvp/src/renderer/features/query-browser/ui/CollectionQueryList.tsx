@@ -23,9 +23,9 @@ import {
   ChevronRight,
   CheckCircle2,
   XCircle,
-  Clock,
+  Circle,
   Loader2,
-  Eye,
+  Table2,
   MinusCircle,
   Pencil,
 } from 'lucide-react';
@@ -38,7 +38,7 @@ import type { TItemStatus } from '../model/useCollectionRunner';
 
 function StatusBadge({ status }: { status?: TItemStatus }) {
   if (!status || status === 'pending') {
-    return <Clock className="size-3 text-muted-foreground" />;
+    return <Circle className="size-3 text-muted-foreground" />;
   }
   if (status === 'running') {
     return <Loader2 className="size-3 animate-spin text-blue-500" />;
@@ -128,11 +128,13 @@ function SortableQueryRow({
     ? item.sqlContent.split('\n').slice(0, 3).join('\n')
     : '';
 
+  const hasSql = Boolean(item.sqlContent?.trim());
+
   return (
     <div ref={setNodeRef} style={style} className="border-b border-border last:border-b-0">
       {/* Main row */}
       <div
-        className="group flex items-center gap-2 px-2 py-1.5 text-xs hover:bg-muted/50"
+        className={`group flex items-center gap-2 px-2 py-1.5 text-xs ${hasSql ? 'hover:bg-muted/50' : 'opacity-50'}`}
         {...attributes}
         {...listeners}
       >
@@ -141,6 +143,7 @@ function SortableQueryRow({
           type="button"
           onClick={() => onToggleExpand(item.id)}
           className="shrink-0 text-muted-foreground hover:text-foreground"
+          disabled={!hasSql}
         >
           {isExpanded ? <ChevronDown className="size-3" /> : <ChevronRight className="size-3" />}
         </button>
@@ -148,36 +151,42 @@ function SortableQueryRow({
         {/* Number */}
         <span className="w-5 shrink-0 text-center text-muted-foreground">{index + 1}</span>
 
+        {/* Status */}
+        <StatusBadge status={status} />
+
+        {/* View result button — fixed-width slot next to status for alignment */}
+        <div className="w-4 shrink-0 flex items-center justify-center">
+          {hasResult && onViewResult ? (
+            <button
+              type="button"
+              onClick={() => onViewResult(item.id)}
+              className="shrink-0 rounded p-0.5 text-primary hover:bg-muted hover:text-primary/80"
+              title="View result"
+            >
+              <Table2 className="size-3" />
+            </button>
+          ) : null}
+        </div>
+
         {/* Query name + description */}
-        <div className="min-w-0 flex-1" title={sqlPreview}>
-          <span className="truncate block">{item.queryName ?? 'Unnamed'}</span>
+        <div className="min-w-0 flex-1" title={hasSql ? sqlPreview : 'No SQL content'}>
+          <span className={`truncate block ${!hasSql ? 'text-muted-foreground italic' : ''}`}>
+            {item.queryName ?? 'Unnamed'}
+            {!hasSql && <span className="ml-1 text-[10px] text-muted-foreground/60">(empty)</span>}
+          </span>
           {item.queryDescription && (
             <span className="truncate block text-[10px] text-muted-foreground/70">{item.queryDescription}</span>
           )}
         </div>
 
-        {/* Status */}
-        <StatusBadge status={status} />
-
-        {/* View result button (for SELECT results) */}
-        {hasResult && onViewResult && (
-          <button
-            type="button"
-            onClick={() => onViewResult(item.id)}
-            className="shrink-0 rounded p-0.5 text-muted-foreground opacity-0 hover:bg-muted hover:text-foreground group-hover:opacity-100"
-            title="View result"
-          >
-            <Eye className="size-3" />
-          </button>
-        )}
-
         {/* Run button */}
         {onRunSingle && (
           <button
             type="button"
-            onClick={() => onRunSingle(item)}
-            className="shrink-0 rounded p-0.5 text-muted-foreground opacity-0 hover:bg-muted hover:text-foreground group-hover:opacity-100"
-            title="Run this query"
+            onClick={() => hasSql && onRunSingle(item)}
+            disabled={!hasSql}
+            className={`shrink-0 rounded p-0.5 text-muted-foreground opacity-0 group-hover:opacity-100 ${hasSql ? 'hover:bg-muted hover:text-foreground' : 'cursor-not-allowed'}`}
+            title={hasSql ? 'Run this query' : 'No SQL to run'}
           >
             <Play className="size-3" />
           </button>

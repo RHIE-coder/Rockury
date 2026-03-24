@@ -6,7 +6,7 @@ import {
   type ColumnDef,
   type VisibilityState,
 } from '@tanstack/react-table';
-import { ArrowUp, ArrowDown, ArrowUpDown, Braces } from 'lucide-react';
+import { ArrowUp, ArrowDown, ArrowUpDown, Braces, Copy, Check } from 'lucide-react';
 import type { IQueryResult, IColumn } from '~/shared/types/db';
 import { CellEditor } from './CellEditor';
 import { JsonEditorModal } from './JsonEditorModal';
@@ -116,22 +116,13 @@ export function DataGrid({
   const [editingCell, setEditingCell] = useState<{ rowIndex: number; column: string } | null>(null);
   const [jsonEditor, setJsonEditor] = useState<{ row: TRow; column: string; value: unknown } | null>(null);
 
-  // Floating hover preview
-  const [hoverCell, setHoverCell] = useState<{ rect: DOMRect; text: string } | null>(null);
-  const hoverTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Copy cell value to clipboard
+  const [copiedCellId, setCopiedCellId] = useState<string | null>(null);
 
-  const handleCellMouseEnter = useCallback((e: React.MouseEvent<HTMLTableCellElement>, text: string) => {
-    if (!text || text.length < 10) return;
-    const rect = e.currentTarget.getBoundingClientRect();
-    if (hoverTimerRef.current) clearTimeout(hoverTimerRef.current);
-    hoverTimerRef.current = setTimeout(() => {
-      setHoverCell({ rect, text });
-    }, 250);
-  }, []);
-
-  const handleCellMouseLeave = useCallback(() => {
-    if (hoverTimerRef.current) { clearTimeout(hoverTimerRef.current); hoverTimerRef.current = null; }
-    setHoverCell(null);
+  const handleCopyCell = useCallback((cellId: string, text: string) => {
+    navigator.clipboard.writeText(text);
+    setCopiedCellId(cellId);
+    setTimeout(() => setCopiedCellId(null), 1200);
   }, []);
 
 
@@ -365,14 +356,13 @@ export function DataGrid({
                     const cellVal = colId === '__rowNum' ? '' : formatCellValue(
                       change ? change.modified[colId] : row.original[colId],
                     );
+                    const isCopied = copiedCellId === cell.id;
                     return (
                       <td
                         key={cell.id}
-                        className={`max-w-xs truncate border-b border-r border-border px-3 py-1 font-mono ${
+                        className={`group/cell relative max-w-xs truncate border-b border-r border-border px-3 py-1 font-mono hover:overflow-visible ${
                           isEditable ? 'cursor-pointer' : ''
-                        } ${isEditing ? 'relative overflow-visible' : ''}`}
-                        onMouseEnter={(e) => handleCellMouseEnter(e, cellVal)}
-                        onMouseLeave={handleCellMouseLeave}
+                        } ${isEditing ? 'overflow-visible' : ''}`}
                         onDoubleClick={() => {
                           if (isEditable) {
                             const colInfo = columnInfoMap.get(colId);
@@ -398,6 +388,27 @@ export function DataGrid({
                         }}
                       >
                         {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                        {colId !== '__rowNum' && cellVal && (
+                          <>
+                            {/* Copy button — appears on cell hover */}
+                            <button
+                              type="button"
+                              onClick={(e) => { e.stopPropagation(); handleCopyCell(cell.id, cellVal); }}
+                              className="absolute right-0.5 top-0.5 hidden rounded bg-popover/90 p-0.5 text-muted-foreground shadow-sm hover:text-foreground group-hover/cell:block"
+                              title="Copy value"
+                            >
+                              {isCopied
+                                ? <Check className="size-3 text-green-500" />
+                                : <Copy className="size-3" />}
+                            </button>
+                            {/* Full content tooltip — appears on cell hover, only if truncated */}
+                            {cellVal.length > 20 && (
+                              <div className="pointer-events-none absolute left-0 top-full z-50 mt-0.5 hidden max-h-40 max-w-sm overflow-hidden whitespace-pre-wrap break-all rounded-md border border-border bg-popover px-3 py-1.5 font-mono text-xs text-popover-foreground shadow-lg group-hover/cell:block">
+                                {cellVal.length > 300 ? cellVal.slice(0, 300) + '…' : cellVal}
+                              </div>
+                            )}
+                          </>
+                        )}
                       </td>
                     );
                   })}
@@ -408,15 +419,6 @@ export function DataGrid({
         </table>
       </div>
 
-      {/* Floating hover preview */}
-      {hoverCell && (
-        <div
-          className="pointer-events-none fixed z-50 max-w-md whitespace-pre-wrap break-all rounded-md border border-border bg-popover px-3 py-1.5 font-mono text-xs text-popover-foreground shadow-lg"
-          style={{ left: hoverCell.rect.left, top: hoverCell.rect.bottom + 2 }}
-        >
-          {hoverCell.text}
-        </div>
-      )}
 
       {/* JSON Editor Modal */}
       {jsonEditor && (

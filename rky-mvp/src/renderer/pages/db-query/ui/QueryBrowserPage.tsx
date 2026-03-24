@@ -62,11 +62,12 @@ export function QueryBrowserPage() {
           <button
             type="button"
             onClick={() => setHistoryDrawerOpen(!historyDrawerOpen)}
-            className="flex items-center gap-1 rounded px-2 py-1 text-[11px] text-muted-foreground hover:bg-muted hover:text-foreground"
-            title="Toggle History drawer"
+            className={`flex items-center gap-1 rounded px-2 py-1 text-muted-foreground hover:bg-muted hover:text-foreground ${
+              historyDrawerOpen ? 'bg-muted text-foreground' : ''
+            }`}
+            title="Recent history"
           >
-            <Clock className="h-3 w-3" />
-            <span>History</span>
+            <Clock className="h-3.5 w-3.5" />
           </button>
         </div>
       </div>

@@ -28,6 +28,7 @@ export function useDataQuery(connectionId: string, dbType: TDbType) {
   });
   const [result, setResult] = useState<IQueryResult | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
   const stateRef = useRef(state);
   stateRef.current = state;
 
@@ -52,6 +53,7 @@ export function useDataQuery(connectionId: string, dbType: TDbType) {
         orderBy: state.orderBy ?? undefined,
         filters: state.filters.length > 0 ? state.filters : undefined,
       });
+      setIsLoading(true);
       queryMutation.mutate(sql);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -66,9 +68,11 @@ export function useDataQuery(connectionId: string, dbType: TDbType) {
     onSuccess: (data) => {
       setResult(data);
       setError(null);
+      setIsLoading(false);
     },
     onError: (err: Error) => {
       setError(err.message);
+      setIsLoading(false);
     },
   });
 
@@ -83,6 +87,7 @@ export function useDataQuery(connectionId: string, dbType: TDbType) {
         orderBy: s.orderBy ?? undefined,
         filters: s.filters.length > 0 ? s.filters : undefined,
       });
+      setIsLoading(true);
       queryMutation.mutate(sql);
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -165,7 +170,7 @@ export function useDataQuery(connectionId: string, dbType: TDbType) {
     state,
     result,
     error,
-    isLoading: queryMutation.isPending,
+    isLoading,
     selectTable,
     setPage,
     setPageSize,
