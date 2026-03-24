@@ -145,6 +145,8 @@ const API: TElectronAPI = {
   // Query
   [CHANNELS.QUERY_EXECUTE]: (args) =>
     ipcRenderer.invoke(CHANNELS.QUERY_EXECUTE, args),
+  [CHANNELS.QUERY_EXPLAIN_ANALYZE]: (args: any) =>
+    ipcRenderer.invoke(CHANNELS.QUERY_EXPLAIN_ANALYZE, args),
   [CHANNELS.QUERY_LIST]: () =>
     ipcRenderer.invoke(CHANNELS.QUERY_LIST),
   [CHANNELS.QUERY_SAVE]: (args) =>

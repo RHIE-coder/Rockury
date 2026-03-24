@@ -2,7 +2,9 @@ import { queryRepository, queryHistoryRepository } from '#/repositories';
 import { connectionService } from './connectionService';
 import { createMysqlConnection, closeMysqlConnection } from '#/infrastructure';
 import { createPgConnection, closePgConnection } from '#/infrastructure';
-import type { IQuery, IQueryResult, IQueryHistory } from '~/shared/types/db';
+import type { IQuery, IQueryResult, IQueryHistory, IExplainResult } from '~/shared/types/db';
+import type { TDbType } from '~/shared/types/db';
+import { classifyQueryType, buildExplainAnalyzeSql, parseExplainSummary } from '~/shared/lib/explainSql';
 
 export const queryService = {
   async executeQuery(connectionId: string, sql: string): Promise<IQueryResult> {
@@ -72,6 +74,69 @@ export const queryService = {
 
   listHistory(limit?: number): IQueryHistory[] {
     return queryHistoryRepository.list(limit);
+  },
+
+  async explainAnalyze(connectionId: string, sql: string, dbType: TDbType): Promise<IExplainResult> {
+    const config = connectionService.getConnectionConfig(connectionId);
+    const queryType = classifyQueryType(sql);
+    const explainSql = buildExplainAnalyzeSql(dbType, sql, queryType);
+    const needsRollback = queryType === 'DML' && dbType !== 'sqlite';
+
+    let result: IQueryResult;
+
+    if (needsRollback) {
+      if (config.dbType === 'mysql' || config.dbType === 'mariadb') {
+        const conn = await createMysqlConnection({
+          host: config.host, port: config.port, database: config.database,
+          username: config.username, password: config.password,
+          sslEnabled: config.sslEnabled, sslConfig: config.sslConfig,
+        });
+        try {
+          await conn.query('BEGIN');
+          try {
+            const [results, fields] = await conn.query(explainSql);
+            result = mapMysqlResult(results, fields);
+          } finally {
+            await conn.query('ROLLBACK');
+          }
+        } finally {
+          await closeMysqlConnection(conn);
+        }
+      } else {
+        const client = await createPgConnection({
+          host: config.host, port: config.port, database: config.database,
+          username: config.username, password: config.password,
+          sslEnabled: config.sslEnabled, sslConfig: config.sslConfig,
+        });
+        try {
+          await client.query('BEGIN');
+          try {
+            const pgResult = await client.query(explainSql);
+            result = {
+              columns: pgResult.fields?.map((f) => f.name) ?? [],
+              rows: pgResult.rows ?? [],
+              rowCount: pgResult.rows?.length ?? 0,
+              executionTimeMs: 0,
+            };
+          } finally {
+            await client.query('ROLLBACK');
+          }
+        } finally {
+          await closePgConnection(client);
+        }
+      }
+    } else if (dbType === 'sqlite') {
+      return { planRows: [], summary: 'SQLite EXPLAIN not yet supported', rawJson: undefined };
+    } else {
+      result = await this.executeQuery(connectionId, explainSql);
+    }
+
+    const summary = parseExplainSummary(result.rows, dbType);
+    return {
+      planRows: result.rows,
+      summary,
+      rawJson: result.rows.length > 0 ? result.rows[0] : undefined,
+    };
   },
 };
 

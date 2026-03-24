@@ -1,15 +1,19 @@
-import { useState, useCallback, useEffect, useRef } from 'react';
+import { useState, useCallback, useEffect, useRef, useMemo } from 'react';
 import type { VisibilityState } from '@tanstack/react-table';
-import { Loader2 } from 'lucide-react';
+import { Loader2, TableProperties } from 'lucide-react';
 import { DataGrid, DataFooter } from '@/features/data-browser';
 import { generateUuid } from '@/features/data-browser/lib/uuid';
 import { useQueryTree } from '../model/useQueryTree';
 import { useQueryExecution } from '../model/useQueryExecution';
 import { useQueryBrowserStore } from '../model/queryBrowserStore';
+import { useSchemaData } from '../model/useSchemaData';
 import { queryBrowserApi } from '../api/queryBrowserApi';
 import { FileTreePanel } from './FileTreePanel';
 import { SqlEditorPanel, type SqlEditorPanelHandle } from './SqlEditorPanel';
 import { DmlResultPanel } from './DmlResultPanel';
+import { SchemaPanel } from './SchemaPanel';
+import { TablePreviewModal } from './TablePreviewModal';
+import { ExplainSummaryBanner } from './ExplainSummaryBanner';
 import { extractKeywords, replaceKeywords } from '../lib/keywords';
 import type { TDbType } from '~/shared/types/db';
 
@@ -37,9 +41,20 @@ const AUTO_SAVE_DELAY = 2000;
 /* ------------------------------------------------------------------ */
 
 export function QueryTab({ connectionId, dbType }: QueryTabProps) {
-  const { selectedQueryId, setSelectedQueryId } = useQueryBrowserStore();
+  const { selectedQueryId, setSelectedQueryId, schemaPanelOpen, setSchemaPanelOpen } = useQueryBrowserStore();
   const queryTree = useQueryTree(connectionId);
-  const execution = useQueryExecution(connectionId);
+  const execution = useQueryExecution(connectionId, dbType);
+  const { tables: schemaTables, isLoading: schemaLoading } = useSchemaData(connectionId);
+
+  // Build schema map for SQL autocomplete: { tableName: ['col1', 'col2'] }
+  const sqlSchema = useMemo(() => {
+    if (schemaTables.length === 0) return undefined;
+    const schema: Record<string, readonly string[]> = {};
+    for (const t of schemaTables) {
+      schema[t.name] = t.columns.map((c) => c.name);
+    }
+    return schema;
+  }, [schemaTables]);
 
   const [loadedSql, setLoadedSql] = useState('');
   const [queryMeta, setQueryMeta] = useState<QueryMeta | null>(null);
@@ -51,6 +66,7 @@ export function QueryTab({ connectionId, dbType }: QueryTabProps) {
   const [detectedKeywords, setDetectedKeywords] = useState<string[]>([]);
   const [keywordValues, setKeywordValues] = useState<Record<string, string>>({});
   const [showKeywordError, setShowKeywordError] = useState(false);
+  const [previewTableName, setPreviewTableName] = useState<string | null>(null);
 
   const editorRef = useRef<SqlEditorPanelHandle>(null);
   const autoSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -170,6 +186,23 @@ export function QueryTab({ connectionId, dbType }: QueryTabProps) {
     } else {
       setPage(0);
       execution.execute(sql);
+    }
+  }, [saveCurrentSql, execution, detectedKeywords, keywordValues]);
+
+  const handleExplain = useCallback((sql: string) => {
+    if (!sql.trim()) return;
+    saveCurrentSql(sql);
+
+    if (detectedKeywords.length > 0) {
+      const hasEmpty = detectedKeywords.some((kw) => !keywordValues[kw]?.trim());
+      if (hasEmpty) {
+        setShowKeywordError(true);
+        return;
+      }
+      const resolvedSql = replaceKeywords(sql, keywordValues);
+      execution.explain(resolvedSql);
+    } else {
+      execution.explain(sql);
     }
   }, [saveCurrentSql, execution, detectedKeywords, keywordValues]);
 
@@ -309,6 +342,14 @@ export function QueryTab({ connectionId, dbType }: QueryTabProps) {
     [queryTree, connectionId],
   );
 
+  /* -- Schema insert ------------------------------------------------ */
+  const handleSchemaInsert = useCallback(
+    (text: string) => {
+      editorRef.current?.insertText(text);
+    },
+    [],
+  );
+
   /* -- Map tree items for FileTreePanel ----------------------------- */
   const treeItems = queryTree.queries.map((q) => ({
     id: q.id,
@@ -354,11 +395,24 @@ export function QueryTab({ connectionId, dbType }: QueryTabProps) {
       <div className="flex min-w-0 flex-1 flex-col">
         {queryMeta ? (
           <>
-            {/* Toolbar: filename + description */}
+            {/* Toolbar: filename + description + schema toggle */}
             <div className="flex shrink-0 flex-col border-b border-border px-3 py-1.5">
               <div className="flex items-center gap-2">
                 <span className="text-sm font-medium">{queryMeta.name}</span>
                 {/* TODO: collection badges */}
+                <button
+                  type="button"
+                  onClick={() => setSchemaPanelOpen(!schemaPanelOpen)}
+                  className={`ml-auto flex items-center gap-1 rounded border px-1.5 py-0.5 text-[10px] font-medium transition-colors ${
+                    schemaPanelOpen
+                      ? 'border-primary/40 bg-primary/10 text-foreground'
+                      : 'border-border text-muted-foreground hover:text-foreground'
+                  }`}
+                  title="Toggle Schema Panel"
+                >
+                  <TableProperties className="size-3" />
+                  Schema
+                </button>
               </div>
               {isEditingDescription ? (
                 <input
@@ -419,84 +473,109 @@ export function QueryTab({ connectionId, dbType }: QueryTabProps) {
               </div>
             )}
 
-            {/* SQL Editor — key forces remount on query switch */}
-            <SqlEditorPanel
-              key={queryMeta.id}
-              ref={editorRef}
-              initialValue={loadedSql}
-              onContentChange={handleContentChange}
-              onRun={handleRun}
-              isLoading={execution.isLoading}
-            />
-
-            {/* Error Banner */}
-            {execution.error && (
-              <div className="flex items-center gap-2 bg-destructive/10 px-3 py-2">
-                <span className="flex-1 text-xs text-destructive">{execution.error}</span>
-                <button
-                  type="button"
-                  onClick={execution.dismissError}
-                  className="text-xs text-destructive underline"
-                >
-                  Dismiss
-                </button>
-              </div>
-            )}
-
-            {/* Result area */}
-            {execution.txState ? (
-              <div className="p-3">
-                <DmlResultPanel
-                  dmlType={execution.txState.dmlType}
-                  affectedRows={execution.txState.affectedRows}
-                  onConfirm={execution.confirm}
-                  onRollback={execution.rollback}
+            {/* Editor + Schema side-by-side */}
+            <div className="flex min-h-0 flex-1">
+              {/* Editor + Result column */}
+              <div className="flex min-w-0 flex-1 flex-col">
+                {/* SQL Editor — key forces remount on query switch */}
+                <SqlEditorPanel
+                  key={queryMeta.id}
+                  ref={editorRef}
+                  initialValue={loadedSql}
+                  onContentChange={handleContentChange}
+                  onRun={handleRun}
+                  onExplain={handleExplain}
+                  isLoading={execution.isLoading}
+                  sqlSchema={sqlSchema}
+                  dbType={dbType}
                 />
-              </div>
-            ) : execution.isDdlWarning ? (
-              <div className="p-3">
-                <DmlResultPanel
-                  dmlType="DDL"
-                  affectedRows={0}
-                  isDdlWarning
-                  onConfirm={() => {}}
-                  onRollback={() => {}}
-                />
-              </div>
-            ) : hasSelectResult ? (
-              <DataGrid
-                result={execution.result!}
-                pageOffset={page * pageSize}
-                orderBy={null}
-                onToggleSort={() => {}}
-                columnVisibility={columnVisibility}
-                onColumnVisibilityChange={setColumnVisibility}
-                canEdit={false}
-                pendingChanges={new Map()}
-                insertedRows={[]}
-                getRowKey={(row) => JSON.stringify(row)}
-                onCellSave={() => {}}
-                onRowContextMenu={() => {}}
-              />
-            ) : execution.isLoading ? (
-              <div className="flex flex-1 items-center justify-center text-muted-foreground">
-                <Loader2 className="mr-2 size-4 animate-spin" />
-                <span className="text-sm">Executing...</span>
-              </div>
-            ) : null}
 
-            {/* Footer */}
-            {hasSelectResult && (
-              <DataFooter
-                rowCount={execution.result!.rowCount}
-                executionTimeMs={execution.result!.executionTimeMs}
-                page={page}
-                pageSize={pageSize}
-                isLoading={execution.isLoading}
-                onPageChange={setPage}
-                onPageSizeChange={setPageSize}
-              />
-            )}
+                {/* Error Banner */}
+                {execution.error && (
+                  <div className="flex items-center gap-2 bg-destructive/10 px-3 py-2">
+                    <span className="flex-1 text-xs text-destructive">{execution.error}</span>
+                    <button
+                      type="button"
+                      onClick={execution.dismissError}
+                      className="text-xs text-destructive underline"
+                    >
+                      Dismiss
+                    </button>
+                  </div>
+                )}
+
+                {/* EXPLAIN ANALYZE summary banner */}
+                {execution.explainResult?.summary && (
+                  <ExplainSummaryBanner summary={execution.explainResult.summary} />
+                )}
+
+                {/* Result area */}
+                {execution.txState ? (
+                  <div className="p-3">
+                    <DmlResultPanel
+                      dmlType={execution.txState.dmlType}
+                      affectedRows={execution.txState.affectedRows}
+                      onConfirm={execution.confirm}
+                      onRollback={execution.rollback}
+                    />
+                  </div>
+                ) : execution.isDdlWarning ? (
+                  <div className="p-3">
+                    <DmlResultPanel
+                      dmlType="DDL"
+                      affectedRows={0}
+                      isDdlWarning
+                      onConfirm={() => {}}
+                      onRollback={() => {}}
+                    />
+                  </div>
+                ) : hasSelectResult ? (
+                  <DataGrid
+                    result={execution.result!}
+                    pageOffset={page * pageSize}
+                    orderBy={null}
+                    onToggleSort={() => {}}
+                    columnVisibility={columnVisibility}
+                    onColumnVisibilityChange={setColumnVisibility}
+                    canEdit={false}
+                    pendingChanges={new Map()}
+                    insertedRows={[]}
+                    getRowKey={(row) => JSON.stringify(row)}
+                    onCellSave={() => {}}
+                    onRowContextMenu={() => {}}
+                  />
+                ) : execution.isLoading ? (
+                  <div className="flex flex-1 items-center justify-center text-muted-foreground">
+                    <Loader2 className="mr-2 size-4 animate-spin" />
+                    <span className="text-sm">Executing...</span>
+                  </div>
+                ) : null}
+
+                {/* Footer */}
+                {hasSelectResult && (
+                  <DataFooter
+                    rowCount={execution.result!.rowCount}
+                    executionTimeMs={execution.result!.executionTimeMs}
+                    page={page}
+                    pageSize={pageSize}
+                    isLoading={execution.isLoading}
+                    onPageChange={setPage}
+                    onPageSizeChange={setPageSize}
+                  />
+                )}
+              </div>
+
+              {/* Schema Sidebar */}
+              {schemaPanelOpen && (
+                <SchemaPanel
+                  tables={schemaTables}
+                  isLoading={schemaLoading}
+                  onInsert={handleSchemaInsert}
+                  onPreviewTable={setPreviewTableName}
+                  onClose={() => setSchemaPanelOpen(false)}
+                />
+              )}
+            </div>
           </>
         ) : (
           <div className="flex flex-1 items-center justify-center text-muted-foreground">
@@ -504,6 +583,16 @@ export function QueryTab({ connectionId, dbType }: QueryTabProps) {
           </div>
         )}
       </div>
+
+      {/* Table data preview modal */}
+      {previewTableName && (
+        <TablePreviewModal
+          open
+          tableName={previewTableName}
+          connectionId={connectionId}
+          onClose={() => setPreviewTableName(null)}
+        />
+      )}
     </div>
   );
 }

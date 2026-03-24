@@ -545,6 +545,7 @@ export interface IQueryHistory {
   affectedTables?: string[];
   affectedRows?: number;
   dmlType?: TDmlType;
+  explainSummary?: string;
   executedAt: string;
 }
 
@@ -554,6 +555,12 @@ export interface IQueryResult {
   rowCount: number;
   executionTimeMs: number;
   affectedRows?: number;
+}
+
+export interface IExplainResult {
+  planRows: Record<string, unknown>[];
+  summary: string;
+  rawJson?: unknown;
 }
 
 // ─── Document ───

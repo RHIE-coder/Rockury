@@ -57,4 +57,13 @@ export function registerQueryHandlers() {
       return { success: false, data: null, error: (error as Error).message };
     }
   });
+
+  ipcMain.handle(CHANNELS.QUERY_EXPLAIN_ANALYZE, async (_event, args: { connectionId: string; sql: string; dbType: string }) => {
+    try {
+      const data = await queryService.explainAnalyze(args.connectionId, args.sql, args.dbType as any);
+      return { success: true, data };
+    } catch (error) {
+      return { success: false, data: null, error: (error as Error).message };
+    }
+  });
 }

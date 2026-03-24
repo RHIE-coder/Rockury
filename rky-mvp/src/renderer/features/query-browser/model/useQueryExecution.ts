@@ -1,8 +1,9 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useRef } from 'react';
 import { queryApi } from '@/features/query-execution/api/queryApi';
 import { queryBrowserApi } from '../api/queryBrowserApi';
 import { isDdl } from '../lib/ddlDetection';
-import type { IQueryResult } from '~/shared/types/db';
+import { buildExplainSql } from '~/shared/lib/explainSql';
+import type { IQueryResult, IExplainResult, TDbType } from '~/shared/types/db';
 
 interface TxState {
   txId: string;
@@ -10,21 +11,40 @@ interface TxState {
   affectedRows: number;
 }
 
-export function useQueryExecution(connectionId: string) {
+export function useQueryExecution(connectionId: string, dbType?: TDbType) {
   const [result, setResult] = useState<IQueryResult | null>(null);
+  const [explainResult, setExplainResult] = useState<IExplainResult | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [txState, setTxState] = useState<TxState | null>(null);
   const [isDdlWarning, setIsDdlWarning] = useState(false);
 
+  // Generation counter to discard stale EXPLAIN results from previous runs
+  const genRef = useRef(0);
+
   const execute = useCallback(async (sql: string) => {
+    const gen = ++genRef.current;
     setError(null);
     setResult(null);
+    setExplainResult(null);
     setTxState(null);
     setIsDdlWarning(false);
     setIsLoading(true);
 
     try {
+      // Step 1: EXPLAIN ANALYZE (fire-and-forget, non-blocking)
+      if (dbType) {
+        queryApi
+          .explainAnalyze({ connectionId, sql, dbType })
+          .then((res) => {
+            // Discard if a newer execution has started
+            if (gen !== genRef.current) return;
+            if (res.success && res.data) setExplainResult(res.data);
+          })
+          .catch(() => {});
+      }
+
+      // Step 2: Actual query execution (existing logic unchanged)
       if (isDdl(sql)) {
         const res = await queryApi.execute({ connectionId, sql });
         if (!res.success) throw new Error((res as any).error ?? 'DDL execution failed');
@@ -33,7 +53,6 @@ export function useQueryExecution(connectionId: string) {
         return;
       }
 
-      // Detect DML after stripping leading comments
       const trimmed = sql.replace(/^\s*(--[^\n]*\n|\/\*[\s\S]*?\*\/\s*)*/g, '').trim();
       const isDml = /^(INSERT|UPDATE|DELETE)\s/i.test(trimmed);
 
@@ -49,14 +68,9 @@ export function useQueryExecution(connectionId: string) {
         }
 
         const dmlType = trimmed.split(/\s/)[0].toUpperCase();
-        setTxState({
-          txId,
-          dmlType,
-          affectedRows: execRes.data?.affectedRows ?? 0,
-        });
+        setTxState({ txId, dmlType, affectedRows: execRes.data?.affectedRows ?? 0 });
         setResult(execRes.data ?? null);
       } else {
-        // SELECT or other read queries
         const res = await queryApi.execute({ connectionId, sql });
         if (!res.success) throw new Error((res as any).error ?? 'Query failed');
         setResult(res.data ?? null);
@@ -66,7 +80,28 @@ export function useQueryExecution(connectionId: string) {
     } finally {
       setIsLoading(false);
     }
-  }, [connectionId]);
+  }, [connectionId, dbType]);
+
+  const explain = useCallback(async (sql: string) => {
+    if (!dbType) return;
+    setError(null);
+    setResult(null);
+    setExplainResult(null);
+    setTxState(null);
+    setIsDdlWarning(false);
+    setIsLoading(true);
+
+    try {
+      const explainSql = buildExplainSql(dbType, sql);
+      const res = await queryApi.execute({ connectionId, sql: explainSql });
+      if (!res.success) throw new Error((res as any).error ?? 'EXPLAIN failed');
+      setResult(res.data ?? null);
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [connectionId, dbType]);
 
   const confirm = useCallback(async () => {
     if (!txState) return;
@@ -95,11 +130,13 @@ export function useQueryExecution(connectionId: string) {
 
   return {
     result,
+    explainResult,
     error,
     isLoading,
     txState,
     isDdlWarning,
     execute,
+    explain,
     confirm,
     rollback,
     dismissError,

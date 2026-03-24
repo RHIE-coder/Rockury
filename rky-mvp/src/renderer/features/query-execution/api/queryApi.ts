@@ -11,4 +11,6 @@ export const queryApi = {
     api.QUERY_UPDATE(args),
   delete: (id: string) => api.QUERY_DELETE({ id }),
   historyList: (limit?: number) => api.QUERY_HISTORY_LIST({ limit }),
+  explainAnalyze: (args: { connectionId: string; sql: string; dbType: string }) =>
+    api.QUERY_EXPLAIN_ANALYZE(args),
 };

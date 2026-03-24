@@ -6,6 +6,7 @@ import type {
   IDiagram, IDiagramLayout, IDiagramVersion, IDiagramFilter, TDiagramType,
   ITable, TDbType, TSchemaObjectType, IDiffResult, IMigration, TMigrationDirection, IViewSnapshot,
   IQuery, IQueryResult, IQueryHistory, IQueryFolder, ICollectionFolder, ICollection, ICollectionItem, THistorySource,
+  IExplainResult,
   IDocument, TExportFormat,
   IValidationReport,
   IValidationSuite, IValidationRunResult,
@@ -299,6 +300,10 @@ export interface IEvents {
   [CHANNELS.QUERY_EXECUTE]: {
     args: { connectionId: string; sql: string };
     response: { success: boolean; data: IQueryResult };
+  };
+  [CHANNELS.QUERY_EXPLAIN_ANALYZE]: {
+    args: { connectionId: string; sql: string; dbType: string };
+    response: { success: boolean; data: IExplainResult | null; error?: string };
   };
   [CHANNELS.QUERY_LIST]: {
     args: void;
